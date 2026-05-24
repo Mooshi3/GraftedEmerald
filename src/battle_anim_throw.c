@@ -458,6 +458,12 @@ static const struct PokeBallParticles sBallParticles[POKEBALL_COUNT] =
         .animNums = 0,
         .particleAnimationFunc = MasterBallOpenParticleAnimation,
     },
+    [BALL_GRAFT] = {
+        POKE_BALL_ANIMATION(TAG_PARTICLES_ULTRA_BALL, gBattleAnimSpriteGfx_Particles, gBattleAnimSpritePal_CircleImpact),
+        .openFadeColor = RGB(31, 31, 15),
+        .animNums = 5,
+        .particleAnimationFunc = UltraBallOpenParticleAnimation,
+    },
 };
 
 const struct SpriteTemplate gPokeblockSpriteTemplate =

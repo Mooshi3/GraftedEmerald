@@ -115,6 +115,7 @@ enum {
     MENU_CATALOG_MOWER,
     MENU_CHANGE_FORM,
     MENU_CHANGE_ABILITY,
+    MENU_APPLY_GRAFT,
     MENU_FIELD_MOVES
 };
 
@@ -137,6 +138,7 @@ enum {
     ACTIONS_TAKEITEM_TOSS,
     ACTIONS_ROTOM_CATALOG,
     ACTIONS_ZYGARDE_CUBE,
+    ACTIONS_GRAFT,
 };
 
 enum {
@@ -479,6 +481,7 @@ static void CursorCb_Trade1(u8);
 static void CursorCb_Trade2(u8);
 static void CursorCb_Toss(u8);
 static void CursorCb_FieldMove(u8);
+static void CursorCb_ApplyGraft(u8);
 static void CursorCb_ChangeLevelUpMoves(u8);
 static void CursorCb_ChangeEggMoves(u8);
 static void CursorCb_ChangeTMMoves(u8);
@@ -516,6 +519,7 @@ static const u8 sText_CannotSendMonToBoxHM[] = _("Cannot send that mon to the bo
 static const u8 sText_CannotSendMonToBoxPartner[] = _("Cannot send a mon that doesn't\nbelong to you to the box.{PAUSE_UNTIL_PRESS}");
 
 // static const data
+#include "graft_menu.h"
 #include "data/party_menu.h"
 
 // code
@@ -1557,6 +1561,14 @@ static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
             }
             break;
         }
+case PARTY_ACTION_GRAFT:
+            {
+                PlaySE(SE_SELECT);
+                gGraftSelectedPartySlot = (u8)*slotPtr;
+                PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
+                Task_ClosePartyMenu(taskId);
+            }
+            break;
         default:
         case PARTY_ACTION_ABILITY_PREVENTS:
         case PARTY_ACTION_SWITCHING:
@@ -7412,6 +7424,8 @@ void ChooseMonForInBattleItem(void)
 
 static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *mon)
 {
+    if (gPartyMenu.action == PARTY_ACTION_GRAFT)
+        return ACTIONS_GRAFT;
     if (GetMonData(&gPlayerParty[1], MON_DATA_SPECIES) != SPECIES_NONE && GetMonData(mon, MON_DATA_IS_EGG) == FALSE)
     {
         if (gPartyMenu.action == PARTY_ACTION_SEND_OUT)
@@ -7420,6 +7434,15 @@ static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *mon)
             return ACTIONS_SHIFT;
     }
     return ACTIONS_SUMMARY_ONLY;
+}
+
+static void CursorCb_ApplyGraft(u8 taskId)
+{
+    u8 slot = GetCursorSelectionMonId();
+    // Store selected slot — ALL graft application happens in Cmd_graftmenu sub-states
+    gGraftSelectedPartySlot = slot;
+    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
+    Task_ExitPartyMenu(taskId);
 }
 
 static bool8 TrySwitchInPokemon(void)

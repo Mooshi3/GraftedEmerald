@@ -192,6 +192,7 @@ BattleScript_SafariBallThrow::
 BattleScript_SuccessBallThrow::
 	setbyte sMON_CAUGHT, TRUE
 	incrementgamestat GAME_STAT_POKEMON_CAPTURES
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36A, BattleScript_GraftBallCatch
 	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
 	jumpifbyte CMP_NOT_EQUAL, sEXP_CATCH, TRUE, BattleScript_TryPrintCaughtMonInfo
 	setbyte sGIVEEXP_STATE, 0
@@ -215,6 +216,56 @@ BattleScript_TryNicknameCaughtMon::
 	goto BattleScript_SuccessBallThrowEnd
 BattleScript_GiveCaughtMonEnd::
 	givecaughtmon BattleScript_SuccessBallThrowEnd
+BattleScript_GraftBallCatch::
+	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
+	waitmessage B_WAIT_TIME_LONG
+	setbyte gBattleCommunication, 0
+	graftmenu
+	jumpifbyte CMP_EQUAL, gGraftLearnMovePending, 1, BattleScript_GraftLearnMove
+	jumpifbyte CMP_NOT_EQUAL, gGraftLearnMovePending, 0, BattleScript_GraftDirectLearn
+	setbyte gBattleOutcome, B_OUTCOME_CAUGHT
+	finishturn
+
+@ Move graft: mon has room, learn directly
+BattleScript_GraftDirectLearn::
+	buffermovetolearn
+	fanfare MUS_LEVEL_UP
+	printstring STRINGID_PKMNLEARNEDMOVE
+	waitmessage B_WAIT_TIME_LONG
+	waitfanfare
+	graftrecordmove
+	setbyte gBattleOutcome, B_OUTCOME_CAUGHT
+	finishturn
+
+@ Move graft: mon has 4 moves, need to forget one
+BattleScript_GraftLearnMove::
+	buffermovetolearn
+	printstring STRINGID_TRYTOLEARNMOVE1
+	printstring STRINGID_TRYTOLEARNMOVE2
+	printstring STRINGID_TRYTOLEARNMOVE3
+	waitstate
+	setbyte sLEARNMOVE_STATE, 0
+	yesnoboxlearnmove BattleScript_GraftForgotMove
+	printstring STRINGID_DIDNOTLEARNMOVE
+	goto BattleScript_GraftBallCatchEnd
+
+BattleScript_GraftForgotMove::
+	printstring STRINGID_123POOF
+	printstring STRINGID_PKMNFORGOTMOVE
+	printstring STRINGID_ANDELLIPSIS
+
+BattleScript_GraftLearnedMove::
+	buffermovetolearn
+	fanfare MUS_LEVEL_UP
+	printstring STRINGID_PKMNLEARNEDMOVE
+	waitmessage B_WAIT_TIME_LONG
+	waitfanfare
+	graftrecordmove
+
+BattleScript_GraftBallCatchEnd::
+	setbyte gBattleOutcome, B_OUTCOME_CAUGHT
+	finishturn
+
 BattleScript_SuccessBallThrowEnd::
 	setbyte gBattleOutcome, B_OUTCOME_CAUGHT
 	finishturn

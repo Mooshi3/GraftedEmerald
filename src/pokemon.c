@@ -2,6 +2,8 @@
 #include "malloc.h"
 #include "apprentice.h"
 #include "battle.h"
+#include "graft_data.h"
+#include "pokeball.h"
 #include "battle_ai_util.h"
 #include "battle_anim.h"
 #include "battle_controllers.h"
@@ -36,6 +38,7 @@
 #include "pokedex.h"
 #include "pokeblock.h"
 #include "pokemon.h"
+#include "graft_data.h"
 #include "pokemon_animation.h"
 #include "pokemon_icon.h"
 #include "pokemon_summary_screen.h"
@@ -1255,6 +1258,18 @@ void ZeroBoxMonData(struct BoxPokemon *boxMon)
     u32 i;
     for (i = 0; i < sizeof(struct BoxPokemon); i++)
         raw[i] = 0;
+    // GRAFT: Initialize graft fields to sentinel values after memset
+    // memset sets everything to 0, but 0 = TYPE_NONE/ABILITY_NONE which
+    // are valid values (Normal type, no ability). Use 0xFF for "no override."
+    boxMon->graftTypes[0] = GRAFT_TYPE_NONE;
+    boxMon->graftTypes[1] = GRAFT_TYPE_NONE;
+    boxMon->graftAbility = GRAFT_ABILITY_NONE;  // 0 is valid (ABILITY_NONE)
+    boxMon->graftFlags = 0;  // 0 = no grafts active
+    // Stat overrides: 0 = no override (valid, since no base stat is 0)
+    for (u32 i = 0; i < 6; i++)
+        boxMon->graftStatOverrides[i] = 0;
+    for (u32 j = 0; j < 4; j++)
+        boxMon->graftMoves[j] = MOVE_NONE;
 }
 
 void ZeroMonData(struct Pokemon *mon)
@@ -1273,6 +1288,11 @@ void ZeroMonData(struct Pokemon *mon)
     SetMonData(mon, MON_DATA_SPDEF, &arg);
     arg = MAIL_NONE;
     SetMonData(mon, MON_DATA_MAIL, &arg);
+    // GRAFT: Initialize graft fields to "no override"
+    mon->box.graftTypes[0] = GRAFT_TYPE_NONE;
+    mon->box.graftTypes[1] = GRAFT_TYPE_NONE;
+    mon->box.graftAbility = GRAFT_ABILITY_NONE;
+    mon->box.graftFlags = 0;
 }
 
 void ZeroPlayerPartyMons(void)
@@ -1832,6 +1852,17 @@ void CalculateMonStats(struct Pokemon *mon)
             continue;
 
         u8 baseStat = GetSpeciesBaseStat(species, i);
+            // GRAFT: Check for stat override
+            for (u32 gSlot = 0; gSlot < PARTY_SIZE; gSlot++)
+            {
+                if (&gPlayerParty[gSlot] == mon)
+                {
+                    u16 grafted = GetGraftedStat(gSlot, i);
+                    if (grafted != GRAFT_STAT_NONE)
+                        baseStat = grafted;
+                    break;
+                }
+            }
         s32 n = (((2 * baseStat + iv[i] + ev[i] / 4) * level) / 100) + 5;
         n = ModifyStatByNature(nature, n, i);
         if (B_FRIENDSHIP_BOOST == TRUE)
@@ -1851,6 +1882,17 @@ void CalculateMonStats(struct Pokemon *mon)
     else
     {
         s32 n = 2 * GetSpeciesBaseHP(species) + iv[STAT_HP];
+        // GRAFT: Check for HP stat override
+        for (u32 gSlot = 0; gSlot < PARTY_SIZE; gSlot++)
+        {
+            if (&gPlayerParty[gSlot] == mon)
+            {
+                u16 graftedHP = GetGraftedStat(gSlot, STAT_HP);
+                if (graftedHP != GRAFT_STAT_NONE)
+                    n = 2 * graftedHP + iv[STAT_HP];
+                break;
+            }
+        }
         newMaxHP = (((n + ev[STAT_HP] / 4) * level) / 100) + level + 10;
     }
 
@@ -1885,6 +1927,7 @@ void BoxMonToMon(const struct BoxPokemon *src, struct Pokemon *dest)
     dest->maxHP = 0;
     value = MAIL_NONE;
     SetMonData(dest, MON_DATA_MAIL, &value);
+    // GRAFT: graft fields are copied via dest->box = *src above, no need to overwrite
     value = GetBoxMonData(&dest->box, MON_DATA_HP_LOST);
     CalculateMonStats(dest);
     value = GetMonData(dest, MON_DATA_MAX_HP) - value;
@@ -2962,12 +3005,23 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
         }
         case MON_DATA_DAYS_SINCE_FORM_CHANGE:
             retVal = boxMon->daysSinceFormChange;
-            break;
-        default:
-            break;
-        }
+        break;
+    case MON_DATA_GRAFT_MOVE1:
+        retVal = boxMon->graftMoves[0];
+        break;
+    case MON_DATA_GRAFT_MOVE2:
+        retVal = boxMon->graftMoves[1];
+        break;
+    case MON_DATA_GRAFT_MOVE3:
+        retVal = boxMon->graftMoves[2];
+        break;
+    case MON_DATA_GRAFT_MOVE4:
+        retVal = boxMon->graftMoves[3];
+        break;
+    default:
+        break;
     }
-
+    }
     if (field > MON_DATA_ENCRYPT_SEPARATOR)
         EncryptBoxMon(boxMon);
 
@@ -3397,6 +3451,18 @@ void SetBoxMonData(struct BoxPokemon *boxMon, s32 field, const void *dataArg)
         case MON_DATA_DAYS_SINCE_FORM_CHANGE:
             SET8(boxMon->daysSinceFormChange);
             break;
+    case MON_DATA_GRAFT_MOVE1:
+        SET16(boxMon->graftMoves[0]);
+        break;
+    case MON_DATA_GRAFT_MOVE2:
+        SET16(boxMon->graftMoves[1]);
+        break;
+    case MON_DATA_GRAFT_MOVE3:
+        SET16(boxMon->graftMoves[2]);
+        break;
+    case MON_DATA_GRAFT_MOVE4:
+        SET16(boxMon->graftMoves[3]);
+        break;
         }
     }
 
@@ -3411,6 +3477,14 @@ void CopyMon(void *dest, void *src, size_t size)
 
 u8 GiveCapturedMonToPlayer(struct Pokemon *mon)
 {
+    // GRAFT: If caught with a Graft Ball, consume the mon (skip party add)
+    if (ItemIdToBallId(gLastThrownBall) == BALL_GRAFT)
+    {
+        // Mon is consumed for grafting. Return as if given to party
+        // to avoid the "box full" error path.
+        return MON_GIVEN_TO_PARTY;
+    }
+
     s32 i;
 
     SetMonData(mon, MON_DATA_OT_NAME, gSaveBlock2Ptr->playerName);
@@ -3584,6 +3658,21 @@ enum Ability GetMonAbility(struct Pokemon *mon)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     u8 abilityNum = GetMonData(mon, MON_DATA_ABILITY_NUM);
+    // GRAFT: Check graft ability override by personality
+    {
+        s32 i;
+        u32 personality = GetMonData(mon, MON_DATA_PERSONALITY);
+        for (i = 0; i < PARTY_SIZE; i++)
+        {
+            if (GetMonData(&gPlayerParty[i], MON_DATA_PERSONALITY) == personality)
+            {
+                u16 graftedAbility = GetGraftedAbility(i);
+                if (graftedAbility != GRAFT_ABILITY_NONE)
+                    return (enum Ability)graftedAbility;
+                break;
+            }
+        }
+    }
     return GetAbilityBySpecies(species, abilityNum);
 }
 

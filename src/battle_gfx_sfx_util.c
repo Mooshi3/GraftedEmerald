@@ -29,6 +29,7 @@
 #include "constants/battle_palace.h"
 #include "constants/battle_move_effects.h"
 #include "constants/event_objects.h" // only for SHADOW_SIZE constants
+#include "graft_data.h"
 
 // this file's functions
 static u8 GetBattlePalaceMoveGroup(enum BattlerId battler, enum Move move);
@@ -679,10 +680,26 @@ void BattleLoadMonSpriteGfx(struct Pokemon *mon, enum BattlerId battler)
 
     // Terastallization's tint
     if (GetActiveGimmick(battler) == GIMMICK_TERA)
+
     {
         BlendPalette(paletteOffset, 16, 8, GetTeraTypeRGB(GetBattlerTeraType(battler)));
         CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
     }
+        // Graft type tint: recolor sprite to show grafted types
+        // If any type differs from species default, tint with both
+        // effective type colors (highlights→type1, shadows→type2)
+        // Don't apply if terastallized (tera tint takes priority)
+        if (GetActiveGimmick(battler) != GIMMICK_TERA)
+        {
+            u8 effType1, effType2;
+            if (GetBattlerGraftedTypeInfo(battler, &effType1, &effType2))
+            {
+                u16 type1Color = gTypesInfo[effType1].teraTypeRGBValue;
+                u16 type2Color = gTypesInfo[effType2].teraTypeRGBValue;
+                BlendGraftTypePalette(paletteOffset, 16, type1Color, type2Color, 5);
+                CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
+            }
+        }
 }
 
 void BattleGfxSfxDummy2(u16 species)

@@ -124,6 +124,10 @@ enum MonData {
     MON_DATA_GIGANTAMAX_FACTOR,
     MON_DATA_TERA_TYPE,
     MON_DATA_EVOLUTION_TRACKER,
+    MON_DATA_GRAFT_MOVE1,
+    MON_DATA_GRAFT_MOVE2,
+    MON_DATA_GRAFT_MOVE3,
+    MON_DATA_GRAFT_MOVE4,
 };
 
 struct PokemonSubstruct0
@@ -278,6 +282,12 @@ struct BoxPokemon
         u32 raw[(NUM_SUBSTRUCT_BYTES * 4) / 4]; // *4 because there are 4 substructs, /4 because it's u32, not u8
         union PokemonSubstruct substructs[4];
     } secure;
+    // GRAFT: Per-mon override data (persists through PC/save)
+    u8 graftTypes[2];      // type1, type2 (0xFF = no override)
+    u16 graftAbility;      // ability override (0 = no override)
+    u8 graftFlags;         // bitmask: which grafts are active
+    u8 graftStatOverrides[6]; // HP, ATK, DEF, SPD, SPATK, SPDEF (0 = no override)
+    u16 graftMoves[4];      // grafted move IDs (MOVE_NONE = no graft move)
 };
 
 struct Pokemon

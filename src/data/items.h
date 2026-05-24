@@ -627,6 +627,21 @@ const struct ItemInfo gItemsInfo[] =
         .iconPalette = gItemIconPalette_CherishBall,
     },
 
+[ITEM_GRAFT_BALL] = {
+    .name = ITEM_NAME("Graft Ball"),
+    .price = 800,
+    .description = COMPOUND_STRING(
+        "A Ball that extracts\n"
+        "genetic material from\n"
+        "a caught Pokemon."),
+    .pocket = POCKET_POKE_BALLS,
+    .type = ITEM_USE_BAG_MENU,
+    .battleUsage = EFFECT_ITEM_THROW_BALL,
+    .secondaryId = BALL_GRAFT,
+    .iconPic = gItemIcon_UltraBall,
+    .iconPalette = gItemIconPalette_UltraBall,
+},
+
 // Medicine
 
     [ITEM_POTION] =

@@ -51,6 +51,7 @@
 #include "constants/region_map_sections.h"
 #include "constants/rgb.h"
 #include "constants/songs.h"
+#include "graft_data.h"
 
 // Screen titles (upper left)
 #define PSS_LABEL_WINDOW_POKEMON_INFO_TITLE 0
@@ -1965,6 +1966,8 @@ bool32 CheckRelearnerStateFlag(enum MoveRelearnerStates state)
         return P_TM_MOVES_RELEARNER;
     case MOVE_RELEARNER_TUTOR_MOVES:
         return FlagGet(P_FLAG_TUTOR_MOVES);
+    case MOVE_RELEARNER_GRAFT_MOVES:
+        return TRUE;
     default:
         return FALSE;
     }
@@ -2006,10 +2009,10 @@ static void TryUpdateRelearnType(enum IncrDecrUpdateValues delta)
             // should never reach this, but just in case
             break;
         case TRY_INCREMENT:
-            state = state >= MOVE_RELEARNER_TUTOR_MOVES ? MOVE_RELEARNER_LEVEL_UP_MOVES : state + 1;
+            state = state >= MOVE_RELEARNER_GRAFT_MOVES ? MOVE_RELEARNER_LEVEL_UP_MOVES : state + 1;
             break;
         case TRY_DECREMENT:
-            state = state == MOVE_RELEARNER_LEVEL_UP_MOVES ? MOVE_RELEARNER_TUTOR_MOVES : state - 1;
+            state = state == MOVE_RELEARNER_LEVEL_UP_MOVES ? MOVE_RELEARNER_GRAFT_MOVES : state - 1;
             break;
         }
 
@@ -3644,13 +3647,37 @@ static void PrintMonOTID(void)
 
 static void PrintMonAbilityName(void)
 {
-    enum Ability ability = GetAbilityBySpecies(sMonSummaryScreen->summary.species, sMonSummaryScreen->summary.abilityNum);
+    enum Ability ability;
+    // GRAFT: Check for grafted ability override
+    u16 graftedAbility;
+    if (sMonSummaryScreen->isBoxMon)
+    {
+        const struct BoxPokemon *boxMon = &sMonSummaryScreen->monList.boxMons[sMonSummaryScreen->curMonIndex];
+        graftedAbility = GetGraftedAbilityFromBoxMon(boxMon);
+    }
+    else
+    {
+        graftedAbility = GetGraftedAbility(sMonSummaryScreen->curMonIndex);
+    }
+    if (graftedAbility != GRAFT_ABILITY_NONE)
+        ability = (enum Ability)graftedAbility;
+    else
+        ability = GetAbilityBySpecies(sMonSummaryScreen->summary.species, sMonSummaryScreen->summary.abilityNum);
     PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_ABILITY), gAbilitiesInfo[ability].name, 0, 1, 0, 1);
 }
 
 static void PrintMonAbilityDescription(void)
 {
-    enum Ability ability = GetAbilityBySpecies(sMonSummaryScreen->summary.species, sMonSummaryScreen->summary.abilityNum);
+    enum Ability ability;
+    u16 graftedAbility;
+    if (sMonSummaryScreen->isBoxMon)
+        graftedAbility = GetGraftedAbilityFromBoxMon(&sMonSummaryScreen->monList.boxMons[sMonSummaryScreen->curMonIndex]);
+    else
+        graftedAbility = GetGraftedAbility(sMonSummaryScreen->curMonIndex);
+    if (graftedAbility != GRAFT_ABILITY_NONE)
+        ability = (enum Ability)graftedAbility;
+    else
+        ability = GetAbilityBySpecies(sMonSummaryScreen->summary.species, sMonSummaryScreen->summary.abilityNum);
     PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_ABILITY), gAbilitiesInfo[ability].description, 0, 17, 0, 0);
 }
 
@@ -4454,10 +4481,26 @@ static void SetMonTypeIcons(void)
     }
     else
     {
-        SetTypeSpritePosAndPal(GetSpeciesType(summary->species, 0), 120, 48, SPRITE_ARR_ID_TYPE);
-        if (GetSpeciesType(summary->species, 0) != GetSpeciesType(summary->species, 1))
+        // GRAFT: Check for grafted type overrides
+        u8 type0, type1;
+        u8 graftedType0, graftedType1;
+     if (sMonSummaryScreen->isBoxMon)
+     {
+         const struct BoxPokemon *boxMon = &sMonSummaryScreen->monList.boxMons[sMonSummaryScreen->curMonIndex];
+         graftedType0 = GetGraftedTypeFromBoxMon(boxMon, 0);
+         graftedType1 = GetGraftedTypeFromBoxMon(boxMon, 1);
+     }
+     else
+     {
+         graftedType0 = GetGraftedType(sMonSummaryScreen->curMonIndex, 0);
+        graftedType1 = GetGraftedType(sMonSummaryScreen->curMonIndex, 1);
+     }
+        type0 = (graftedType0 != GRAFT_TYPE_NONE) ? graftedType0 : GetSpeciesType(summary->species, 0);
+        type1 = (graftedType1 != GRAFT_TYPE_NONE) ? graftedType1 : GetSpeciesType(summary->species, 1);
+        SetTypeSpritePosAndPal(type0, 120, 48, SPRITE_ARR_ID_TYPE);
+        if (type0 != type1)
         {
-            SetTypeSpritePosAndPal(GetSpeciesType(summary->species, 1), 160, 48, SPRITE_ARR_ID_TYPE + 1);
+            SetTypeSpritePosAndPal(type1, 160, 48, SPRITE_ARR_ID_TYPE + 1);
             SetSpriteInvisibility(SPRITE_ARR_ID_TYPE + 1, FALSE);
         }
         else

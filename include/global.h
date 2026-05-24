@@ -1090,6 +1090,8 @@ struct Bag
     struct ItemSlot berries[BAG_BERRIES_COUNT];
 };
 
+
+
 struct SaveBlock1
 {
     /*0x00*/ struct Coords16 pos;

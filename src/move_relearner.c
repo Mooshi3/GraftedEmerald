@@ -360,6 +360,18 @@ static const struct BgTemplate sMoveRelearnerMenuBackgroundTemplates[] =
 };
 
 static void DoMoveRelearnerMain(void);
+static u16 GetRelearnerGraftMoves(struct BoxPokemon *boxMon, u16 *moves)
+{
+    u16 count = 0;
+    for (u8 i = 0; i < 4; i++)
+    {
+        u16 move = boxMon->graftMoves[i];
+        if (move != MOVE_NONE && !BoxMonKnowsMove(boxMon, move))
+            moves[count++] = move;
+    }
+    return count;
+}
+
 static void CreateLearnableMovesList(void);
 static void CreateUISprites(void);
 static void CB2_MoveRelearnerMain(void);
@@ -382,12 +394,24 @@ static u32 GetRelearnerEggMoves(struct BoxPokemon *mon, u16 *moves);
 static u32 GetRelearnerTMMoves(struct BoxPokemon *mon, u16 *moves);
 static u32 GetRelearnerTutorMoves(struct BoxPokemon *mon, u16 *moves);
 
+static bool32 HasRelearnerGraftMoves(struct BoxPokemon *boxMon)
+{
+    for (u8 i = 0; i < 4; i++)
+    {
+        u16 move = boxMon->graftMoves[i];
+        if (move != MOVE_NONE && !BoxMonKnowsMove(boxMon, move))
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static const struct RelearnType sRelearnTypes[MOVE_RELEARNER_COUNT] =
 {
     [MOVE_RELEARNER_LEVEL_UP_MOVES] = {HasRelearnerLevelUpMoves},
     [MOVE_RELEARNER_EGG_MOVES] = {HasRelearnerEggMoves},
     [MOVE_RELEARNER_TM_MOVES] = {HasRelearnerTMMoves},
     [MOVE_RELEARNER_TUTOR_MOVES] = {HasRelearnerTutorMoves},
+    [MOVE_RELEARNER_GRAFT_MOVES] = {HasRelearnerGraftMoves},
 };
 
 static void VBlankCB_MoveRelearner(void)
@@ -1051,9 +1075,38 @@ static void CreateLearnableMovesList(void)
     case MOVE_RELEARNER_TUTOR_MOVES:
         sMoveRelearnerStruct->numMenuChoices = GetRelearnerTutorMoves(boxmon, sMoveRelearnerStruct->movesToLearn);
         break;
+    case MOVE_RELEARNER_GRAFT_MOVES:
+        sMoveRelearnerStruct->numMenuChoices = GetRelearnerGraftMoves(boxmon, sMoveRelearnerStruct->movesToLearn);
+        break;
     case MOVE_RELEARNER_LEVEL_UP_MOVES:
     default:
         sMoveRelearnerStruct->numMenuChoices = GetRelearnerLevelUpMoves(boxmon, sMoveRelearnerStruct->movesToLearn);
+        // Append grafted moves not already in the list
+        {
+            u16 count = sMoveRelearnerStruct->numMenuChoices;
+            // Append grafted moves to relearner list
+                // Only show grafted moves the mon doesn't currently know
+            for (u8 g = 0; g < 4; g++)
+            {
+                u16 graftMove = boxmon->graftMoves[g];
+                if (graftMove != MOVE_NONE && !BoxMonKnowsMove(boxmon, graftMove) && count < MAX_RELEARNER_MOVES)
+                {
+                    // Check if already in the list (from level-up learnset)
+                    bool8 alreadyListed = FALSE;
+                    for (u16 j = 0; j < count; j++)
+                    {
+                        if (sMoveRelearnerStruct->movesToLearn[j] == graftMove)
+                        {
+                            alreadyListed = TRUE;
+                            break;
+                        }
+                    }
+                    if (!alreadyListed)
+                        sMoveRelearnerStruct->movesToLearn[count++] = graftMove;
+                }
+            }
+            sMoveRelearnerStruct->numMenuChoices = count;
+        }
         break;
     }
 
@@ -1332,7 +1385,7 @@ static bool32 HasRelearnerLevelUpMoves(struct BoxPokemon *boxMon)
     u32 species = GetBoxMonData(boxMon, MON_DATA_SPECIES_OR_EGG);
 
     if (species == SPECIES_EGG)
-        return FALSE;
+    return FALSE;
 
     u32 level = (P_ENABLE_ALL_LEVEL_UP_MOVES == TRUE) ? MAX_LEVEL : GetLevelFromBoxMonExp(boxMon);
 
@@ -1353,7 +1406,7 @@ static bool32 HasRelearnerLevelUpMoves(struct BoxPokemon *boxMon)
 
     } while (species != SPECIES_NONE);
 
-    return FALSE;
+    return FALSE || HasRelearnerGraftMoves(boxMon);  // GRAFT: also check graft moves
 }
 
 static bool32 HasRelearnerEggMoves(struct BoxPokemon *boxMon)

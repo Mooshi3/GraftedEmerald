@@ -38,10 +38,15 @@
 #include "task.h"
 #include "naming_screen.h"
 #include "battle_setup.h"
+#include "graft_menu.h"
+#include "party_menu.h"
+#include "graft_data.h"
+#include "palette.h"
 #include "overworld.h"
 #include "wild_encounter.h"
 #include "rtc.h"
 #include "party_menu.h"
+#include "graft_data.h"
 #include "battle_arena.h"
 #include "battle_pike.h"
 #include "battle_pyramid.h"
@@ -456,7 +461,26 @@ static void Cmd_jumptocalledmove(void);
 static void Cmd_statusanimation(void);
 static void Cmd_futuresighttargetfailure(void);
 static void Cmd_getpossiblenexttarget(void);
+static void Cmd_graftrecordmove(void)
+{
+    // Record the move that was just learned via the graft learn flow
+    // in the graftMoves history for move relearner
+    u8 partySlot = gBattleStruct->expGetterMonId;
+    u16 moveId = gMoveToLearn;
+    u8 i;
+    for (i = 0; i < 4; i++)
+    {
+        if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
+        {
+            gPlayerParty[partySlot].box.graftMoves[i] = moveId;
+            break;
+        }
+    }
+    gBattlescriptCurrInstr++;
+}
+
 static void Cmd_yesnobox(void);
+static void Cmd_graftmenu(void);
 static void Cmd_cancelallactions(void);
 static void Cmd_setgravity(void);
 static void Cmd_removeitem(void);
@@ -809,8 +833,8 @@ void (*const gBattleScriptingCommandsTable[])(void) =
     [B_SCR_OP_JUMPIFCAPTIVATEAFFECTED]               = Cmd_jumpifcaptivateaffected,
     [B_SCR_OP_SETNONVOLATILESTATUS]                  = Cmd_setnonvolatilestatus,
     [B_SCR_OP_TRYOVERWRITEABILITY]                   = Cmd_tryoverwriteability,
-    [B_SCR_OP_UNUSED_1]                              = Cmd_dummy,
-    [B_SCR_OP_UNUSED_2]                              = Cmd_dummy,
+    [B_SCR_OP_UNUSED_1] = Cmd_graftmenu,
+    [B_SCR_OP_GRAFT_RECORD_MOVE]                              = Cmd_graftrecordmove,
     [B_SCR_OP_UNUSED_3]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_4]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_5]                              = Cmd_dummy,
@@ -5296,6 +5320,25 @@ static void Cmd_switchindataupdate(void)
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
     gBattleMons[battler].ability = GetAbilityBySpecies(gBattleMons[battler].species, gBattleMons[battler].abilityNum);
+
+    // GRAFT: Override type and ability from graft data if present
+    {
+        u8 graftPartySlot = gBattlerPartyIndexes[battler];
+        u8 graftedType;
+        u16 graftedAbility;
+        if (GetBattlerSide(battler) == B_SIDE_PLAYER)
+        {
+            graftedType = GetGraftedType(graftPartySlot, 0);
+            if (graftedType != GRAFT_TYPE_NONE)
+                gBattleMons[battler].types[0] = graftedType;
+            graftedType = GetGraftedType(graftPartySlot, 1);
+            if (graftedType != GRAFT_TYPE_NONE)
+                gBattleMons[battler].types[1] = graftedType;
+            graftedAbility = GetGraftedAbility(graftPartySlot);
+            if (graftedAbility != GRAFT_ABILITY_NONE)
+                gBattleMons[battler].ability = graftedAbility;
+        }
+    }
     #if TESTING
     if (gTestRunnerEnabled)
     {
@@ -6475,6 +6518,415 @@ static void Cmd_getpossiblenexttarget(void)
         gBattlescriptCurrInstr = cmd->nextInstr;
     }
 }
+
+
+static void Cmd_graftmenu(void)
+{
+    CMD_ARGS();
+    switch (gBattleCommunication[MULTIUSE_STATE])
+    {
+    case 0:
+        // Initialize graft menu
+        StartGraftMenu();
+        gGraftLearnMovePending = FALSE;
+        gBattleCommunication[MULTIUSE_STATE] = 1;
+        gBattleCommunication[CURSOR_POSITION] = 0;
+        break;
+
+    case 1:
+        // Handle input - scroll through graft options
+        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0
+                && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
+        {
+            PlaySE(SE_SELECT);
+            gBattleCommunication[CURSOR_POSITION]--;
+            UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
+        }
+        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < 3
+                && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
+        {
+            PlaySE(SE_SELECT);
+            gBattleCommunication[CURSOR_POSITION]++;
+            UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
+        }
+        if (JOY_NEW(A_BUTTON))
+            {
+                PlaySE(SE_SELECT);
+                // Player picked a graft - open party menu to choose target mon
+                SetSelectedGraftIndex(gBattleCommunication[CURSOR_POSITION]);
+                BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
+                gBattleCommunication[MULTIUSE_STATE] = 2;
+            }
+        if (JOY_NEW(B_BUTTON))
+        {
+            PlaySE(SE_SELECT);
+            gBattlescriptCurrInstr = cmd->nextInstr;
+        }
+        break;
+
+    case 2:
+        // Wait for fade out, then open party menu
+        if (!gPaletteFade.active)
+        {
+            FreeAllWindowBuffers();
+            OpenPartyMenuInBattle(PARTY_ACTION_GRAFT);
+            gBattleCommunication[MULTIUSE_STATE] = 3;
+        }
+        break;
+
+case 3: // Wait for party menu to return to battle
+        if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2)
+        {
+            u8 graftType = GetSelectedGraftType();
+            if (graftType == GRAFT_MENU_TYPE)
+            {
+                gBattleCommunication[MULTIUSE_STATE] = 10;
+                gBattleCommunication[CURSOR_POSITION] = 0;
+                gBattleCommunication[4] = 0; // first frame flag
+            }
+            else if (graftType == GRAFT_MENU_STAT)
+            {
+                u8 partySlot = gGraftSelectedPartySlot;
+                u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
+                StringCopy(gStringVar1, GetStatNameString(GetSelectedGraftStatIndex()));
+                {
+                u8 currentStat = (&gSpeciesInfo[species].baseHP)[GetSelectedGraftStatIndex()];
+                u16 graftedCurrent = GetGraftedStat(gGraftSelectedPartySlot, GetSelectedGraftStatIndex());
+                if (graftedCurrent != GRAFT_STAT_NONE)
+                    currentStat = graftedCurrent;
+                ConvertIntToDecimalStringN(gStringVar2, currentStat, STR_CONV_MODE_LEFT_ALIGN, 3);
+            }
+                ConvertIntToDecimalStringN(gStringVar3, GetSelectedGraftStatValue(), STR_CONV_MODE_LEFT_ALIGN, 3);
+                FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
+                StringExpandPlaceholders(gStringVar4, GetText_StatCompare());
+                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+                gBattleCommunication[MULTIUSE_STATE] = 12;
+                gBattleCommunication[CURSOR_POSITION] = 0;
+                gBattleCommunication[4] = 0;  // first frame flag for stat yes/no
+            }
+            else if (graftType == GRAFT_MENU_MOVE)
+            {
+                gBattleCommunication[MULTIUSE_STATE] = 14;
+                gBattleCommunication[4] = 0;  // first frame flag for move confirm
+                gBattleCommunication[CURSOR_POSITION] = 0;
+            }
+            else if (graftType == GRAFT_MENU_ABILITY)
+            {
+                SetGraftedAbility(gGraftSelectedPartySlot, GetSelectedGraftValue());
+                gBattlescriptCurrInstr = cmd->nextInstr;
+            }
+        else if (graftType == GRAFT_MENU_NATURE)
+            {
+                u8 natureId = GetSelectedGraftValue();
+                u8 partySlot = gGraftSelectedPartySlot;
+                u8 currentNature = GetNatureFromPersonality(GetMonData(&gPlayerParty[partySlot], MON_DATA_PERSONALITY));
+                u8 hiddenNature = GetMonData(&gPlayerParty[partySlot], MON_DATA_HIDDEN_NATURE);
+                if (hiddenNature != NATURE_HARDY) currentNature = hiddenNature;
+                // Build STR_VAR_1: "OldNature +STAT -STAT"
+                StringCopy(gStringVar1, gNaturesInfo[currentNature].name);
+                if (gNaturesInfo[currentNature].statUp != gNaturesInfo[currentNature].statDown)
+                {
+                    StringAppend(gStringVar1, COMPOUND_STRING(" +"));
+                    StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[currentNature].statUp));
+                    StringAppend(gStringVar1, COMPOUND_STRING(" -"));
+                    StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[currentNature].statDown));
+                }
+                // Build STR_VAR_2: "NewNature +STAT -STAT"
+                StringCopy(gStringVar2, gNaturesInfo[natureId].name);
+                if (gNaturesInfo[natureId].statUp != gNaturesInfo[natureId].statDown)
+                {
+                    StringAppend(gStringVar2, COMPOUND_STRING(" +"));
+                    StringAppend(gStringVar2, GetStatNameString(gNaturesInfo[natureId].statUp));
+                    StringAppend(gStringVar2, COMPOUND_STRING(" -"));
+                    StringAppend(gStringVar2, GetStatNameString(gNaturesInfo[natureId].statDown));
+                }
+                // Display new nature then replace prompt with old nature
+                FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
+                StringExpandPlaceholders(gStringVar4, GetText_NatureApply());
+                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+                gBattleCommunication[MULTIUSE_STATE] = 16;
+                gBattleCommunication[CURSOR_POSITION] = 0;
+            }
+            else
+            {
+                gBattlescriptCurrInstr = cmd->nextInstr;
+            }
+        }
+        break;
+    case 4:
+        gBattlescriptCurrInstr = cmd->nextInstr;
+        break;
+
+    // TYPE SLOT PICKER
+    case 10:
+        // Show initial type info on first frame
+        if (gBattleCommunication[4] == 0)
+        {
+            u8 partySlot = gGraftSelectedPartySlot;
+            u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
+            u8 t0 = GetGraftedType(partySlot, 0);
+            u8 t1 = GetGraftedType(partySlot, 1);
+            u8 newType = (u8)GetSelectedGraftValue();
+            if (t0 == GRAFT_TYPE_NONE) t0 = GetSpeciesType(species, 0);
+            if (t1 == GRAFT_TYPE_NONE) t1 = GetSpeciesType(species, 1);
+            StringCopy(gStringVar1, gTypesInfo[t0].name);
+            StringCopy(gStringVar2, gTypesInfo[newType].name);
+            StringExpandPlaceholders(gStringVar4, GetText_ReplaceType1());
+            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+            gBattleCommunication[4] = 1;
+        }
+        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
+        {
+            PlaySE(SE_SELECT);
+            gBattleCommunication[CURSOR_POSITION] = 0;
+            {
+                u8 partySlot = gGraftSelectedPartySlot;
+                u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
+                u8 t = GetGraftedType(partySlot, 0);
+                u8 newType = (u8)GetSelectedGraftValue();
+                if (t == GRAFT_TYPE_NONE) t = GetSpeciesType(species, 0);
+                StringCopy(gStringVar1, gTypesInfo[t].name);
+                StringCopy(gStringVar2, gTypesInfo[newType].name);
+                StringExpandPlaceholders(gStringVar4, GetText_ReplaceType1());
+                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+            }
+        }
+        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
+        {
+            PlaySE(SE_SELECT);
+            gBattleCommunication[CURSOR_POSITION] = 1;
+            {
+                u8 partySlot = gGraftSelectedPartySlot;
+                u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
+                u8 t = GetGraftedType(partySlot, 1);
+                u8 newType = (u8)GetSelectedGraftValue();
+                if (t == GRAFT_TYPE_NONE) t = GetSpeciesType(species, 1);
+                StringCopy(gStringVar1, gTypesInfo[t].name);
+                StringCopy(gStringVar2, gTypesInfo[newType].name);
+                StringExpandPlaceholders(gStringVar4, GetText_ReplaceType2());
+                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+            }
+        }
+        if (JOY_NEW(A_BUTTON))
+        {
+            PlaySE(SE_SELECT);
+            {
+                u8 partySlot = gGraftSelectedPartySlot;
+                SetGraftedType(partySlot, gBattleCommunication[CURSOR_POSITION], (u8)GetSelectedGraftValue());
+            }
+            gBattlescriptCurrInstr = cmd->nextInstr;
+        }
+        if (JOY_NEW(B_BUTTON))
+        {
+            PlaySE(SE_SELECT);
+            gBattlescriptCurrInstr = cmd->nextInstr;
+        }
+        break;
+
+// STAT CONFIRMATION
+            case 12:
+                // Wait for stat comparison text to finish printing
+                if (gBattleCommunication[4] == 0)
+                {
+                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
+                    {
+                        HandleBattleWindow(YESNOBOX_X_Y, 0);
+                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
+                        gBattleCommunication[CURSOR_POSITION] = 0;
+                        BattleCreateYesNoCursorAt(0);
+                        gBattleCommunication[4] = 1;
+                    }
+                }
+                // Handle cursor
+                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 0;
+                    BattleCreateYesNoCursorAt(0);
+                }
+                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 1;
+                    BattleCreateYesNoCursorAt(1);
+                }
+                if (JOY_NEW(A_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    if (gBattleCommunication[CURSOR_POSITION] == 0)
+                    {
+                        u8 partySlot = gGraftSelectedPartySlot;
+                        SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
+                    }
+                    gBattlescriptCurrInstr = cmd->nextInstr;
+                }
+                if (JOY_NEW(B_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    gBattlescriptCurrInstr = cmd->nextInstr;
+                }
+                break;
+
+// MOVE CONFIRMATION
+            case 14:
+                // Show "learn [move]?" prompt on first frame
+                if (gBattleCommunication[4] == 0)
+                {
+                    StringCopy(gStringVar1, gMovesInfo[GetSelectedGraftValue()].name);
+                    StringExpandPlaceholders(gStringVar4, GetText_MoveLearn());
+                    BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+                    gBattleCommunication[4] = 1;
+                }
+                // Wait for text to finish printing, then show yes/no box
+                if (gBattleCommunication[4] == 1)
+                {
+                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
+                    {
+                        HandleBattleWindow(YESNOBOX_X_Y, 0);
+                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
+                        gBattleCommunication[CURSOR_POSITION] = 0;
+                        BattleCreateYesNoCursorAt(0);
+                        gBattleCommunication[4] = 2;
+                    }
+                }
+                // Handle cursor
+                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 0;
+                    BattleCreateYesNoCursorAt(0);
+                }
+                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 1;
+                    BattleCreateYesNoCursorAt(1);
+                }
+                if (JOY_NEW(A_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    if (gBattleCommunication[CURSOR_POSITION] == 0)
+                    {
+                        // YES - learn the move
+                        gMoveToLearn = GetSelectedGraftValue();
+                        gBattleStruct->expGetterMonId = gGraftSelectedPartySlot;
+                        PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, gGraftSelectedPartySlot);
+                        {
+                            u8 slot = gGraftSelectedPartySlot;
+                            u8 moveCount = 0;
+                            for (u8 i = 0; i < MAX_MON_MOVES; i++)
+                            {
+                                if (GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i) != MOVE_NONE)
+                                    moveCount++;
+                            }
+                            if (moveCount < MAX_MON_MOVES)
+                            {
+                                u8 i;
+                                for (i = 0; i < MAX_MON_MOVES; i++)
+                                {
+                                    if (GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i) == MOVE_NONE)
+                                    {
+                                        SetMonMoveSlot(&gPlayerParty[slot], gMoveToLearn, i);
+                                        {
+                                            u8 g;
+                                            for (g = 0; g < 4; g++)
+                                            {
+                                                if (gPlayerParty[slot].box.graftMoves[g] == MOVE_NONE)
+                                                {
+                                                    gPlayerParty[slot].box.graftMoves[g] = gMoveToLearn;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, slot);
+                                BufferMoveToLearnIntoBattleTextBuff2();
+                                gGraftLearnMovePending = 2;
+                                gBattlescriptCurrInstr = cmd->nextInstr;
+                            }
+                            else
+                            {
+                                gGraftLearnMovePending = TRUE;
+                                gBattlescriptCurrInstr = cmd->nextInstr;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // NO - cancel
+                        gGraftLearnMovePending = FALSE;
+                        gBattlescriptCurrInstr = cmd->nextInstr;
+                    }
+                }
+                if (JOY_NEW(B_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    gGraftLearnMovePending = FALSE;
+                    gBattlescriptCurrInstr = cmd->nextInstr;
+                }
+                break;
+    // NATURE CONFIRMATION
+            case 16:
+                // Wait for nature text to finish printing
+                if (gBattleCommunication[4] == 0)
+                {
+                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
+                    {
+                        HandleBattleWindow(YESNOBOX_X_Y, 0);
+                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
+                        gBattleCommunication[CURSOR_POSITION] = 0;
+                        BattleCreateYesNoCursorAt(0);
+                        gBattleCommunication[4] = 1;
+                    }
+                }
+                // Handle cursor movement
+                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 0;
+                    BattleCreateYesNoCursorAt(0);
+                }
+                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
+                {
+                    PlaySE(SE_SELECT);
+                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
+                    gBattleCommunication[CURSOR_POSITION] = 1;
+                    BattleCreateYesNoCursorAt(1);
+                }
+                // A button: confirm selection
+                if (JOY_NEW(A_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    if (gBattleCommunication[CURSOR_POSITION] == 0)
+                    {
+                        // YES - apply nature graft
+                        SetGraftedNature(gGraftSelectedPartySlot, GetSelectedGraftValue());
+                    }
+                    gBattlescriptCurrInstr = cmd->nextInstr;
+                }
+                // B button: always cancel
+                if (JOY_NEW(B_BUTTON))
+                {
+                    PlaySE(SE_SELECT);
+                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                    gBattlescriptCurrInstr = cmd->nextInstr;
+                }
+                break;
+    }
+}
+
 
 static void Cmd_yesnobox(void)
 {

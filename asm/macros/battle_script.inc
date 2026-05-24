@@ -620,6 +620,14 @@
 	.byte B_SCR_OP_YESNOBOX
 	.endm
 
+
+.macro graftmenu
+	.byte B_SCR_OP_UNUSED_1
+.endm
+
+.macro graftrecordmove
+	.byte B_SCR_OP_GRAFT_RECORD_MOVE
+	.endm
 	.macro cancelallactions
 	.byte B_SCR_OP_CANCELALLACTIONS
 	.endm

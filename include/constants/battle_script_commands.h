@@ -233,7 +233,7 @@ enum BattleScriptOpcode
     // They are reserved for expansion usage.
     // Use callnatives instead.
     B_SCR_OP_UNUSED_1,
-    B_SCR_OP_UNUSED_2,
+    B_SCR_OP_GRAFT_RECORD_MOVE,
     B_SCR_OP_UNUSED_3,
     B_SCR_OP_UNUSED_4,
     B_SCR_OP_UNUSED_5,
