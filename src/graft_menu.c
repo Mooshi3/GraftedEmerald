@@ -150,28 +150,57 @@ static void GenerateGraftRoll(u16 species)
         switch (type)
         {
         case GRAFT_MENU_MOVE:
+{
+            // Pick a random move, avoiding duplicates already in this roll
+            u16 move = MOVE_NONE;
+            u8 j;
+            // Collect unique moves from the caught mon
+            u16 uniqueMoves[4];
+            u8 uniqueCount = 0;
+            for (j = 0; j < MAX_MON_MOVES; j++)
             {
-                // Pick a random move, avoiding duplicates already in this roll
-                u16 move;
-                u8 j;
-                for (attempts = 0; attempts < 10; attempts++)
+                u16 m = gBattleMons[gBattlerTarget].moves[j];
+                if (m != MOVE_NONE)
                 {
-                    u8 moveSlot = RandomUniform(RNG_BALLTHROW_SHAKE, 0, MAX_MON_MOVES - 1);
-                    move = gBattleMons[gBattlerTarget].moves[moveSlot];
-                    if (move == MOVE_NONE)
-                        move = gBattleMons[gBattlerTarget].moves[0];
-                    // Check if already used in this roll
-                    for (j = 0; j < usedMoveCount; j++)
+                    u8 k;
+                    for (k = 0; k < uniqueCount; k++)
                     {
-                        if (usedMoves[j] == move)
+                        if (uniqueMoves[k] == m)
                             break;
                     }
-                    if (j == usedMoveCount)
-                        break;  // not a duplicate, use it
+                    if (k == uniqueCount)
+                        uniqueMoves[uniqueCount++] = m;
                 }
+            }
+            // Filter out moves already used in this roll
+            u8 availableCount = 0;
+            u8 availableIdx[4];
+            for (j = 0; j < uniqueCount; j++)
+            {
+                u8 k;
+                for (k = 0; k < usedMoveCount; k++)
+                {
+                    if (usedMoves[k] == uniqueMoves[j])
+                        break;
+                }
+                if (k == usedMoveCount)
+                    availableIdx[availableCount++] = j;
+            }
+            if (availableCount > 0)
+            {
+                u8 pick = RandomUniform(RNG_BALLTHROW_SHAKE, 0, availableCount - 1);
+                move = uniqueMoves[availableIdx[pick]];
                 sGraftRoll[i].value = move;
                 usedMoves[usedMoveCount++] = move;
             }
+            else
+            {
+                // All unique moves already used - pick a random one anyway
+                u8 pick = RandomUniform(RNG_BALLTHROW_SHAKE, 0, (uniqueCount > 0 ? uniqueCount : 1) - 1);
+                move = uniqueMoves[pick];
+                sGraftRoll[i].value = move;
+            }
+        }
             break;
         case GRAFT_MENU_ABILITY:
             // Use the caught mon's actual ability

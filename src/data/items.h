@@ -629,7 +629,7 @@ const struct ItemInfo gItemsInfo[] =
 
 [ITEM_GRAFT_BALL] = {
     .name = ITEM_NAME("Graft Ball"),
-    .price = 800,
+    .price = 400,
     .description = COMPOUND_STRING(
         "A Ball that extracts\n"
         "genetic material from\n"

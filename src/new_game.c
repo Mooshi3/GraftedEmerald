@@ -204,13 +204,7 @@ void NewGameInitData(void)
     DeactivateAllRoamers();
     gSaveBlock1Ptr->registeredItem = ITEM_NONE;
     ClearBag();
-    AddBagItem(ITEM_GRAFT_BALL, 99); // GRAFT: Start with 99 Graft Balls
     InitGraftData();
-    AddBagItem(ITEM_POKE_BALL, 30);
-    AddBagItem(ITEM_POTION, 10);
-    // GRAFT TEST: Give player starters immediately
-    ScriptGiveMon(SPECIES_MUDKIP, 5, ITEM_NONE);
-    ScriptGiveMon(SPECIES_SHUPPET, 5, ITEM_NONE);
     NewGameInitPCItems();
     ClearPokeblocks();
     ClearDecorationInventories();
