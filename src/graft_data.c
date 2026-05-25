@@ -57,6 +57,31 @@ u8 GetMonEffectiveType(u16 species, u8 partySlot, u8 typeIndex)
     return gSpeciesInfo[species].types[typeIndex];
 }
 
+// Get effective type from a struct Pokemon pointer (checks grafts first)
+u8 GetEffectiveTypeFromMon(struct Pokemon *mon, u8 typeIndex)
+{
+    u16 species = GetMonData(mon, MON_DATA_SPECIES);
+    if (typeIndex > 1)
+        return GetSpeciesType(species, typeIndex);
+    u8 grafted = mon->box.graftTypes[typeIndex];
+    if (grafted != GRAFT_TYPE_NONE)
+        return grafted;
+    return GetSpeciesType(species, typeIndex);
+}
+
+// Get effective type from a struct BoxPokemon pointer (checks grafts first)
+u8 GetEffectiveTypeFromBoxMon(struct BoxPokemon *boxMon, u8 typeIndex)
+{
+    u16 species = GetMonData((struct Pokemon *)boxMon, MON_DATA_SPECIES);
+    if (typeIndex > 1)
+        return GetSpeciesType(species, typeIndex);
+    u8 grafted = boxMon->graftTypes[typeIndex];
+    if (grafted != GRAFT_TYPE_NONE)
+        return grafted;
+    return GetSpeciesType(species, typeIndex);
+}
+
+
 // Get grafted ability for a party mon
 u16 GetGraftedAbility(u8 partySlot)
 {

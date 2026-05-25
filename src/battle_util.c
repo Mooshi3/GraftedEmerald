@@ -5,6 +5,7 @@
 #include "battle_environment.h"
 #include "battle_pyramid.h"
 #include "battle_util.h"
+#include "graft_data.h"
 #include "battle_controllers.h"
 #include "battle_interface.h"
 #include "battle_setup.h"
@@ -8427,7 +8428,7 @@ uq4_12_t CalcTypeEffectivenessMultiplier(struct BattleContext *ctx)
     return modifier;
 }
 
-uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef)
+uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef, s8 partySlotDef)
 {
     uq4_12_t modifier = UQ_4_12(1.0);
     enum Type moveType = GetBattleMoveType(move);
@@ -8440,7 +8441,8 @@ uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef,
         ctx.updateFlags = FALSE;
         ctx.abilityDef = abilityDef;
 
-        MulByTypeEffectiveness(&ctx, &modifier, GetSpeciesType(speciesDef, 0));
+        enum Type defType0 = (partySlotDef >= 0) ? GetMonEffectiveType(speciesDef, partySlotDef, 0) : GetSpeciesType(speciesDef, 0);
+    MulByTypeEffectiveness(&ctx, &modifier, defType0);
         if (GetSpeciesType(speciesDef, 1) != GetSpeciesType(speciesDef, 0))
             MulByTypeEffectiveness(&ctx, &modifier, GetSpeciesType(speciesDef, 1));
 
@@ -8483,8 +8485,8 @@ uq4_12_t GetOverworldTypeEffectiveness(struct Pokemon *mon, enum Type moveType)
     ctx.updateFlags = FALSE;
 
     u32 speciesDef = GetMonData(mon, MON_DATA_SPECIES);
-    enum Type type1 = GetSpeciesType(speciesDef, 0);
-    enum Type type2 = GetSpeciesType(speciesDef, 1);
+    enum Type type1 = GetEffectiveTypeFromMon(mon, 0);
+    enum Type type2 = GetEffectiveTypeFromMon(mon, 1);
 
     MulByTypeEffectiveness(&ctx, &modifier, type1);
     if (type2 != type1)
@@ -9577,6 +9579,16 @@ void CopyMonAbilityAndTypesToBattleMon(enum BattlerId battler, struct Pokemon *m
     gBattleMons[battler].types[0] = GetSpeciesType(gBattleMons[battler].species, 0);
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
+    // GRAFT: Override types from graft data if present (player side only)
+    if (GetBattlerSide(battler) == B_SIDE_PLAYER) {
+        u8 graftPartySlot = gBattlerPartyIndexes[battler];
+        u8 gt0 = GetGraftedType(graftPartySlot, 0);
+        u8 gt1 = GetGraftedType(graftPartySlot, 1);
+        if (gt0 != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[0] = gt0;
+        if (gt1 != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[1] = gt1;
+    }
 }
 
 void RecalcBattlerStats(enum BattlerId battler, struct Pokemon *mon, bool32 isDynamaxing)
@@ -9739,7 +9751,7 @@ bool32 CanMonParticipateInSkyBattle(struct Pokemon *mon)
     u32 monAbilityNum = GetMonData(mon, MON_DATA_ABILITY_NUM);
 
     bool32 hasLevitateAbility = GetSpeciesAbility(species, monAbilityNum) == ABILITY_LEVITATE;
-    bool32 isFlyingType = GetSpeciesType(species, 0) == TYPE_FLYING || GetSpeciesType(species, 1) == TYPE_FLYING;
+    bool32 isFlyingType = GetEffectiveTypeFromMon(mon, 0) == TYPE_FLYING || GetEffectiveTypeFromMon(mon, 1) == TYPE_FLYING;
     bool32 monIsValidAndNotEgg = GetMonData(mon, MON_DATA_SANITY_HAS_SPECIES) && !GetMonData(mon, MON_DATA_IS_EGG);
 
     if (monIsValidAndNotEgg)

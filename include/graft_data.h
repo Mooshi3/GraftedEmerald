@@ -30,6 +30,8 @@ void InitGraftData(void);
 // Sprite tinting
 void BlendGraftTypePalette(u16 palOffset, u16 numEntries, u32 type1Color, u32 type2Color, u8 coeff);
 bool8 GetBattlerGraftedTypeInfo(u8 battler, u8 *effectiveType1, u8 *effectiveType2);
+u8 GetEffectiveTypeFromMon(struct Pokemon *mon, u8 typeIndex);
+u8 GetEffectiveTypeFromBoxMon(struct BoxPokemon *boxMon, u8 typeIndex);
 
 #endif // GUARD_GRAFT_DATA_H
 
