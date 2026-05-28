@@ -340,36 +340,35 @@ static u32 WriteCategoryOptionName(u8 category, u8 *dest)
         break;
     case GRAFT_CATEGORY_MOVE:
     {
-        // Show category label + count of available moves
-        u8 count = 0;
-        u8 i;
-        for (i = 0; i < 4; i++)
-        {
-            if (sGraftSource.moves[i] != MOVE_NONE)
-                count++;
-        }
-        ConvertIntToDecimalStringN(gStringVar1, count, STR_CONV_MODE_LEFT_ALIGN, 1);
-        StringExpandPlaceholders(dest, COMPOUND_STRING("MOVE ({STR_VAR_1})"));
+        StringExpandPlaceholders(dest, COMPOUND_STRING("Graft a move"));
         break;
     }
     case GRAFT_CATEGORY_TYPE:
     {
-        // Show type category with the two type names
         StringCopy(gStringVar1, gTypesInfo[sGraftSource.types[0]].name);
         if (sGraftSource.types[0] != sGraftSource.types[1])
         {
             StringAppend(gStringVar1, COMPOUND_STRING("/"));
             StringAppend(gStringVar1, gTypesInfo[sGraftSource.types[1]].name);
         }
-        StringExpandPlaceholders(dest, COMPOUND_STRING("TYPE: {STR_VAR_1}"));
+        StringExpandPlaceholders(dest, COMPOUND_STRING("Graft a type: {STR_VAR_1}"));
         break;
     }
     case GRAFT_CATEGORY_NATURE:
+    {
         StringCopy(gStringVar1, gNaturesInfo[sGraftSource.nature].name);
+        if (gNaturesInfo[sGraftSource.nature].statUp != gNaturesInfo[sGraftSource.nature].statDown)
+        {
+            StringAppend(gStringVar1, COMPOUND_STRING(" +"));
+            StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[sGraftSource.nature].statUp));
+            StringAppend(gStringVar1, COMPOUND_STRING(" -"));
+            StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[sGraftSource.nature].statDown));
+        }
         StringExpandPlaceholders(dest, COMPOUND_STRING("NATURE: {STR_VAR_1}"));
+    }
         break;
     case GRAFT_CATEGORY_STAT:
-        StringExpandPlaceholders(dest, COMPOUND_STRING("STAT (6)"));
+        StringExpandPlaceholders(dest, COMPOUND_STRING("Graft a base stat"));
         break;
     }
     return StringLength(dest);

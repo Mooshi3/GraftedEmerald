@@ -6580,7 +6580,7 @@ static void Cmd_graftmenu(void)
 
                         }
                     }
-                gBattleCommunication[MULTIUSE_STATE] = 2;
+
             }
         if (JOY_NEW(B_BUTTON))
         {
