@@ -16,6 +16,7 @@ PetalburgCity_Mart_EventScript_Clerk::
 PetalburgCity_Mart_Pokemart_Basic:
 	.2byte ITEM_POKE_BALL
 .2byte ITEM_GRAFT_BALL
+.2byte ITEM_GRAFT_SPLICER
 	.2byte ITEM_POTION
 	.2byte ITEM_ANTIDOTE
 	.2byte ITEM_PARALYZE_HEAL
@@ -38,6 +39,7 @@ PetalburgCity_Mart_EventScript_ExpandedItems::
 PetalburgCity_Mart_Pokemart_Expanded:
 	.2byte ITEM_POKE_BALL
 .2byte ITEM_GRAFT_BALL
+.2byte ITEM_GRAFT_SPLICER
 	.2byte ITEM_GREAT_BALL
 	.2byte ITEM_POTION
 	.2byte ITEM_SUPER_POTION

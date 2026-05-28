@@ -642,6 +642,23 @@ const struct ItemInfo gItemsInfo[] =
     .iconPalette = gItemIconPalette_UltraBall,
 },
 
+// Graft Splicer
+[ITEM_GRAFT_SPLICER] = {
+    .name = ITEM_NAME("Graft Splicer"),
+    .price = 800,
+    .holdEffectParam = 0,
+    .description = COMPOUND_STRING(
+        "Sacrifice a Pokemon to\n"
+        "extract a graft for\n"
+        "another team member."),
+    .pocket = POCKET_ITEMS,
+    .sortType = ITEM_TYPE_FIELD_USE,
+    .type = ITEM_USE_PARTY_MENU,
+    .fieldUseFunc = ItemUseOutOfBattle_GraftSplicer,
+    .iconPic = gItemIcon_AbilityCapsule,
+    .iconPalette = gItemIconPalette_AbilityCapsule,
+},
+
 // Medicine
 
     [ITEM_POTION] =

@@ -1790,6 +1790,12 @@ u8 UpdateSpritePaletteWithTime(u8 paletteNum)
 
 static void OverworldBasic(void)
 {
+    // DEBUG: Select+R gives 999999 money
+    if (JOY_HELD(SELECT_BUTTON) && JOY_NEW(R_BUTTON))
+    {
+        u32 money = 999999;
+        SetMoney(&gSaveBlock1Ptr->money, money);
+    }
     ScriptContext_RunScript();
     RunTasks();
     AnimateSprites();

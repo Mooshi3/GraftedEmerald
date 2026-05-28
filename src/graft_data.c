@@ -106,46 +106,41 @@ void SetGraftedAbility(u8 partySlot, u16 ability)
 void ApplyMoveGraft(u8 partySlot, u16 moveId)
 {
     struct Pokemon *mon = &gPlayerParty[partySlot];
-    u16 existingMove;
     u8 emptySlot = MAX_MON_MOVES;
-    for (u8 i = 0; i < MAX_MON_MOVES; i++)
+    u8 i;
+
+    // Find an empty move slot
+    for (i = 0; i < MAX_MON_MOVES; i++)
     {
-        existingMove = GetMonData(mon, MON_DATA_MOVE1 + i);
-        if (existingMove == MOVE_NONE)
+        if (GetMonData(mon, MON_DATA_MOVE1 + i) == MOVE_NONE)
         {
             emptySlot = i;
             break;
-            // Record graft move in history for move relearner
-    {
-        u8 i;
-        for (i = 0; i < 4; i++)
-        {
-            if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
-            {
-                gPlayerParty[partySlot].box.graftMoves[i] = moveId;
-                break;
-            }
         }
     }
-}
-        // Record graft move in history for move relearner
-    {
-        u8 i;
-        for (i = 0; i < 4; i++)
-        {
-            if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
-            {
-                gPlayerParty[partySlot].box.graftMoves[i] = moveId;
-                break;
-            }
-        }
-    }
-}
+
+    // If all 4 moves are known, overwrite the last slot
+    // TODO: Show move deletion dialog instead of silent overwrite
     if (emptySlot >= MAX_MON_MOVES)
         emptySlot = MAX_MON_MOVES - 1;
+
+    // Teach the move
     SetMonData(mon, MON_DATA_MOVE1 + emptySlot, &moveId);
-    u8 pp = GetMovePP(moveId);
-    SetMonData(mon, MON_DATA_PP1 + emptySlot, &pp);
+    {
+        u8 pp = GetMovePP(moveId);
+        SetMonData(mon, MON_DATA_PP1 + emptySlot, &pp);
+    }
+
+    // Record graft move in history for move relearner
+    for (i = 0; i < 4; i++)
+    {
+        if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
+        {
+            gPlayerParty[partySlot].box.graftMoves[i] = moveId;
+            break;
+        }
+    }
+
     mon->box.graftFlags |= GRAFT_FLAG_MOVE;
 }
 
@@ -226,7 +221,6 @@ void BlendGraftTypePalette(u16 palOffset, u16 numEntries, u32 type1Color, u32 ty
         s16 g = src->g;
         s16 b = src->b;
         u16 brightness;
-        u16 type1Weight, type2Weight, totalWeight;
         s16 targetR, targetG, targetB;
 
         // Skip transparent entry (index 0)
@@ -236,34 +230,36 @@ void BlendGraftTypePalette(u16 palOffset, u16 numEntries, u32 type1Color, u32 ty
         // Measure brightness (0 to ~93 in RGB555)
         brightness = r + g + b;
 
-        // Weight type colors by brightness:
-        // bright pixels → more type1 color (highlights)
-        // dark pixels → more type2 color (shadows)
-        // This creates a natural-looking split tint
-        if (brightness >= 40)
+        // Distinct two-color tinting:
+        // bright pixels (highlights) → tint toward type1 ONLY
+        // dark pixels (shadows) → tint toward type2 ONLY
+        // mid-range → smooth crossfade between the two
+        // This keeps the two type colors visually distinct instead of muddy blend
+        if (brightness >= 60)
         {
-            type1Weight = 3;
-            type2Weight = 1;
+            // Bright: pure type1 tint
+            targetR = c1->r;
+            targetG = c1->g;
+            targetB = c1->b;
         }
-        else if (brightness >= 20)
+        else if (brightness >= 30)
         {
-            type1Weight = 2;
-            type2Weight = 2;
+            // Mid: crossfade from type1 to type2
+            // 60 brightness = 100% type1, 30 brightness = 0% type1 (100% type2)
+            u8 type1Fraction = (brightness - 30) * 255 / 30;
+            targetR = ((c1->r * type1Fraction) + (c2->r * (255 - type1Fraction))) >> 8;
+            targetG = ((c1->g * type1Fraction) + (c2->g * (255 - type1Fraction))) >> 8;
+            targetB = ((c1->b * type1Fraction) + (c2->b * (255 - type1Fraction))) >> 8;
         }
         else
         {
-            type1Weight = 1;
-            type2Weight = 3;
+            // Dark: pure type2 tint
+            targetR = c2->r;
+            targetG = c2->g;
+            targetB = c2->b;
         }
 
-        totalWeight = type1Weight + type2Weight;
-
-        // Calculate blended target color
-        targetR = ((c1->r * type1Weight) + (c2->r * type2Weight)) / totalWeight;
-        targetG = ((c1->g * type1Weight) + (c2->g * type2Weight)) / totalWeight;
-        targetB = ((c1->b * type1Weight) + (c2->b * type2Weight)) / totalWeight;
-
-        // Blend original toward target
+        // Blend original pixel toward target color
         gPlttBufferFaded[index] = RGB(
             r + ((targetR - r) * coeff >> 4),
             g + ((targetG - g) * coeff >> 4),

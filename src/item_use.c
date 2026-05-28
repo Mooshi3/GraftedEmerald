@@ -873,6 +873,13 @@ void ItemUseOutOfBattle_AbilityPatch(u8 taskId)
     SetUpItemUseCallback(taskId);
 }
 
+
+// GRAFT SPLICER
+void ItemUseOutOfBattle_GraftSplicer(u8 taskId)
+{
+    gItemUseCB = ItemUseCB_GraftSplicer;
+    SetUpItemUseCallback(taskId);
+}
 void ItemUseOutOfBattle_Mint(u8 taskId)
 {
     gItemUseCB = ItemUseCB_Mint;

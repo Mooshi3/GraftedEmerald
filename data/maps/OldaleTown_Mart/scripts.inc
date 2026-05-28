@@ -30,6 +30,7 @@ OldaleTown_Mart_ExpandedItems::
 OldaleTown_Mart_Pokemart_Expanded:
 	.2byte ITEM_POKE_BALL
 .2byte ITEM_GRAFT_BALL
+.2byte ITEM_GRAFT_SPLICER
 	.2byte ITEM_POTION
 	.2byte ITEM_ANTIDOTE
 	.2byte ITEM_PARALYZE_HEAL
