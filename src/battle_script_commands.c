@@ -6567,12 +6567,21 @@ static void Cmd_graftmenu(void)
                     // Route to submenu based on category
                     {
                         u8 cat = GetSelectedGraftCategory();
-                        if (cat == GRAFT_CATEGORY_TYPE)
-                            gBattleCommunication[MULTIUSE_STATE] = 20;
-                        else if (cat == GRAFT_CATEGORY_MOVE)
-                            gBattleCommunication[MULTIUSE_STATE] = 21;
-                        else if (cat == GRAFT_CATEGORY_STAT)
-                            gBattleCommunication[MULTIUSE_STATE] = 22;
+                if (cat == GRAFT_CATEGORY_TYPE)
+                {
+                    gBattleCommunication[MULTIUSE_STATE] = 20;
+                    gBattleCommunication[4] = 0;
+                }
+                else if (cat == GRAFT_CATEGORY_MOVE)
+                {
+                    gBattleCommunication[MULTIUSE_STATE] = 21;
+                    gBattleCommunication[4] = 0;
+                }
+                else if (cat == GRAFT_CATEGORY_STAT)
+                {
+                    gBattleCommunication[MULTIUSE_STATE] = 22;
+                    gBattleCommunication[4] = 0;
+                }
                         else
                         {
                             // Ability and Nature don't need submenus - go to party menu
