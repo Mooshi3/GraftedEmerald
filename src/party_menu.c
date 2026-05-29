@@ -1573,6 +1573,12 @@ case PARTY_ACTION_GRAFT:
                 Task_ClosePartyMenu(taskId);
             }
             break;
+        case PARTY_ACTION_SPLICER:
+        {
+            PlaySE(SE_SELECT);
+            CursorCb_GraftSplicerTarget(taskId);
+        }
+        break;
         default:
         case PARTY_ACTION_ABILITY_PREVENTS:
         case PARTY_ACTION_SWITCHING:
