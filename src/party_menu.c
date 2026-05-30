@@ -5566,6 +5566,24 @@ static void Task_LearnNextMoveOrClosePartyMenu(u8 taskId)
         {
             if (gPartyMenu.learnMoveState == 2) // never occurs
                 gSpecialVar_Result = TRUE;
+            // GRAFT: If we came from the Graft Splicer move-forget flow,
+            // record the graft move and consume the item before closing.
+            if (gGraftLearnMovePending)
+            {
+                u8 targetSlot = gPartyMenu.slotId;
+                u16 moveId = gPartyMenu.data1;
+                u8 g;
+                for (g = 0; g < 4; g++)
+                {
+                    if (gPlayerParty[targetSlot].box.graftMoves[g] == MOVE_NONE)
+                    {
+                        gPlayerParty[targetSlot].box.graftMoves[g] = moveId;
+                        break;
+                    }
+                }
+                RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
+                gGraftLearnMovePending = FALSE;
+            }
             Task_ClosePartyMenu(taskId);
         }
     }
@@ -8789,6 +8807,28 @@ void Task_GraftSplicer(u8 taskId)
     {
         u8 targetSlot = gPartyMenu.slotId;
         u8 graftType = GetSelectedGraftType();
+            // Release the sacrifice mon NOW — we already have the graft data,
+            // and the move-forget flow reinitializes the party menu, destroying
+            // splicer state. Releasing early avoids needing to preserve state.
+            {
+                u8 sacrificeSlot = gPartyMenu.slotId2;
+                u8 partyCount = CalculatePlayerPartyCount();
+                // Adjust targetSlot if it is after the sacrifice slot
+                if (targetSlot > sacrificeSlot)
+                    targetSlot--;
+                if (sacrificeSlot < partyCount - 1)
+                {
+                    u8 i;
+                    for (i = sacrificeSlot; i < partyCount - 1; i++)
+                        CopyMon(&gPlayerParty[i], &gPlayerParty[i + 1], sizeof(struct Pokemon));
+                    ZeroMonData(&gPlayerParty[partyCount - 1]);
+                }
+                else
+                {
+                    ZeroMonData(&gPlayerParty[sacrificeSlot]);
+                }
+                gPartyMenu.slotId = targetSlot;
+            }
  
         if (graftType == GRAFT_MENU_MOVE)
         {
@@ -9021,23 +9061,6 @@ void Task_GraftSplicer(u8 taskId)
             return;
         // Consume the Graft Splicer item
         RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
-        // Release the sacrificed mon
-        {
-            u8 sacrificeSlot = gPartyMenu.slotId2;
-            u8 partyCount = CalculatePlayerPartyCount();
-            if (sacrificeSlot < partyCount - 1)
-            {
-                // Shift party down
-                u8 i;
-                for (i = sacrificeSlot; i < partyCount - 1; i++)
-                    CopyMon(&gPlayerParty[i], &gPlayerParty[i + 1], sizeof(struct Pokemon));
-                ZeroMonData(&gPlayerParty[partyCount - 1]);
-            }
-            else
-            {
-                ZeroMonData(&gPlayerParty[sacrificeSlot]);
-            }
-        }
         gPartyMenuUseExitCallback = TRUE;
         gTasks[taskId].func = Task_ClosePartyMenu;
         sPartyMenuInternal->data[0] = SPLICER_DONE;
