@@ -6586,6 +6586,7 @@ static void Cmd_graftmenu(void)
                         {
                             // Ability and Nature don't need submenus - go to party menu
                             BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
+                    gBattleCommunication[MULTIUSE_STATE] = 2;
 
                         }
                     }

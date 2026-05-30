@@ -523,6 +523,7 @@ static const u8 sText_CannotSendMonToBoxPartner[] = _("Cannot send a mon that do
 
 // static const data
 #include "graft_menu.h"
+#include "graft_data.h"
 #include "battle_main.h"
 #include "data/party_menu.h"
 
@@ -8397,6 +8398,7 @@ enum SplicerState
     SPLICER_CANCEL_TARGET,
     SPLICER_MOVE_CONFIRM,
     SPLICER_MOVE_REPLACE_YESNO,
+    SPLICER_TYPE_SLOT,
     SPLICER_APPLY_FINISH,
 };
 
@@ -8406,6 +8408,8 @@ static const u8 sText_SplicerEgg[] = _("Eggs can't be\nsacrificed.");
 static const u8 sText_SplicerSameMon[] = _("Can't graft onto\nthe same Pokémon.");
 static const u8 sText_SplicerTeachMove[] = _("Teach {STR_VAR_2}\nto {STR_VAR_1}?");
 static const u8 sText_SplicerMoveReplaced[] = _("{STR_VAR_1} learned\n{STR_VAR_2}!");
+static const u8 sText_SplicerTypeSlot1[] = _("Replace type1 ({STR_VAR_1})\nwith {STR_VAR_2}?");
+static const u8 sText_SplicerTypeSlot2[] = _("Replace type2 ({STR_VAR_1})\nwith {STR_VAR_2}?");
 static const u8 sText_SplicerApplied[] = _("Graft applied!\n{STR_VAR_1} was released.");
 
 void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
@@ -8810,6 +8814,65 @@ void Task_GraftSplicer(u8 taskId)
     }
     break;
 
+    case SPLICER_TYPE_SLOT:
+        if (IsPartyMenuTextPrinterActive() == TRUE)
+            return;
+        {
+            u8 targetSlot = gPartyMenu.slotId;
+            u16 species = GetMonData(&gPlayerParty[targetSlot], MON_DATA_SPECIES);
+            u8 newType = (u8)GetSelectedGraftValue();
+            if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] == 0)
+            {
+                PlaySE(SE_SELECT);
+                sPartyMenuInternal->data[1] = 1;
+                {
+                    u8 t = GetGraftedType(targetSlot, 1);
+                    if (t == GRAFT_TYPE_NONE)
+                        t = GetSpeciesType(species, 1);
+                    StringCopy(gStringVar1, gTypesInfo[t].name);
+                    StringCopy(gStringVar2, gTypesInfo[newType].name);
+                    StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot2);
+                    StringAppend(gStringVar4, COMPOUND_STRING("\n{UP_ARROW} 2/2"));
+                }
+                DisplayPartyMenuMessage(gStringVar4, TRUE);
+                ScheduleBgCopyTilemapToVram(2);
+            }
+            if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] == 1)
+            {
+                PlaySE(SE_SELECT);
+                sPartyMenuInternal->data[1] = 0;
+                {
+                    u8 t = GetGraftedType(targetSlot, 0);
+                    if (t == GRAFT_TYPE_NONE)
+                        t = GetSpeciesType(species, 0);
+                    StringCopy(gStringVar1, gTypesInfo[t].name);
+                    StringCopy(gStringVar2, gTypesInfo[newType].name);
+                    StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot1);
+                    StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
+                }
+                DisplayPartyMenuMessage(gStringVar4, TRUE);
+                ScheduleBgCopyTilemapToVram(2);
+            }
+            if (JOY_NEW(A_BUTTON))
+            {
+                PlaySE(SE_SELECT);
+                SetGraftedType(targetSlot, sPartyMenuInternal->data[1], newType);
+                GetMonNickname(&gPlayerParty[gPartyMenu.slotId2], gStringVar1);
+                StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
+                DisplayPartyMenuMessage(gStringVar4, TRUE);
+                ScheduleBgCopyTilemapToVram(2);
+                sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
+            }
+            if (JOY_NEW(B_BUTTON))
+            {
+                PlaySE(SE_SELECT);
+                DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+                gTasks[taskId].func = Task_HandleChooseMonInput;
+                sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
+            }
+        }
+        break;
+
     case SPLICER_MOVE_CONFIRM:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
@@ -8931,6 +8994,8 @@ void Task_GraftSplicer(u8 taskId)
     case SPLICER_APPLY_FINISH:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
+        // Consume the Graft Splicer item
+        RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
         // Release the sacrificed mon
         {
             u8 sacrificeSlot = gPartyMenu.slotId2;
