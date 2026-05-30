@@ -1570,6 +1570,7 @@ case PARTY_ACTION_GRAFT:
             {
                 PlaySE(SE_SELECT);
                 gGraftSelectedPartySlot = (u8)*slotPtr;
+                gGraftSelectedPartyPersonality = GetMonData(&gPlayerParty[(u8)*slotPtr], MON_DATA_PERSONALITY);
                 PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
                 Task_ClosePartyMenu(taskId);
             }

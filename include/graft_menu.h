@@ -50,6 +50,8 @@ struct GraftOption {
 
 // Global: selected party slot for graft application
 extern u8 gGraftSelectedPartySlot;
+extern u32 gGraftSelectedPartyPersonality;
+extern u8 ResolveGraftTargetSlot(void);
 extern bool8 gGraftLearnMovePending;
 
 void GatherGraftSourceDataBattle(void);

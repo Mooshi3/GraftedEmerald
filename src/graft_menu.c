@@ -21,6 +21,18 @@
 
 // Global variables
 u8 gGraftSelectedPartySlot = 0;
+u32 gGraftSelectedPartyPersonality = 0;
+
+u8 ResolveGraftTargetSlot(void)
+{
+    s32 i;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (GetMonData(&gPlayerParty[i], MON_DATA_PERSONALITY) == gGraftSelectedPartyPersonality)
+            return (u8)i;
+    }
+    return gGraftSelectedPartySlot; // fallback
+}
 bool8 gGraftLearnMovePending = FALSE;
 
 // ============================================================

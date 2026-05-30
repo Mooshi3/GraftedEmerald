@@ -6621,12 +6621,12 @@ case 3: // Wait for party menu to return to battle
             }
             else if (graftType == GRAFT_MENU_STAT)
             {
-                u8 partySlot = gGraftSelectedPartySlot;
+                u8 partySlot = ResolveGraftTargetSlot();
                 u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
                 StringCopy(gStringVar1, GetStatNameString(GetSelectedGraftStatIndex()));
                 {
                 u8 currentStat = (&gSpeciesInfo[species].baseHP)[GetSelectedGraftStatIndex()];
-                u16 graftedCurrent = GetGraftedStat(gGraftSelectedPartySlot, GetSelectedGraftStatIndex());
+                u16 graftedCurrent = GetGraftedStat(ResolveGraftTargetSlot(), GetSelectedGraftStatIndex());
                 if (graftedCurrent != GRAFT_STAT_NONE)
                     currentStat = graftedCurrent;
                 ConvertIntToDecimalStringN(gStringVar2, currentStat, STR_CONV_MODE_LEFT_ALIGN, 3);
@@ -6643,7 +6643,7 @@ case 3: // Wait for party menu to return to battle
             {
                     // Apply move graft directly
                     {
-                        u8 slot = gGraftSelectedPartySlot;
+                        u8 slot = ResolveGraftTargetSlot();
                         u16 moveId = GetSelectedGraftValue();
                         u8 moveCount = 0;
                         u8 k;
@@ -6687,13 +6687,13 @@ case 3: // Wait for party menu to return to battle
             }
             else if (graftType == GRAFT_MENU_ABILITY)
             {
-                SetGraftedAbility(gGraftSelectedPartySlot, GetSelectedGraftValue());
+                SetGraftedAbility(ResolveGraftTargetSlot(), GetSelectedGraftValue());
                 gBattlescriptCurrInstr = cmd->nextInstr;
             }
         else if (graftType == GRAFT_MENU_NATURE)
             {
                 u8 natureId = GetSelectedGraftValue();
-                u8 partySlot = gGraftSelectedPartySlot;
+                u8 partySlot = ResolveGraftTargetSlot();
                 u8 currentNature = GetNatureFromPersonality(GetMonData(&gPlayerParty[partySlot], MON_DATA_PERSONALITY));
                 u8 hiddenNature = GetMonData(&gPlayerParty[partySlot], MON_DATA_HIDDEN_NATURE);
                 if (hiddenNature != NATURE_HARDY) currentNature = hiddenNature;
@@ -6951,7 +6951,7 @@ case 3: // Wait for party menu to return to battle
         // Show initial type info on first frame
         if (gBattleCommunication[4] == 0)
         {
-            u8 partySlot = gGraftSelectedPartySlot;
+            u8 partySlot = ResolveGraftTargetSlot();
             u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
             u8 t0 = GetGraftedType(partySlot, 0);
             u8 t1 = GetGraftedType(partySlot, 1);
@@ -6969,7 +6969,7 @@ case 3: // Wait for party menu to return to battle
             PlaySE(SE_SELECT);
             gBattleCommunication[CURSOR_POSITION] = 0;
             {
-                u8 partySlot = gGraftSelectedPartySlot;
+                u8 partySlot = ResolveGraftTargetSlot();
                 u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
                 u8 t = GetGraftedType(partySlot, 0);
                 u8 newType = (u8)GetSelectedGraftValue();
@@ -6985,7 +6985,7 @@ case 3: // Wait for party menu to return to battle
             PlaySE(SE_SELECT);
             gBattleCommunication[CURSOR_POSITION] = 1;
             {
-                u8 partySlot = gGraftSelectedPartySlot;
+                u8 partySlot = ResolveGraftTargetSlot();
                 u16 species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
                 u8 t = GetGraftedType(partySlot, 1);
                 u8 newType = (u8)GetSelectedGraftValue();
@@ -7000,7 +7000,7 @@ case 3: // Wait for party menu to return to battle
         {
             PlaySE(SE_SELECT);
             {
-                u8 partySlot = gGraftSelectedPartySlot;
+                u8 partySlot = ResolveGraftTargetSlot();
                 SetGraftedType(partySlot, gBattleCommunication[CURSOR_POSITION], (u8)GetSelectedGraftValue());
             }
             gBattlescriptCurrInstr = cmd->nextInstr;
@@ -7047,7 +7047,7 @@ case 3: // Wait for party menu to return to battle
                     HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
                     if (gBattleCommunication[CURSOR_POSITION] == 0)
                     {
-                        u8 partySlot = gGraftSelectedPartySlot;
+                        u8 partySlot = ResolveGraftTargetSlot();
                         SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
                     }
                     gBattlescriptCurrInstr = cmd->nextInstr;
@@ -7105,10 +7105,10 @@ case 3: // Wait for party menu to return to battle
                     {
                         // YES - learn the move
                         gMoveToLearn = GetSelectedGraftValue();
-                        gBattleStruct->expGetterMonId = gGraftSelectedPartySlot;
-                        PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, gGraftSelectedPartySlot);
+                        gBattleStruct->expGetterMonId = ResolveGraftTargetSlot();
+                        PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, ResolveGraftTargetSlot());
                         {
-                            u8 slot = gGraftSelectedPartySlot;
+                            u8 slot = ResolveGraftTargetSlot();
                             u8 moveCount = 0;
                             for (u8 i = 0; i < MAX_MON_MOVES; i++)
                             {
@@ -7201,7 +7201,7 @@ case 3: // Wait for party menu to return to battle
                     if (gBattleCommunication[CURSOR_POSITION] == 0)
                     {
                         // YES - apply nature graft
-                        SetGraftedNature(gGraftSelectedPartySlot, GetSelectedGraftValue());
+                        SetGraftedNature(ResolveGraftTargetSlot(), GetSelectedGraftValue());
                     }
                     gBattlescriptCurrInstr = cmd->nextInstr;
                 }
