@@ -6569,8 +6569,19 @@ static void Cmd_graftmenu(void)
                         u8 cat = GetSelectedGraftCategory();
                 if (cat == GRAFT_CATEGORY_TYPE)
                 {
-                    gBattleCommunication[MULTIUSE_STATE] = 20;
-                    gBattleCommunication[4] = 0;
+                    // Skip submenu if mono-type (both types are the same)
+                    if (GetGraftSourceType(0) == GetGraftSourceType(1))
+                    {
+                        SetGraftMenuSubCursor(0);
+                        SetSelectedGraftFromCategory();
+                        BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
+                        gBattleCommunication[MULTIUSE_STATE] = 2;
+                    }
+                    else
+                    {
+                        gBattleCommunication[MULTIUSE_STATE] = 20;
+                        gBattleCommunication[4] = 0;
+                    }
                 }
                 else if (cat == GRAFT_CATEGORY_MOVE)
                 {

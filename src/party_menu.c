@@ -8542,7 +8542,22 @@ void Task_GraftSplicer(u8 taskId)
                     DisplayPartyMenuMessage(gStringVar4, TRUE);
                     ScheduleBgCopyTilemapToVram(2);
                 }
-                else if (cat == GRAFT_CATEGORY_TYPE)
+            else if (cat == GRAFT_CATEGORY_TYPE)
+            {
+                // Skip submenu if mono-type (both types are the same)
+                if (GetGraftSourceType(0) == GetGraftSourceType(1))
+                {
+                    SetGraftMenuSubCursor(0);
+                    SetSelectedGraftFromCategory();
+                    sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
+                    gPartyMenu.action = PARTY_ACTION_SPLICER;
+                    AnimatePartySlot(gPartyMenu.slotId2, 1);
+                    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+                    ClearWindowTilemap(WIN_MSG);
+                    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+                    gTasks[taskId].func = Task_HandleChooseMonInput;
+                }
+                else
                 {
                     sPartyMenuInternal->data[1] = 0;
                     sPartyMenuInternal->data[0] = SPLICER_SUBMENU_TYPE;
@@ -8552,6 +8567,7 @@ void Task_GraftSplicer(u8 taskId)
                     DisplayPartyMenuMessage(gStringVar4, TRUE);
                     ScheduleBgCopyTilemapToVram(2);
                 }
+            }
                 else if (cat == GRAFT_CATEGORY_STAT)
                 {
                     sPartyMenuInternal->data[1] = 0;
