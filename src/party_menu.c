@@ -8916,6 +8916,8 @@ void Task_GraftSplicer(u8 taskId)
                     // 4 moves - ask to forget one
                     sPartyMenuInternal->data[2] = moveId;
                     gPartyMenu.data1 = moveId;
+                    GetMonNickname(mon, gStringVar1);
+                    StringCopy(gStringVar2, GetMoveName(moveId));
                     DisplayPartyMenuMessage(gText_PkmnNeedsToReplaceMove, TRUE);
                     ScheduleBgCopyTilemapToVram(2);
                     sPartyMenuInternal->data[0] = 100; // wait for text, then forget
