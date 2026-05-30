@@ -52,6 +52,7 @@
 #include "constants/rgb.h"
 #include "constants/songs.h"
 #include "graft_data.h"
+#include "battle_main.h"
 
 // Screen titles (upper left)
 #define PSS_LABEL_WINDOW_POKEMON_INFO_TITLE 0
@@ -304,6 +305,7 @@ static void SetNewMoveTypeIcon(void);
 static void SwapMovesTypeSprites(u8, u8);
 static u8 LoadMonGfxAndSprite(struct Pokemon *, s16 *);
 static u8 CreateMonSprite(struct Pokemon *);
+static void ApplyGraftPaletteToSummarySprite(u8 spriteId, struct Pokemon *mon);
 static void SpriteCB_Pokemon(struct Sprite *);
 static void StopPokemonAnimations(void);
 static void CreateMonMarkingsSprite(struct Pokemon *);
@@ -1367,6 +1369,7 @@ static bool8 LoadGraphics(void)
         sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON] = LoadMonGfxAndSprite(&sMonSummaryScreen->currentMon, &sMonSummaryScreen->switchCounter);
         if (sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON] != SPRITE_NONE)
         {
+                ApplyGraftPaletteToSummarySprite(sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON], &sMonSummaryScreen->currentMon);
             sMonSummaryScreen->switchCounter = 0;
             gMain.state++;
         }
@@ -2146,6 +2149,7 @@ static void Task_ChangeSummaryMon(u8 taskId)
         sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON] = LoadMonGfxAndSprite(&sMonSummaryScreen->currentMon, &data[1]);
         if (sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON] == SPRITE_NONE)
             return;
+            ApplyGraftPaletteToSummarySprite(sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON], &sMonSummaryScreen->currentMon);
         gSprites[sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_MON]].data[2] = 1;
         TryDrawExperienceProgressBar();
         data[1] = 0;
@@ -4659,6 +4663,26 @@ static void PlayMonCry(void)
     }
 }
 
+
+// GRAFT: Apply type palette swap to a summary screen sprite if the mon has grafted types
+static void ApplyGraftPaletteToSummarySprite(u8 spriteId, struct Pokemon *mon)
+{
+    u8 effType1, effType2;
+    u16 species = GetMonData(mon, MON_DATA_SPECIES);
+    u8 gType1 = GetGraftedTypeFromBoxMon(&mon->box, 0);
+    u8 gType2 = GetGraftedTypeFromBoxMon(&mon->box, 1);
+    effType1 = (gType1 != GRAFT_TYPE_NONE) ? gType1 : gSpeciesInfo[species].types[0];
+    effType2 = (gType2 != GRAFT_TYPE_NONE) ? gType2 : gSpeciesInfo[species].types[1];
+    if (gType1 != GRAFT_TYPE_NONE || gType2 != GRAFT_TYPE_NONE)
+    {
+        u16 palOffset = OBJ_PLTT_ID(gSprites[spriteId].oam.paletteNum);
+        u32 type1Color = gTypesInfo[effType1].teraTypeRGBValue;
+        u32 type2Color = gTypesInfo[effType2].teraTypeRGBValue;
+        bool8 isDualType = (effType1 != effType2);
+        ApplyGraftTypePaletteSwap(palOffset, 16, type1Color, type2Color, isDualType);
+        CpuCopy32(gPlttBufferFaded + palOffset, gPlttBufferUnfaded + palOffset, PLTT_SIZEOF(16));
+    }
+}
 static u8 CreateMonSprite(struct Pokemon *unused)
 {
     struct PokeSummary *summary = &sMonSummaryScreen->summary;
