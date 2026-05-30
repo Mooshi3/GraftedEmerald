@@ -6720,6 +6720,7 @@ case 3: // Wait for party menu to return to battle
                 StringExpandPlaceholders(gStringVar4, GetText_NatureApply());
                 BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
                 gBattleCommunication[MULTIUSE_STATE] = 16;
+            gBattleCommunication[4] = 0;
                 gBattleCommunication[CURSOR_POSITION] = 0;
             }
             else
