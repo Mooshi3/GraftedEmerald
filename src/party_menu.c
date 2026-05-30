@@ -8788,11 +8788,13 @@ void Task_GraftSplicer(u8 taskId)
     {
         u8 targetSlot = gPartyMenu.slotId;
         u8 graftType = GetSelectedGraftType();
+ 
         if (graftType == GRAFT_MENU_MOVE)
         {
-            // Move graft - show confirmation
+            // Move graft — show the "Teach X to Y?" confirmation.
             u16 moveId = GetSelectedGraftValue();
             struct Pokemon *mon = &gPlayerParty[targetSlot];
+ 
             GetMonNickname(mon, gStringVar1);
             StringCopy(gStringVar2, GetMoveName(moveId));
             StringExpandPlaceholders(gStringVar4, sText_SplicerTeachMove);
@@ -8801,9 +8803,30 @@ void Task_GraftSplicer(u8 taskId)
             ScheduleBgCopyTilemapToVram(2);
             sPartyMenuInternal->data[0] = SPLICER_MOVE_CONFIRM;
         }
+        else if (graftType == GRAFT_MENU_TYPE)
+        {
+            // Type graft — go to the type-slot picker (slot 1 / slot 2 chooser).
+            u16 species = GetMonData(&gPlayerParty[targetSlot], MON_DATA_SPECIES);
+            u8 t0 = GetGraftedType(targetSlot, 0);
+            u8 newType = (u8)GetSelectedGraftValue();
+ 
+            sPartyMenuInternal->data[1] = 0; // start on slot 1
+ 
+            if (t0 == GRAFT_TYPE_NONE)
+                t0 = GetSpeciesType(species, 0);
+            StringCopy(gStringVar1, gTypesInfo[t0].name);
+            StringCopy(gStringVar2, gTypesInfo[newType].name);
+            StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot1);
+            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
+ 
+            PlaySE(SE_SELECT);
+            DisplayPartyMenuMessage(gStringVar4, TRUE);
+            ScheduleBgCopyTilemapToVram(2);
+            sPartyMenuInternal->data[0] = SPLICER_TYPE_SLOT;
+        }
         else
         {
-            // Non-move graft - apply directly
+            // Ability / Stat / Nature — no extra prompt, apply immediately.
             ApplyGraftFromMenuToSlot(targetSlot);
             GetMonNickname(&gPlayerParty[gPartyMenu.slotId2], gStringVar1);
             StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
@@ -8918,8 +8941,7 @@ void Task_GraftSplicer(u8 taskId)
                     gPartyMenu.data1 = moveId;
                     GetMonNickname(mon, gStringVar1);
                     StringCopy(gStringVar2, GetMoveName(moveId));
-                    DisplayPartyMenuMessage(gText_PkmnNeedsToReplaceMove, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
+                    DisplayLearnMoveMessage(gText_PkmnNeedsToReplaceMove);
                     sPartyMenuInternal->data[0] = 100; // wait for text, then forget
                 }
             }
