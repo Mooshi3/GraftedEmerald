@@ -9579,11 +9579,11 @@ void CopyMonAbilityAndTypesToBattleMon(enum BattlerId battler, struct Pokemon *m
     gBattleMons[battler].types[0] = GetSpeciesType(gBattleMons[battler].species, 0);
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
-    // GRAFT: Override types from graft data if present (player side only)
-    if (GetBattlerSide(battler) == B_SIDE_PLAYER) {
-        u8 graftPartySlot = gBattlerPartyIndexes[battler];
-        u8 gt0 = GetGraftedType(graftPartySlot, 0);
-        u8 gt1 = GetGraftedType(graftPartySlot, 1);
+    // GRAFT: Override types from graft data (direct BoxMon accessor)
+    if (GetBattlerSide(battler) == B_SIDE_PLAYER)
+    {
+        u8 gt0 = GetGraftedTypeFromBoxMon(&mon->box, 0);
+        u8 gt1 = GetGraftedTypeFromBoxMon(&mon->box, 1);
         if (gt0 != GRAFT_TYPE_NONE)
             gBattleMons[battler].types[0] = gt0;
         if (gt1 != GRAFT_TYPE_NONE)

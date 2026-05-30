@@ -1852,16 +1852,11 @@ void CalculateMonStats(struct Pokemon *mon)
             continue;
 
         u8 baseStat = GetSpeciesBaseStat(species, i);
-            // GRAFT: Check for stat override
-            for (u32 gSlot = 0; gSlot < PARTY_SIZE; gSlot++)
+            // GRAFT: Check for stat override (direct BoxMon accessor)
             {
-                if (&gPlayerParty[gSlot] == mon)
-                {
-                    u16 grafted = GetGraftedStat(gSlot, i);
-                    if (grafted != GRAFT_STAT_NONE)
-                        baseStat = grafted;
-                    break;
-                }
+                u16 grafted = GetGraftedStatFromBoxMon(&mon->box, i);
+                if (grafted != GRAFT_STAT_NONE)
+                    baseStat = grafted;
             }
         s32 n = (((2 * baseStat + iv[i] + ev[i] / 4) * level) / 100) + 5;
         n = ModifyStatByNature(nature, n, i);
@@ -1882,17 +1877,12 @@ void CalculateMonStats(struct Pokemon *mon)
     else
     {
         s32 n = 2 * GetSpeciesBaseHP(species) + iv[STAT_HP];
-        // GRAFT: Check for HP stat override
-        for (u32 gSlot = 0; gSlot < PARTY_SIZE; gSlot++)
-        {
-            if (&gPlayerParty[gSlot] == mon)
-            {
-                u16 graftedHP = GetGraftedStat(gSlot, STAT_HP);
-                if (graftedHP != GRAFT_STAT_NONE)
-                    n = 2 * graftedHP + iv[STAT_HP];
-                break;
-            }
-        }
+                // GRAFT: Check for HP stat override (direct BoxMon accessor)
+                {
+                    u16 graftedHP = GetGraftedStatFromBoxMon(&mon->box, STAT_HP);
+                    if (graftedHP != GRAFT_STAT_NONE)
+                        n = 2 * graftedHP + iv[STAT_HP];
+                }
         newMaxHP = (((n + ev[STAT_HP] / 4) * level) / 100) + level + 10;
     }
 
@@ -3658,20 +3648,11 @@ enum Ability GetMonAbility(struct Pokemon *mon)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     u8 abilityNum = GetMonData(mon, MON_DATA_ABILITY_NUM);
-    // GRAFT: Check graft ability override by personality
+    // GRAFT: Check graft ability override directly on the mon
     {
-        s32 i;
-        u32 personality = GetMonData(mon, MON_DATA_PERSONALITY);
-        for (i = 0; i < PARTY_SIZE; i++)
-        {
-            if (GetMonData(&gPlayerParty[i], MON_DATA_PERSONALITY) == personality)
-            {
-                u16 graftedAbility = GetGraftedAbility(i);
-                if (graftedAbility != GRAFT_ABILITY_NONE)
-                    return (enum Ability)graftedAbility;
-                break;
-            }
-        }
+        u16 graftedAbility = GetGraftedAbilityFromBoxMon(&mon->box);
+        if (graftedAbility != GRAFT_ABILITY_NONE)
+            return (enum Ability)graftedAbility;
     }
     return GetAbilityBySpecies(species, abilityNum);
 }

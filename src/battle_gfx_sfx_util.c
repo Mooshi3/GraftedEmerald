@@ -696,7 +696,7 @@ void BattleLoadMonSpriteGfx(struct Pokemon *mon, enum BattlerId battler)
             {
                 u16 type1Color = gTypesInfo[effType1].teraTypeRGBValue;
                 u16 type2Color = gTypesInfo[effType2].teraTypeRGBValue;
-                BlendGraftTypePalette(paletteOffset, 16, type1Color, type2Color, 5);
+                ApplyGraftTypePaletteSwap(paletteOffset, 16, type1Color, type2Color, (effType1 != effType2));
                 CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
             }
         }
