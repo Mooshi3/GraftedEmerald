@@ -4676,8 +4676,8 @@ static void ApplyGraftPaletteToSummarySprite(u8 spriteId, struct Pokemon *mon)
     if (gType1 != GRAFT_TYPE_NONE || gType2 != GRAFT_TYPE_NONE)
     {
         u16 palOffset = OBJ_PLTT_ID(gSprites[spriteId].oam.paletteNum);
-        u32 type1Color = gTypesInfo[effType1].teraTypeRGBValue;
-        u32 type2Color = gTypesInfo[effType2].teraTypeRGBValue;
+        u32 type1Color = gTypesInfo[effType1].graftPaletteRGBValue;
+        u32 type2Color = gTypesInfo[effType2].graftPaletteRGBValue;
         bool8 isDualType = (effType1 != effType2);
         ApplyGraftTypePaletteSwap(palOffset, 16, type1Color, type2Color, isDualType);
         CpuCopy32(gPlttBufferFaded + palOffset, gPlttBufferUnfaded + palOffset, PLTT_SIZEOF(16));

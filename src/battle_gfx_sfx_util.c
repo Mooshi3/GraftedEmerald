@@ -694,8 +694,8 @@ void BattleLoadMonSpriteGfx(struct Pokemon *mon, enum BattlerId battler)
             u8 effType1, effType2;
             if (GetBattlerGraftedTypeInfo(battler, &effType1, &effType2))
             {
-                u16 type1Color = gTypesInfo[effType1].teraTypeRGBValue;
-                u16 type2Color = gTypesInfo[effType2].teraTypeRGBValue;
+                u16 type1Color = gTypesInfo[effType1].graftPaletteRGBValue;
+                u16 type2Color = gTypesInfo[effType2].graftPaletteRGBValue;
                 ApplyGraftTypePaletteSwap(paletteOffset, 16, type1Color, type2Color, (effType1 != effType2));
                 CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
             }
