@@ -150,6 +150,7 @@ struct TypeInfo
     u16 maxMove;
     u16 teraTypeRGBValue;    // Most values pulled from the Tera type icon palette.
     u16 graftPaletteRGBValue; // Color used for graft sprite palette swaps (not tera).
+    u16 shinyGraftPaletteRGBValue; // Shiny variant color for graft sprite palette swaps.
     u16 damageCategory:2;    // Used for B_PHYSICAL_SPECIAL_SPLIT <= GEN_3
     u16 useSecondTypeIconPalette:1;
     u16 isSpecialCaseType:1;

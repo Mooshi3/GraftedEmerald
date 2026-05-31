@@ -4669,16 +4669,31 @@ static void ApplyGraftPaletteToSummarySprite(u8 spriteId, struct Pokemon *mon)
 {
     u8 effType1, effType2;
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
+    bool8 isShiny = GetMonData(mon, MON_DATA_IS_SHINY);
     u8 gType1 = GetGraftedTypeFromBoxMon(&mon->box, 0);
     u8 gType2 = GetGraftedTypeFromBoxMon(&mon->box, 1);
+
     effType1 = (gType1 != GRAFT_TYPE_NONE) ? gType1 : gSpeciesInfo[species].types[0];
     effType2 = (gType2 != GRAFT_TYPE_NONE) ? gType2 : gSpeciesInfo[species].types[1];
+
     if (gType1 != GRAFT_TYPE_NONE || gType2 != GRAFT_TYPE_NONE)
     {
         u16 palOffset = OBJ_PLTT_ID(gSprites[spriteId].oam.paletteNum);
-        u32 type1Color = gTypesInfo[effType1].graftPaletteRGBValue;
-        u32 type2Color = gTypesInfo[effType2].graftPaletteRGBValue;
+        u32 type1Color, type2Color;
         bool8 isDualType = (effType1 != effType2);
+
+        // Use shiny graft colors for shiny mons, normal graft colors otherwise
+        if (isShiny)
+        {
+            type1Color = gTypesInfo[effType1].shinyGraftPaletteRGBValue;
+            type2Color = gTypesInfo[effType2].shinyGraftPaletteRGBValue;
+        }
+        else
+        {
+            type1Color = gTypesInfo[effType1].graftPaletteRGBValue;
+            type2Color = gTypesInfo[effType2].graftPaletteRGBValue;
+        }
+
         ApplyGraftTypePaletteSwap(palOffset, 16, type1Color, type2Color, isDualType);
         CpuCopy32(gPlttBufferFaded + palOffset, gPlttBufferUnfaded + palOffset, PLTT_SIZEOF(16));
     }
