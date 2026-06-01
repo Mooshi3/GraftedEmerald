@@ -492,3 +492,20 @@ enum TimeOfDay TryDecrementTimeOfDay(enum TimeOfDay timeOfDay)
     timeOfDay = timeOfDay == TIME_FIRST ? TIME_LAST : timeOfDay - 1;
     return GenConfigTimeOfDay(timeOfDay);
 }
+
+
+// Sleeping Bag specials
+void SleepingBagSetMorning(void)
+{
+    FakeRtc_ForwardTimeTo(6, 0, 0);  // 6:00 AM
+}
+
+void SleepingBagSetDay(void)
+{
+    FakeRtc_ForwardTimeTo(12, 0, 0); // 12:00 PM
+}
+
+void SleepingBagSetNight(void)
+{
+    FakeRtc_ForwardTimeTo(22, 0, 0); // 10:00 PM
+}

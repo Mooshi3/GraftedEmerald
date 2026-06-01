@@ -1735,3 +1735,51 @@ EventScript_PalletTown_PlayersHouse_2F_TurnOnPC::
 	.include "data/scripts/dexnav.inc"
 	.include "data/scripts/battle_frontier.inc"
 	.include "data/scripts/apricorn_tree.inc"
+
+
+EventScript_SleepingBag::
+	lockall
+	msgbox SleepingBag_Text_ChooseTime, MSGBOX_DEFAULT
+	multichoice 20, 8, MULTI_SLEEPING_BAG, FALSE
+	compare VAR_RESULT, 0
+	goto_if_eq SleepingBag_Morning
+	compare VAR_RESULT, 1
+	goto_if_eq SleepingBag_Day
+	compare VAR_RESULT, 2
+	goto_if_eq SleepingBag_Night
+	releaseall
+	end
+
+SleepingBag_Morning::
+	special SleepingBagSetMorning
+	msgbox SleepingBag_Text_Morning, MSGBOX_DEFAULT
+	releaseall
+	end
+
+SleepingBag_Day::
+	special SleepingBagSetDay
+	msgbox SleepingBag_Text_Day, MSGBOX_DEFAULT
+	releaseall
+	end
+
+SleepingBag_Night::
+	special SleepingBagSetNight
+	msgbox SleepingBag_Text_Night, MSGBOX_DEFAULT
+	releaseall
+	end
+
+SleepingBag_Text_ChooseTime:
+	.string "The sleeping bag is ready!\n"
+	.string "Set the time of day to which?$"
+
+SleepingBag_Text_Morning:
+	.string "You woke up feeling refreshed!\n"
+	.string "It's now morning.$"
+
+SleepingBag_Text_Day:
+	.string "You took a nice nap!\n"
+	.string "It's now daytime.$"
+
+SleepingBag_Text_Night:
+	.string "You slept through the day!\n"
+	.string "It's now nighttime.$"

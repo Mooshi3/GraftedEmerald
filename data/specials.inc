@@ -640,3 +640,7 @@ gSpecials::
 	def_special UpdateTrainerCardPhotoIcons
 	def_special StickerManGetBragFlags
 	def_special CheckAddCoins
+
+def_special SleepingBagSetMorning
+def_special SleepingBagSetDay
+def_special SleepingBagSetNight

@@ -761,6 +761,7 @@ extern const u8 gOakSpeech_Text_LetsGo[];
 extern const u8 EventScript_Food[];
 extern const u8 EventScript_ImpressiveMachine[];
 extern const u8 EventScript_Blueprints[];
+extern const u8 EventScript_SleepingBag[];
 extern const u8 EventScript_VideoGame[];
 extern const u8 EventScript_Burglary[];
 extern const u8 EventScript_Computer[];

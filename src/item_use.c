@@ -880,6 +880,20 @@ void ItemUseOutOfBattle_GraftSplicer(u8 taskId)
     gItemUseCB = ItemUseCB_GraftSplicer;
     SetUpItemUseCallback(taskId);
 }
+
+void ItemUseOutOfBattle_SleepingBag(u8 taskId)
+{
+    if (!OW_USE_FAKE_RTC)
+    {
+        DisplayItemMessage(taskId, FONT_NORMAL, COMPOUND_STRING("Nothing happened..."), CloseItemMessage);
+        return;
+    }
+    // Use script multichoice: morning=0, day=1, night=2
+    gSpecialVar_Result = 0xFF;
+    ScriptContext_SetupScript(EventScript_SleepingBag);
+    DestroyTask(taskId);
+}
+
 void ItemUseOutOfBattle_Mint(u8 taskId)
 {
     gItemUseCB = ItemUseCB_Mint;

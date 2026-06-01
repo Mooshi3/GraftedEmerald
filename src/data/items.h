@@ -659,6 +659,22 @@ const struct ItemInfo gItemsInfo[] =
     .iconPalette = gItemIconPalette_DubiousDisc,
 },
 
+// Sleeping Bag
+[ITEM_SLEEPING_BAG] = {
+    .name = ITEM_NAME("Sleeping Bag"),
+    .price = 0,
+    .description = COMPOUND_STRING(
+        "A cozy sleeping bag.\n"
+        "Use it to change\n"
+        "the time of day."),
+    .importance = 1,
+    .pocket = POCKET_KEY_ITEMS,
+    .type = ITEM_USE_FIELD,
+    .fieldUseFunc = ItemUseOutOfBattle_SleepingBag,
+    .iconPic = gItemIcon_Bicycle,
+    .iconPalette = gItemIconPalette_Bicycle,
+},
+
 // Medicine
 
     [ITEM_POTION] =

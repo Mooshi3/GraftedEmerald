@@ -168,6 +168,7 @@
 #define MULTI_EGGS_VICTORIES_QUIT                        157
 #define MULTI_HOF_EGGS_VICTORIES_QUIT                    158
 
+#define MULTI_SLEEPING_BAG 159
 #define MULTI_NONE 255
 
 // Lilycove SS Tidal Multichoice Selections
