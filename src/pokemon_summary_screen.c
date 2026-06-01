@@ -33,6 +33,7 @@
 #include "pokemon_sprite_visualizer.h"
 #include "pokemon_storage_system.h"
 #include "pokemon_summary_screen.h"
+#include "graft_data.h"
 #include "pokerus.h"
 #include "region_map.h"
 #include "scanline_effect.h"
@@ -330,6 +331,7 @@ static void WriteToStatsTilemapBuffer(u32 length, u32 block, u32 statsCoordX, u3
 void ExtractMonSkillStatsData(struct Pokemon *mon, struct PokeSummary *sum);
 void ExtractMonSkillIvData(struct Pokemon *mon, struct PokeSummary *sum);
 void ExtractMonSkillEvData(struct Pokemon *mon, struct PokeSummary *sum);
+void ExtractMonSkillBaseStatsData(struct Pokemon *mon, struct PokeSummary *sum);
 static void PrintTextOnWindow(u8 windowId, const u8 *string, u8 x, u8 y, u8 lineSpacing, u8 colorId);
 static void PrintTextOnWindowWithFont(u8 windowId, const u8 *string, u8 x, u8 y, u8 lineSpacing, u8 colorId, u32 fontId);
 static const u8 *GetLetterGrade(u32 stat);
@@ -1694,6 +1696,9 @@ static void ChangeStatLabel(s16 mode)
     case SUMMARY_SKILLS_MODE_EVS:
         WriteToStatsTilemapBuffer(ivEvLength, evsBlock, statsCoordX, statsCoordY);
         break;
+    case SUMMARY_SKILLS_MODE_BASE_STATS:
+        WriteToStatsTilemapBuffer(ivEvLength, evsBlock, statsCoordX, statsCoordY);
+        break;
     }
     CopyBgTilemapBufferToVram(1);
 }
@@ -1852,8 +1857,8 @@ static u8 IncrementSkillsStatsMode(u8 mode)
     case SUMMARY_SKILLS_MODE_IVS:
         if (P_SUMMARY_SCREEN_IV_ONLY)
         {
-            sMonSummaryScreen->skillsPageMode = SUMMARY_SKILLS_MODE_STATS;
-            return SUMMARY_SKILLS_MODE_STATS;
+            sMonSummaryScreen->skillsPageMode = SUMMARY_SKILLS_MODE_BASE_STATS;
+            return SUMMARY_SKILLS_MODE_BASE_STATS;
         }
         else
         {
@@ -1861,11 +1866,13 @@ static u8 IncrementSkillsStatsMode(u8 mode)
             return SUMMARY_SKILLS_MODE_EVS;
         }
     case SUMMARY_SKILLS_MODE_EVS:
+        sMonSummaryScreen->skillsPageMode = SUMMARY_SKILLS_MODE_BASE_STATS;
+        return SUMMARY_SKILLS_MODE_BASE_STATS;
+    case SUMMARY_SKILLS_MODE_BASE_STATS:
     default:
         sMonSummaryScreen->skillsPageMode = SUMMARY_SKILLS_MODE_STATS;
         return SUMMARY_SKILLS_MODE_STATS;
     }
-
 }
 
 static void ShowMonSkillsInfo(u8 taskId, s16 mode)
@@ -1895,6 +1902,11 @@ static void ShowMonSkillsInfo(u8 taskId, s16 mode)
     else if (mode == SUMMARY_SKILLS_MODE_EVS)
     {
         ExtractMonSkillEvData(mon, sum);
+        BufferLeftColumnIvEvStats();
+    }
+    else if (mode == SUMMARY_SKILLS_MODE_BASE_STATS)
+    {
+        ExtractMonSkillBaseStatsData(mon, sum);
         BufferLeftColumnIvEvStats();
     }
 
@@ -1935,6 +1947,30 @@ void ExtractMonSkillEvData(struct Pokemon *mon, struct PokeSummary *sum)
     sum->spatk = GetMonData(mon, MON_DATA_SPATK_EV);
     sum->spdef = GetMonData(mon, MON_DATA_SPDEF_EV);
     sum->speed = GetMonData(mon, MON_DATA_SPEED_EV);
+}
+void ExtractMonSkillBaseStatsData(struct Pokemon *mon, struct PokeSummary *sum)
+{
+    u16 species = GetMonData(mon, MON_DATA_SPECIES);
+    u16 graftedStat;
+    sum->currentHP = gSpeciesInfo[species].baseHP;
+    sum->atk = gSpeciesInfo[species].baseAttack;
+    sum->def = gSpeciesInfo[species].baseDefense;
+    sum->spatk = gSpeciesInfo[species].baseSpAttack;
+    sum->spdef = gSpeciesInfo[species].baseSpDefense;
+    sum->speed = gSpeciesInfo[species].baseSpeed;
+    // Overlay grafted stat overrides
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_HP);
+    if (graftedStat != GRAFT_STAT_NONE) sum->currentHP = graftedStat;
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_ATK);
+    if (graftedStat != GRAFT_STAT_NONE) sum->atk = graftedStat;
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_DEF);
+    if (graftedStat != GRAFT_STAT_NONE) sum->def = graftedStat;
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_SPATK);
+    if (graftedStat != GRAFT_STAT_NONE) sum->spatk = graftedStat;
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_SPDEF);
+    if (graftedStat != GRAFT_STAT_NONE) sum->spdef = graftedStat;
+    graftedStat = GetGraftedStatFromBoxMon(&mon->box, STAT_SPEED);
+    if (graftedStat != GRAFT_STAT_NONE) sum->speed = graftedStat;
 }
 
 bool32 HasAnyRelearnableMoves(enum MoveRelearnerStates state)
@@ -2011,7 +2047,7 @@ static void TryUpdateRelearnType(enum IncrDecrUpdateValues delta)
             }
             // should never reach this, but just in case
             break;
-        case TRY_INCREMENT:
+    case TRY_INCREMENT:
             state = state >= MOVE_RELEARNER_GRAFT_MOVES ? MOVE_RELEARNER_LEVEL_UP_MOVES : state + 1;
             break;
         case TRY_DECREMENT:
@@ -4949,6 +4985,7 @@ static inline void ShowUtilityPrompt(s16 mode)
     const u8* promptText = NULL;
     const u8* gText_SkillPageIvs = COMPOUND_STRING("IVs");
     const u8* gText_SkillPageEvs = COMPOUND_STRING("EVs");
+    const u8* gText_SkillPageBase = COMPOUND_STRING("BASE");
     const u8* gText_SkillPageStats = COMPOUND_STRING("STATS");
     const u8* gText_Rename = COMPOUND_STRING("RENAME");
 
@@ -4978,6 +5015,10 @@ static inline void ShowUtilityPrompt(s16 mode)
                     promptText = gText_SkillPageEvs;
             }
             else if (mode == SUMMARY_SKILLS_MODE_EVS)
+            {
+                promptText = gText_SkillPageBase;
+            }
+            else if (mode == SUMMARY_SKILLS_MODE_BASE_STATS)
             {
                 promptText = gText_SkillPageStats;
             }
