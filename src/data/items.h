@@ -236,8 +236,8 @@ const struct ItemInfo gItemsInfo[] =
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
         .secondaryId = BALL_ULTRA,
-        .iconPic = gItemIcon_UltraBall,
-        .iconPalette = gItemIconPalette_UltraBall,
+        .iconPic = gItemIcon_BeastBall,
+        .iconPalette = gItemIconPalette_BeastBall,
     },
 
     [ITEM_MASTER_BALL] =
@@ -638,8 +638,8 @@ const struct ItemInfo gItemsInfo[] =
     .type = ITEM_USE_BAG_MENU,
     .battleUsage = EFFECT_ITEM_THROW_BALL,
     .secondaryId = BALL_GRAFT,
-    .iconPic = gItemIcon_UltraBall,
-    .iconPalette = gItemIconPalette_UltraBall,
+    .iconPic = gItemIcon_BeastBall,
+    .iconPalette = gItemIconPalette_BeastBall,
 },
 
 // Graft Splicer
@@ -655,8 +655,8 @@ const struct ItemInfo gItemsInfo[] =
     .sortType = ITEM_TYPE_FIELD_USE,
     .type = ITEM_USE_PARTY_MENU,
     .fieldUseFunc = ItemUseOutOfBattle_GraftSplicer,
-    .iconPic = gItemIcon_AbilityCapsule,
-    .iconPalette = gItemIconPalette_AbilityCapsule,
+    .iconPic = gItemIcon_DubiousDisc,
+    .iconPalette = gItemIconPalette_DubiousDisc,
 },
 
 // Medicine
