@@ -235,8 +235,12 @@ u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon)
     }
     return count;
 }
-bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon)
+bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex)
 {
+    // Overwriting an existing graft slot is always free
+    if (statIndex < 6 && boxMon->graftStatOverrides[statIndex] != 0)
+        return TRUE;
+    // New slot: check against cap
     return CountStatGraftsOnBoxMon(boxMon) < GetStatGraftCap();
 }
 

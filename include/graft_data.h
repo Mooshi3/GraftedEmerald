@@ -41,7 +41,7 @@ u16 GetGraftedStatFromBoxMon(const struct BoxPokemon *boxMon, u8 statIndex);
 u8 GetBadgeCount(void);
 u8 GetStatGraftCap(void);
 u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon);
-bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon);
+bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex);
 // Pointer-based setters (work on any Pokemon, not just gPlayerParty)
 void SetGraftedStatOnMon(struct Pokemon *mon, u8 statIndex, u16 statValue);
 void SetGraftedTypeOnMon(struct Pokemon *mon, u8 typeIndex, u8 type);

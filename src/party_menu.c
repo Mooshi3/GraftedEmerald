@@ -8823,6 +8823,19 @@ void Task_GraftSplicer(u8 taskId)
     {
         u8 targetSlot = gPartyMenu.slotId;
         u8 graftType = GetSelectedGraftType();
+        // Check stat graft cap BEFORE releasing the donor
+        if (graftType == GRAFT_MENU_STAT)
+        {
+            u8 targetSlot = gPartyMenu.slotId;
+            if (!CanApplyStatGraft(&gPlayerParty[targetSlot].box, GetSelectedGraftStatIndex()))
+            {
+                StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                DisplayPartyMenuMessage(gStringVar4, TRUE);
+                ScheduleBgCopyTilemapToVram(2);
+                sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
+                break;
+            }
+        }
             // Release the sacrifice mon NOW — we already have the graft data,
             // and the move-forget flow reinitializes the party menu, destroying
             // splicer state. Releasing early avoids needing to preserve state.

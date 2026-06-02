@@ -523,7 +523,7 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
         SetGraftedType(partySlot, sGraftMenu.subCursor, (u8)sSelectedOption.value);
         break;
     case GRAFT_MENU_STAT:
-        if (!CanApplyStatGraft(&gPlayerParty[partySlot].box))
+        if (!CanApplyStatGraft(&gPlayerParty[partySlot].box, sSelectedOption.statIndex))
             return FALSE;
         SetGraftedStat(partySlot, sSelectedOption.statIndex, sSelectedOption.statValue);
         break;
