@@ -3423,7 +3423,7 @@ const u8* FaintClearSetData(enum BattlerId battler)
 
     gBattleMons[battler].types[0] = GetSpeciesType(gBattleMons[battler].species, 0);
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
-    // GRAFT: Override types from graft data for player mons
+    // GRAFT: Override types/ability from graft data for player AND enemy mons
     if (GetBattlerSide(battler) == B_SIDE_PLAYER)
     {
         u8 graftSlot = gBattlerPartyIndexes[battler];
@@ -3434,6 +3434,19 @@ const u8* FaintClearSetData(enum BattlerId battler)
         if (gt != GRAFT_TYPE_NONE)
             gBattleMons[battler].types[1] = gt;
         u16 ga = GetGraftedAbility(graftSlot);
+        if (ga != GRAFT_ABILITY_NONE)
+            gBattleMons[battler].ability = (enum Ability)ga;
+    }
+    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
+    {
+        u8 graftSlot = gBattlerPartyIndexes[battler];
+        u8 gt = gEnemyParty[graftSlot].box.graftTypes[0];
+        if (gt != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[0] = gt;
+        gt = gEnemyParty[graftSlot].box.graftTypes[1];
+        if (gt != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[1] = gt;
+        u16 ga = gEnemyParty[graftSlot].box.graftAbility;
         if (ga != GRAFT_ABILITY_NONE)
             gBattleMons[battler].ability = (enum Ability)ga;
     }
@@ -3549,6 +3562,19 @@ static void DoBattleIntro(void)
                     if (ga != GRAFT_ABILITY_NONE)
                         gBattleMons[battler].ability = (enum Ability)ga;
                 }
+    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
+    {
+        u8 graftSlot = gBattlerPartyIndexes[battler];
+        u8 gt = gEnemyParty[graftSlot].box.graftTypes[0];
+        if (gt != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[0] = gt;
+        gt = gEnemyParty[graftSlot].box.graftTypes[1];
+        if (gt != GRAFT_TYPE_NONE)
+            gBattleMons[battler].types[1] = gt;
+        u16 ga = gEnemyParty[graftSlot].box.graftAbility;
+        if (ga != GRAFT_ABILITY_NONE)
+            gBattleMons[battler].ability = (enum Ability)ga;
+    }
                 gBattleStruct->battlerState[battler].hpOnSwitchout = gBattleMons[battler].hp;
                 memset(&gBattleMons[battler].volatiles, 0, sizeof(struct Volatiles));
                 for (i = 0; i < NUM_BATTLE_STATS; i++)
