@@ -671,8 +671,8 @@ const struct ItemInfo gItemsInfo[] =
     .pocket = POCKET_KEY_ITEMS,
     .type = ITEM_USE_FIELD,
     .fieldUseFunc = ItemUseOutOfBattle_SleepingBag,
-    .iconPic = gItemIcon_Bicycle,
-    .iconPalette = gItemIconPalette_Bicycle,
+    .iconPic = gItemIcon_TownMap,
+    .iconPalette = gItemIconPalette_TownMap,
 },
 
 // Medicine
@@ -13875,8 +13875,8 @@ const struct ItemInfo gItemsInfo[] =
         .type = ITEM_USE_FIELD,
         .fieldUseFunc = ItemUseOutOfBattle_Bike,
         .secondaryId = STANDARD_BIKE,
-        .iconPic = gItemIcon_Bicycle,
-        .iconPalette = gItemIconPalette_Bicycle,
+        .iconPic = gItemIcon_TownMap,
+        .iconPalette = gItemIconPalette_TownMap,
     },
 
     [ITEM_MACH_BIKE] =
