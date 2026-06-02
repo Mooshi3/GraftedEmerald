@@ -8884,7 +8884,15 @@ void Task_GraftSplicer(u8 taskId)
         else
         {
             // Ability / Stat / Nature — no extra prompt, apply immediately.
-            ApplyGraftFromMenuToSlot(targetSlot);
+bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
+                if (!graftResult && GetSelectedGraftType() == GRAFT_MENU_STAT)
+                {
+                    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                    DisplayPartyMenuMessage(gStringVar4, TRUE);
+                    ScheduleBgCopyTilemapToVram(2);
+                    sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
+                    break;
+                }
             GetMonNickname(&gPlayerParty[gPartyMenu.slotId2], gStringVar1);
             StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
             DisplayPartyMenuMessage(gStringVar4, TRUE);
