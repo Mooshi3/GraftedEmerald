@@ -277,7 +277,7 @@ void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId)
 // Enemy trainer graft system
 // ============================================================
 #define MAX_GRAFT_POOL 64
-#define GRAFT_ROLL_ATTEMPTS 12
+#define GRAFT_ROLL_ATTEMPTS 40
 
 static u16 sGraftDonorPool[MAX_GRAFT_POOL];
 static u8 sGraftDonorCount;
