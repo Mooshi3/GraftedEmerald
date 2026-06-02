@@ -877,21 +877,34 @@ bool8 GetBattlerGraftedTypeInfo(u8 battler, u8 *effectiveType1, u8 *effectiveTyp
     u16 species;
     u8 speciesType1, speciesType2;
     u8 gType1, gType2;
+    struct Pokemon *mon;
 
-    if (GetBattlerSide(battler) != B_SIDE_PLAYER)
+    if (GetBattlerSide(battler) == B_SIDE_PLAYER)
+    {
+        partySlot = gBattlerPartyIndexes[battler];
+        if (partySlot >= PARTY_SIZE)
+            return FALSE;
+        mon = &gPlayerParty[partySlot];
+    }
+    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
+    {
+        partySlot = gBattlerPartyIndexes[battler];
+        if (partySlot >= PARTY_SIZE)
+            return FALSE;
+        mon = &gEnemyParty[partySlot];
+    }
+    else
+    {
         return FALSE;
+    }
 
-    partySlot = gBattlerPartyIndexes[battler];
-    if (partySlot >= PARTY_SIZE)
-        return FALSE;
-
-    species = GetMonData(&gPlayerParty[partySlot], MON_DATA_SPECIES);
+    species = GetMonData(mon, MON_DATA_SPECIES);
     speciesType1 = gSpeciesInfo[species].types[0];
     speciesType2 = gSpeciesInfo[species].types[1];
 
     // Get effective types (grafted override if set, species default if not)
-    gType1 = GetGraftedType(partySlot, 0);
-    gType2 = GetGraftedType(partySlot, 1);
+    gType1 = mon->box.graftTypes[0];
+    gType2 = mon->box.graftTypes[1];
     *effectiveType1 = (gType1 != GRAFT_TYPE_NONE) ? gType1 : speciesType1;
     *effectiveType2 = (gType2 != GRAFT_TYPE_NONE) ? gType2 : speciesType2;
 
