@@ -7060,8 +7060,18 @@ case 3: // Wait for party menu to return to battle
                     if (gBattleCommunication[CURSOR_POSITION] == 0)
                     {
                         u8 partySlot = ResolveGraftTargetSlot();
-                if (CanApplyStatGraft(&gPlayerParty[partySlot].box, GetSelectedGraftStatIndex()))
+                    if (CanApplyStatGraft(&gPlayerParty[partySlot].box, GetSelectedGraftStatIndex()))
                     SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
+                    else
+                    {
+                        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                        FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
+                        BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+                        gBattleCommunication[MULTIUSE_STATE] = 22;
+                        gBattleCommunication[4] = 0;
+                        HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
+                        break;
+                    }
                     }
                     gBattlescriptCurrInstr = cmd->nextInstr;
                 }
