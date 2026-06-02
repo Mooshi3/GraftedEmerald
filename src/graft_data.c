@@ -6,6 +6,7 @@
 #include "palette.h"
 #include "constants/rgb.h"
 #include "battle_main.h"
+#include "event_data.h"
 
 // Get grafted type for a party mon. Returns GRAFT_TYPE_NONE if not grafted.
 u8 GetGraftedType(u8 partySlot, u8 typeIndex)
@@ -201,6 +202,39 @@ u16 GetGraftedStatFromBoxMon(const struct BoxPokemon *boxMon, u8 statIndex)
     if (val == 0)
         return GRAFT_STAT_NONE;
     return val;
+}
+u8 GetBadgeCount(void)
+{
+    u8 count = 0;
+    u32 i;
+    for (i = FLAG_BADGE01_GET; i < FLAG_BADGE01_GET + NUM_BADGES; i++)
+    {
+        if (FlagGet(i))
+            count++;
+    }
+    return count;
+}
+u8 GetStatGraftCap(void)
+{
+    u8 badges = GetBadgeCount();
+    if (badges >= 5)
+        return 255; // uncapped
+    return 1 + badges;
+}
+u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon)
+{
+    u8 count = 0;
+    u8 i;
+    for (i = 0; i < 6; i++)
+    {
+        if (boxMon->graftStatOverrides[i] != 0)
+            count++;
+    }
+    return count;
+}
+bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon)
+{
+    return CountStatGraftsOnBoxMon(boxMon) < GetStatGraftCap();
 }
 
 // Blend sprite palette for grafted type tinting.

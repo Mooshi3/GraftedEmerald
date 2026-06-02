@@ -508,10 +508,9 @@ void UpdateGraftMenuCursorOverworld(u8 cursorPos)
 // Apply the selected graft to a specific party slot
 // ============================================================
 
-void ApplyGraftFromMenuToSlot(u8 partySlot)
+bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
 {
     SetSelectedGraftFromCategory();
-
     switch (sSelectedOption.graftType)
     {
     case GRAFT_MENU_MOVE:
@@ -524,13 +523,17 @@ void ApplyGraftFromMenuToSlot(u8 partySlot)
         SetGraftedType(partySlot, sGraftMenu.subCursor, (u8)sSelectedOption.value);
         break;
     case GRAFT_MENU_STAT:
+        if (!CanApplyStatGraft(&gPlayerParty[partySlot].box))
+            return FALSE;
         SetGraftedStat(partySlot, sSelectedOption.statIndex, sSelectedOption.statValue);
         break;
     case GRAFT_MENU_NATURE:
         SetGraftedNature(partySlot, sSelectedOption.value);
         break;
     }
+    return TRUE;
 }
+
 
 // ============================================================
 // Old GenerateGraftRoll stubs (kept for compat, not used anymore)

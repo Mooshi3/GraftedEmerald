@@ -93,7 +93,7 @@ const u8 *GetText_StatCompare(void);
 const u8 *GetStatNameString(u8 statIndex);
 
 // Apply
-void ApplyGraftFromMenuToSlot(u8 partySlot);
+bool8 ApplyGraftFromMenuToSlot(u8 partySlot);
 
 // Legacy roll accessors (stubs for compat)
 u16 GetGraftRollType(u8 index);
