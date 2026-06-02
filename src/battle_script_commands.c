@@ -7060,7 +7060,8 @@ case 3: // Wait for party menu to return to battle
                     if (gBattleCommunication[CURSOR_POSITION] == 0)
                     {
                         u8 partySlot = ResolveGraftTargetSlot();
-                        SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
+                if (CanApplyStatGraft(&gPlayerParty[partySlot].box))
+                    SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
                     }
                     gBattlescriptCurrInstr = cmd->nextInstr;
                 }
