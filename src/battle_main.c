@@ -10,6 +10,7 @@
 #include "battle_hold_effects.h"
 #include "battle_interface.h"
 #include "battle_main.h"
+#include "graft_data.h"
 #include "battle_message.h"
 #include "battle_pyramid.h"
 #include "battle_scripts.h"

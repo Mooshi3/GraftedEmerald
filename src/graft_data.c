@@ -7,6 +7,9 @@
 #include "constants/rgb.h"
 #include "battle_main.h"
 #include "event_data.h"
+#include "wild_encounter.h"
+#include "global.fieldmap.h"
+#include "move.h"
 
 // Get grafted type for a party mon. Returns GRAFT_TYPE_NONE if not grafted.
 u8 GetGraftedType(u8 partySlot, u8 typeIndex)
@@ -235,6 +238,407 @@ u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon)
 bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon)
 {
     return CountStatGraftsOnBoxMon(boxMon) < GetStatGraftCap();
+}
+
+// ============================================================
+// Pointer-based graft setters (work on any Pokemon pointer)
+// ============================================================
+void SetGraftedStatOnMon(struct Pokemon *mon, u8 statIndex, u16 statValue)
+{
+    if (statIndex >= 6)
+        return;
+    mon->box.graftStatOverrides[statIndex] = (u8)statValue;
+    CalculateMonStats(mon);
+    mon->box.graftFlags |= GRAFT_FLAG_STAT;
+}
+
+void SetGraftedTypeOnMon(struct Pokemon *mon, u8 typeIndex, u8 type)
+{
+    if (typeIndex >= 2)
+        return;
+    mon->box.graftTypes[typeIndex] = type;
+    mon->box.graftFlags |= GRAFT_FLAG_TYPE;
+}
+
+void SetGraftedAbilityOnMon(struct Pokemon *mon, u16 ability)
+{
+    mon->box.graftAbility = ability;
+    mon->box.graftFlags |= GRAFT_FLAG_ABILITY;
+}
+
+void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId)
+{
+    // Nature grafts not applied to enemy mons (per design)
+    (void)mon;
+    (void)natureId;
+}
+
+// ============================================================
+// Enemy trainer graft system
+// ============================================================
+#define MAX_GRAFT_POOL 64
+#define GRAFT_ROLL_ATTEMPTS 12
+
+static u16 sGraftDonorPool[MAX_GRAFT_POOL];
+static u8 sGraftDonorCount;
+
+static void AddSpeciesToPool(u16 species)
+{
+    if (species == SPECIES_NONE)
+        return;
+    for (u8 i = 0; i < sGraftDonorCount; i++)
+        if (sGraftDonorPool[i] == species)
+            return; // dedupe
+    if (sGraftDonorCount < MAX_GRAFT_POOL)
+        sGraftDonorPool[sGraftDonorCount++] = species;
+}
+
+static void AddMapEncountersToPool(u8 mapGroup, u8 mapNum)
+{
+    for (u32 i = 0; gWildMonHeaders[i].mapGroup != 0xFF; i++)
+    {
+        if (gWildMonHeaders[i].mapGroup != mapGroup || gWildMonHeaders[i].mapNum != mapNum)
+            continue;
+        // Check all time-of-day encounter types
+        for (u32 tod = 0; tod < TIMES_OF_DAY_COUNT; tod++)
+        {
+            const struct WildEncounterTypes *enc = &gWildMonHeaders[i].encounterTypes[tod];
+            const struct WildPokemonInfo *infos[] = {
+                enc->landMonsInfo, enc->waterMonsInfo,
+                enc->rockSmashMonsInfo, enc->fishingMonsInfo
+            };
+            const u8 counts[] = { LAND_WILD_COUNT, WATER_WILD_COUNT, ROCK_WILD_COUNT, 12 }; // fishing varies, 12 is safe upper bound
+            for (u32 t = 0; t < 4; t++)
+            {
+                if (infos[t] == NULL)
+                    continue;
+                for (u32 s = 0; s < counts[t]; s++)
+                {
+                    if (infos[t]->wildPokemon[s].species != SPECIES_NONE)
+                        AddSpeciesToPool(infos[t]->wildPokemon[s].species);
+                }
+            }
+        }
+        return;
+    }
+}
+
+// Walk one level of connections from current map
+static void AddConnectedMapEncounters(void)
+{
+    if (gMapHeader.connections == NULL)
+        return;
+    for (s32 i = 0; i < gMapHeader.connections->count; i++)
+    {
+        AddMapEncountersToPool(
+            gMapHeader.connections->connections[i].mapGroup,
+            gMapHeader.connections->connections[i].mapNum
+        );
+    }
+}
+
+// Manual fallback for disconnected indoor maps
+static const struct {
+    u8 group, num, srcGroup, srcNum;
+} sGraftFallbacks[] = {
+    // Gyms - pull from nearby route
+    { MAP_GROUP(MAP_PETALBURG_CITY_GYM), MAP_NUM(MAP_PETALBURG_CITY_GYM), MAP_GROUP(MAP_ROUTE102), MAP_NUM(MAP_ROUTE102) },
+    { MAP_GROUP(MAP_RUSTBORO_CITY_GYM), MAP_NUM(MAP_RUSTBORO_CITY_GYM), MAP_GROUP(MAP_ROUTE116), MAP_NUM(MAP_ROUTE116) },
+    { MAP_GROUP(MAP_DEWFORD_TOWN_GYM), MAP_NUM(MAP_DEWFORD_TOWN_GYM), MAP_GROUP(MAP_ROUTE106), MAP_NUM(MAP_ROUTE106) },
+    { MAP_GROUP(MAP_MAUVILLE_CITY_GYM), MAP_NUM(MAP_MAUVILLE_CITY_GYM), MAP_GROUP(MAP_ROUTE110), MAP_NUM(MAP_ROUTE110) },
+    { MAP_GROUP(MAP_LAVARIDGE_TOWN_GYM_1F), MAP_NUM(MAP_LAVARIDGE_TOWN_GYM_1F), MAP_GROUP(MAP_ROUTE112), MAP_NUM(MAP_ROUTE112) },
+    { MAP_GROUP(MAP_FORTREE_CITY_GYM), MAP_NUM(MAP_FORTREE_CITY_GYM), MAP_GROUP(MAP_ROUTE119), MAP_NUM(MAP_ROUTE119) },
+    { MAP_GROUP(MAP_MOSSDEEP_CITY_GYM), MAP_NUM(MAP_MOSSDEEP_CITY_GYM), MAP_GROUP(MAP_ROUTE124), MAP_NUM(MAP_ROUTE124) },
+    { MAP_GROUP(MAP_SOOTOPOLIS_CITY_GYM_1F), MAP_NUM(MAP_SOOTOPOLIS_CITY_GYM_1F), MAP_GROUP(MAP_ROUTE126), MAP_NUM(MAP_ROUTE126) },
+    // Hideouts - pull from nearest route
+    { MAP_GROUP(MAP_AQUA_HIDEOUT_1F), MAP_NUM(MAP_AQUA_HIDEOUT_1F), MAP_GROUP(MAP_ROUTE124), MAP_NUM(MAP_ROUTE124) },
+    { MAP_GROUP(MAP_MAGMA_HIDEOUT_1F), MAP_NUM(MAP_MAGMA_HIDEOUT_1F), MAP_GROUP(MAP_ROUTE112), MAP_NUM(MAP_ROUTE112) },
+    // Special interiors
+    { MAP_GROUP(MAP_CAVE_OF_ORIGIN_1F), MAP_NUM(MAP_CAVE_OF_ORIGIN_1F), MAP_GROUP(MAP_ROUTE126), MAP_NUM(MAP_ROUTE126) },
+    { MAP_GROUP(MAP_SEAFLOOR_CAVERN_ENTRANCE), MAP_NUM(MAP_SEAFLOOR_CAVERN_ENTRANCE), MAP_GROUP(MAP_ROUTE128), MAP_NUM(MAP_ROUTE128) },
+};
+
+static void ApplyGraftPoolFallback(void)
+{
+    u8 curGroup = gSaveBlock1Ptr->location.mapGroup;
+    u8 curNum = gSaveBlock1Ptr->location.mapNum;
+    for (u32 i = 0; i < ARRAY_COUNT(sGraftFallbacks); i++)
+    {
+        if (sGraftFallbacks[i].group == curGroup && sGraftFallbacks[i].num == curNum)
+        {
+            AddMapEncountersToPool(sGraftFallbacks[i].srcGroup, sGraftFallbacks[i].srcNum);
+            return;
+        }
+    }
+}
+
+void BuildNearbyGraftPool(void)
+{
+    sGraftDonorCount = 0;
+    // Tier 1: current map
+    AddMapEncountersToPool(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
+    // Tier 2: connected maps
+    AddConnectedMapEncounters();
+    // Tier 3: manual fallback
+    if (sGraftDonorCount == 0)
+        ApplyGraftPoolFallback();
+}
+
+// ============================================================
+// Graft roll logic for enemy trainers
+// ============================================================
+
+// Graft kind constants
+enum {
+    GK_STAT,
+    GK_MOVE,
+    GK_ABILITY,
+    GK_TYPE,
+    GK_COUNT
+};
+
+static u8 GetSpeciesBaseStatGraft(u16 species, u8 statIndex)
+{
+    switch (statIndex)
+    {
+    case 0: return gSpeciesInfo[species].baseHP;
+    case 1: return gSpeciesInfo[species].baseAttack;
+    case 2: return gSpeciesInfo[species].baseDefense;
+    case 3: return gSpeciesInfo[species].baseSpeed;
+    case 4: return gSpeciesInfo[species].baseSpAttack;
+    case 5: return gSpeciesInfo[species].baseSpDefense;
+    }
+    return 0;
+}
+
+static u8 GetEffectiveBaseStat(struct Pokemon *mon, u8 statIndex)
+{
+    u8 ov = mon->box.graftStatOverrides[statIndex];
+    if (ov != 0)
+        return ov;
+    return GetSpeciesBaseStatGraft(GetMonData(mon, MON_DATA_SPECIES), statIndex);
+}
+
+// Move value: raw power for attacks, 50 baseline for status moves
+static u16 MoveGraftValue(u16 move)
+{
+    u16 power = gMovesInfo[move].power;
+    return (power == 0) ? 50 : power;
+}
+
+static bool8 IsAttackingMove(u16 move)
+{
+    return gMovesInfo[move].power > 0;
+}
+
+// Pick slot to replace, or 0xFF to reject
+static u8 PickMoveReplaceSlot(struct Pokemon *mon, u16 newMove)
+{
+    u8 worstAttackingSlot = 0xFF;
+    u16 worstAttackingVal = 0xFFFF;
+    u8 worstStatusSlot = 0xFF;
+    u16 worstStatusVal = 0xFFFF;
+    u8 attackingCount = 0;
+
+    for (u8 i = 0; i < MAX_MON_MOVES; i++)
+    {
+        u16 cur = GetMonData(mon, MON_DATA_MOVE1 + i, NULL);
+        if (cur == MOVE_NONE)
+            return i; // free slot
+        if (cur == newMove)
+            return 0xFF; // already knows it
+
+        if (IsAttackingMove(cur))
+        {
+            attackingCount++;
+            u16 v = MoveGraftValue(cur);
+            if (v < worstAttackingVal)
+            {
+                worstAttackingVal = v;
+                worstAttackingSlot = i;
+            }
+        }
+        else
+        {
+            u16 v = MoveGraftValue(cur);
+            if (v < worstStatusVal)
+            {
+                worstStatusVal = v;
+                worstStatusSlot = i;
+            }
+        }
+    }
+
+    if (IsAttackingMove(newMove))
+    {
+        // Only replace an attacking move with lower power
+        // But never replace the last attacking move
+        if (worstAttackingSlot == 0xFF)
+            return 0xFF; // no attacking moves to replace? shouldn't happen but skip
+        if (attackingCount <= 1)
+            return 0xFF; // don't remove the only attacking move
+        return (MoveGraftValue(newMove) > worstAttackingVal) ? worstAttackingSlot : 0xFF;
+    }
+    else
+    {
+        // Status move: replace another status move
+        if (worstStatusSlot == 0xFF)
+            return 0xFF; // no status moves to replace, skip
+        return (MoveGraftValue(newMove) > worstStatusVal) ? worstStatusSlot : 0xFF;
+    }
+}
+
+static u16 PickDonorMove(u16 donor, u8 recipientLevel)
+{
+    const struct LevelUpMove *ls = gSpeciesInfo[donor].levelUpLearnset;
+    u16 moves[64];
+    u8 n = 0;
+    if (ls == NULL)
+        return MOVE_NONE;
+    for (u8 i = 0; ls[i].move != LEVEL_UP_MOVE_END && n < 64; i++)
+    {
+        if (ls[i].level <= recipientLevel) // only moves the donor could know at this level
+            moves[n++] = ls[i].move;
+    }
+    return n ? moves[Random() % n] : MOVE_NONE;
+}
+
+static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
+{
+    u16 species = GetMonData(mon, MON_DATA_SPECIES);
+    bool8 statUsed[6] = { FALSE };
+    bool8 abilityUsed = FALSE;
+    bool8 typeSlotUsed[2] = { FALSE };
+    u8 applied = 0, attempts = 0;
+
+    while (applied < graftCount && attempts < GRAFT_ROLL_ATTEMPTS)
+    {
+        attempts++;
+        if (sGraftDonorCount == 0)
+            return;
+
+        u16 donor = sGraftDonorPool[Random() % sGraftDonorCount];
+        u8 kind = Random() % GK_COUNT;
+
+        if (kind == GK_STAT)
+        {
+            // Find stats the donor improves that aren't already grafted
+            u8 candidates[6];
+            u8 n = 0;
+            for (u8 s = 0; s < 6; s++)
+            {
+                if (statUsed[s])
+                    continue;
+                u8 donorStat = GetSpeciesBaseStatGraft(donor, s);
+                if (donorStat > GetEffectiveBaseStat(mon, s))
+                    candidates[n++] = s;
+            }
+            if (n == 0)
+                continue;
+            u8 stat = candidates[Random() % n];
+            SetGraftedStatOnMon(mon, stat, GetSpeciesBaseStatGraft(donor, stat));
+            statUsed[stat] = TRUE;
+            applied++;
+        }
+        else if (kind == GK_MOVE)
+        {
+            u16 move = PickDonorMove(donor, GetMonData(mon, MON_DATA_LEVEL));
+            if (move == MOVE_NONE || move == MOVE_NONE)
+                continue;
+            u8 slot = PickMoveReplaceSlot(mon, move);
+            if (slot == 0xFF)
+                continue;
+            SetMonMoveSlot(mon, move, slot);
+            mon->box.graftFlags |= GRAFT_FLAG_MOVE;
+            // Record in graftMoves for relearner
+            for (u8 g = 0; g < 4; g++)
+            {
+                if (mon->box.graftMoves[g] == MOVE_NONE)
+                {
+                    mon->box.graftMoves[g] = move;
+                    break;
+                }
+            }
+            applied++;
+        }
+        else if (kind == GK_ABILITY)
+        {
+            if (abilityUsed)
+                continue;
+            u16 curAbility = mon->box.graftAbility;
+            if (curAbility == ABILITY_NONE)
+            {
+                u8 abilityNum = GetMonData(mon, MON_DATA_ABILITY_NUM);
+                u16 species = GetMonData(mon, MON_DATA_SPECIES);
+                curAbility = gSpeciesInfo[species].abilities[abilityNum];
+            }
+            u16 picks[2];
+            u8 n = 0;
+            // Only use ability slots 0-1 (no hidden abilities for enemies)
+            for (u8 i = 0; i < 2; i++)
+            {
+                u16 a = gSpeciesInfo[donor].abilities[i];
+                if (a != ABILITY_NONE && a != curAbility)
+                    picks[n++] = a;
+            }
+            if (n == 0)
+                continue;
+            SetGraftedAbilityOnMon(mon, picks[Random() % n]);
+            abilityUsed = TRUE;
+            applied++;
+        }
+        else // GK_TYPE
+        {
+            u8 type1 = gSpeciesInfo[species].types[0];
+            u8 type2 = gSpeciesInfo[species].types[1];
+            // Check grafted types too
+            if (mon->box.graftTypes[0] != GRAFT_TYPE_NONE)
+                type1 = mon->box.graftTypes[0];
+            if (mon->box.graftTypes[1] != GRAFT_TYPE_NONE)
+                type2 = mon->box.graftTypes[1];
+
+            u8 picks[2];
+            u8 n = 0;
+            for (u8 i = 0; i < 2; i++)
+            {
+                u8 t = gSpeciesInfo[donor].types[i];
+                if (t != type1 && t != type2 && t != TYPE_MYSTERY)
+                    picks[n++] = t;
+            }
+            if (n == 0)
+                continue;
+            u8 newType = picks[Random() % n];
+            // Pick slot: if mono-type, add as type2; else random slot
+            u8 slot;
+            if (type1 == type2)
+                slot = 1;
+            else if (typeSlotUsed[0] && typeSlotUsed[1])
+                continue;
+            else if (typeSlotUsed[0])
+                slot = 1;
+            else if (typeSlotUsed[1])
+                slot = 0;
+            else
+                slot = Random() & 1;
+
+            if (typeSlotUsed[slot])
+                continue;
+            SetGraftedTypeOnMon(mon, slot, newType);
+            typeSlotUsed[slot] = TRUE;
+            applied++;
+        }
+    }
+}
+
+void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
+{
+    u8 badges = GetBadgeCount();
+    u8 graftCount = 2 + badges; // 2 base + 1 per badge
+    BuildNearbyGraftPool();
+    if (sGraftDonorCount == 0)
+        return;
+    for (u8 i = 0; i < count; i++)
+        ApplyEnemyGrafts(&party[i], graftCount);
 }
 
 // Blend sprite palette for grafted type tinting.

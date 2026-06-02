@@ -42,3 +42,11 @@ u8 GetBadgeCount(void);
 u8 GetStatGraftCap(void);
 u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon);
 bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon);
+// Pointer-based setters (work on any Pokemon, not just gPlayerParty)
+void SetGraftedStatOnMon(struct Pokemon *mon, u8 statIndex, u16 statValue);
+void SetGraftedTypeOnMon(struct Pokemon *mon, u8 typeIndex, u8 type);
+void SetGraftedAbilityOnMon(struct Pokemon *mon, u16 ability);
+void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId);
+// Enemy trainer graft system
+void BuildNearbyGraftPool(void);
+void ApplyTrainerGrafts(struct Pokemon *party, u8 count);
