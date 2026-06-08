@@ -15,15 +15,6 @@ PetalburgCity_Mart_EventScript_Clerk::
 	.align 2
 PetalburgCity_Mart_Pokemart_Basic:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_PATCH_BALL
-	.if FLAG_BADGE01_GET
-	.2byte ITEM_GRAFT_BALL
-	.endif
-.if FLAG_BADGE03_GET
-	.2byte ITEM_GRAFT_BALL
-	.2byte ITEM_SPLICE_BALL
-	.2byte ITEM_GRAFT_SPLICER
-	.endif
 	.2byte ITEM_POTION
 	.2byte ITEM_ANTIDOTE
 	.2byte ITEM_PARALYZE_HEAL
@@ -45,15 +36,6 @@ PetalburgCity_Mart_EventScript_ExpandedItems::
 	.align 2
 PetalburgCity_Mart_Pokemart_Expanded:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_PATCH_BALL
-	.if FLAG_BADGE01_GET
-	.2byte ITEM_GRAFT_BALL
-	.endif
-.if FLAG_BADGE03_GET
-	.2byte ITEM_GRAFT_BALL
-	.2byte ITEM_SPLICE_BALL
-	.2byte ITEM_GRAFT_SPLICER
-	.endif
 	.2byte ITEM_GREAT_BALL
 	.2byte ITEM_POTION
 	.2byte ITEM_SUPER_POTION
@@ -66,7 +48,11 @@ PetalburgCity_Mart_Pokemart_Expanded:
 	.2byte ITEM_X_ATTACK
 	.2byte ITEM_X_DEFENSE
 	.2byte ITEM_ORANGE_MAIL
-	pokemartlistend
+		.2byte ITEM_PATCH_BALL
+	.2byte ITEM_GRAFT_BALL
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_GRAFT_SPLICER
+pokemartlistend
 
 PetalburgCity_Mart_EventScript_Woman::
 	msgbox PetalburgCity_Mart_Text_WeakWillGrowStronger, MSGBOX_NPC

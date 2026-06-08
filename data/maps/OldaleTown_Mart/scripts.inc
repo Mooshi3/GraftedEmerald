@@ -29,20 +29,15 @@ OldaleTown_Mart_ExpandedItems::
 	.align 2
 OldaleTown_Mart_Pokemart_Expanded:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_PATCH_BALL
-	.if FLAG_BADGE01_GET
-	.2byte ITEM_GRAFT_BALL
-	.endif
-.if FLAG_BADGE03_GET
-	.2byte ITEM_GRAFT_BALL
-	.2byte ITEM_SPLICE_BALL
-	.2byte ITEM_GRAFT_SPLICER
-	.endif
 	.2byte ITEM_POTION
 	.2byte ITEM_ANTIDOTE
 	.2byte ITEM_PARALYZE_HEAL
 	.2byte ITEM_AWAKENING
-	pokemartlistend
+		.2byte ITEM_PATCH_BALL
+	.2byte ITEM_GRAFT_BALL
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_GRAFT_SPLICER
+pokemartlistend
 
 OldaleTown_Mart_EventScript_Woman::
 	lock

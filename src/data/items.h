@@ -631,9 +631,9 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Graft Ball"),
     .price = 400,
     .description = COMPOUND_STRING(
-        "A Ball that extracts\n"
-        "genetic material from\n"
-        "a caught Pokemon."),
+        "A Ball that reveals\n"
+        "three graft categories\n"
+            "from a caught Pokemon."),
     .pocket = POCKET_POKE_BALLS,
     .type = ITEM_USE_BAG_MENU,
     .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -645,10 +645,8 @@ const struct ItemInfo gItemsInfo[] =
         .name = ITEM_NAME("Patch Ball"),
         .price = 200,
         .description = COMPOUND_STRING(
-            "A cheap Ball that
-"
-            "extracts one graft
-"
+            "A cheap Ball that\n"
+            "extracts one graft\n"
             "category from a catch."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
@@ -661,10 +659,8 @@ const struct ItemInfo gItemsInfo[] =
         .name = ITEM_NAME("Splice Ball"),
         .price = 800,
         .description = COMPOUND_STRING(
-            "A premium Ball that
-"
-            "reveals all graft
-"
+            "A premium Ball that\n"
+            "reveals all graft\n"
             "categories from a catch."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
@@ -677,7 +673,7 @@ const struct ItemInfo gItemsInfo[] =
 // Graft Splicer
 [ITEM_GRAFT_SPLICER] = {
     .name = ITEM_NAME("Graft Splicer"),
-    .price = 800,
+    .price = 1000,
     .holdEffectParam = 0,
     .description = COMPOUND_STRING(
         "Sacrifice a Pokemon to\n"
