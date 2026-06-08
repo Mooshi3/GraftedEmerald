@@ -6561,7 +6561,7 @@ static void Cmd_graftmenu(void)
                 PlaySE(SE_SELECT);
                 // Player picked a graft - open party menu to choose target mon
                 // Player picked a category
-                SetSelectedGraftCategory(gBattleCommunication[CURSOR_POSITION]);
+                SetSelectedGraftCategory(GetGraftMenuRealCategory(gBattleCommunication[CURSOR_POSITION]));
                 SetGraftMenuSubCursor(0);
                 SetSelectedGraftFromCategory();
                     // Route to submenu based on category

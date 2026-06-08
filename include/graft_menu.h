@@ -37,7 +37,8 @@ struct GraftMenuState {
     u8 category;        // Currently selected category (0-4)
     u8 subCursor;       // Cursor for submenu (move index, type slot, stat index)
     u8 phase;           // Which phase of the menu we're in
-    u8 confirmCursor;   // Yes/no cursor
+    u8 confirmCursor;
+    u8 numCategories;   // Yes/no cursor
 };
 
 // Legacy GraftOption struct (used by SetSelectedGraftFromCategory)
@@ -62,6 +63,8 @@ void SetSelectedGraftFromCategory(void);
 
 u8 GetSelectedGraftCategory(void);
 void SetSelectedGraftCategory(u8 category);
+u8 GetGraftMenuNumCategories(void);
+u8 GetGraftMenuRealCategory(u8 displayPos);
 u8 GetGraftMenuSubCursor(void);
 void SetGraftMenuSubCursor(u8 cursor);
 

@@ -19,8 +19,15 @@ RustboroCity_Mart_EventScript_PokemartBasic::
 	.align 2
 RustboroCity_Mart_Pokemart_Basic:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_GRAFT_BALL
-.2byte ITEM_GRAFT_SPLICER
+.2byte ITEM_PATCH_BALL
+	.if FLAG_BADGE01_GET
+	.2byte ITEM_GRAFT_BALL
+	.endif
+.if FLAG_BADGE03_GET
+	.2byte ITEM_GRAFT_BALL
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_GRAFT_SPLICER
+	.endif
 	.2byte ITEM_POTION
 	.2byte ITEM_SUPER_POTION
 	.2byte ITEM_ANTIDOTE
@@ -41,8 +48,15 @@ RustboroCity_Mart_EventScript_PokemartExpanded::
 	.align 2
 RustboroCity_Mart_Pokemart_Expanded:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_GRAFT_BALL
-.2byte ITEM_GRAFT_SPLICER
+.2byte ITEM_PATCH_BALL
+	.if FLAG_BADGE01_GET
+	.2byte ITEM_GRAFT_BALL
+	.endif
+.if FLAG_BADGE03_GET
+	.2byte ITEM_GRAFT_BALL
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_GRAFT_SPLICER
+	.endif
 	.2byte ITEM_TIMER_BALL
 	.2byte ITEM_REPEAT_BALL
 	.2byte ITEM_POTION

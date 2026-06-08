@@ -14,8 +14,15 @@ MauvilleCity_Mart_EventScript_Clerk::
 	.align 2
 MauvilleCity_Mart_Pokemart:
 	.2byte ITEM_POKE_BALL
-.2byte ITEM_GRAFT_BALL
-.2byte ITEM_GRAFT_SPLICER
+.2byte ITEM_PATCH_BALL
+	.if FLAG_BADGE01_GET
+	.2byte ITEM_GRAFT_BALL
+	.endif
+.if FLAG_BADGE03_GET
+	.2byte ITEM_GRAFT_BALL
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_GRAFT_SPLICER
+	.endif
 	.2byte ITEM_GREAT_BALL
 	.2byte ITEM_SUPER_POTION
 	.2byte ITEM_ANTIDOTE

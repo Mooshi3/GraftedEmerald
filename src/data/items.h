@@ -641,6 +641,38 @@ const struct ItemInfo gItemsInfo[] =
     .iconPic = gItemIcon_BeastBall,
     .iconPalette = gItemIconPalette_BeastBall,
 },
+    [ITEM_PATCH_BALL] = {
+        .name = ITEM_NAME("Patch Ball"),
+        .price = 200,
+        .description = COMPOUND_STRING(
+            "A cheap Ball that
+"
+            "extracts one graft
+"
+            "category from a catch."),
+        .pocket = POCKET_POKE_BALLS,
+        .type = ITEM_USE_BAG_MENU,
+        .battleUsage = EFFECT_ITEM_THROW_BALL,
+        .secondaryId = BALL_PATCH,
+        .iconPic = gItemIcon_PokeBall,
+        .iconPalette = gItemIconPalette_PokeBall,
+    },
+    [ITEM_SPLICE_BALL] = {
+        .name = ITEM_NAME("Splice Ball"),
+        .price = 800,
+        .description = COMPOUND_STRING(
+            "A premium Ball that
+"
+            "reveals all graft
+"
+            "categories from a catch."),
+        .pocket = POCKET_POKE_BALLS,
+        .type = ITEM_USE_BAG_MENU,
+        .battleUsage = EFFECT_ITEM_THROW_BALL,
+        .secondaryId = BALL_SPLICE,
+        .iconPic = gItemIcon_UltraBall,
+        .iconPalette = gItemIconPalette_UltraBall,
+    },
 
 // Graft Splicer
 [ITEM_GRAFT_SPLICER] = {

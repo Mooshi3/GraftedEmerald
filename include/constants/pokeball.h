@@ -31,7 +31,9 @@ enum PokeBall
     BALL_PARK = 25,
     BALL_BEAST = 26,
     BALL_CHERISH = 27,
-    BALL_GRAFT = 28,
+    BALL_PATCH = 28,
+    BALL_GRAFT = 29,
+    BALL_SPLICE = 30,
     POKEBALL_COUNT
 };
 

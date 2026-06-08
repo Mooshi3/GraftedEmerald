@@ -192,6 +192,8 @@ BattleScript_SafariBallThrow::
 BattleScript_SuccessBallThrow::
 	setbyte sMON_CAUGHT, TRUE
 	incrementgamestat GAME_STAT_POKEMON_CAPTURES
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36D, BattleScript_GraftBallCatch
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36E, BattleScript_GraftBallCatch
 	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36A, BattleScript_GraftBallCatch
 	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
 	jumpifbyte CMP_NOT_EQUAL, sEXP_CATCH, TRUE, BattleScript_TryPrintCaughtMonInfo

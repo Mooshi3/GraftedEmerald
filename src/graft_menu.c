@@ -1,5 +1,6 @@
 #include "global.h"
 #include "graft_menu.h"
+#include "constants/pokeball.h"
 #include "graft_data.h"
 #include "battle.h"
 #include "battle_setup.h"
@@ -274,6 +275,7 @@ u16 GetGraftSourceSpecies(void) { return sCaughtMonSpecies; }
 
 u8 GetSelectedGraftCategory(void) { return sGraftMenu.category; }
 void SetSelectedGraftCategory(u8 category) { sGraftMenu.category = category; }
+u8 GetGraftMenuNumCategories(void) { return sGraftMenu.numCategories; }
 u8 GetGraftMenuSubCursor(void) { return sGraftMenu.subCursor; }
 void SetGraftMenuSubCursor(u8 cursor) { sGraftMenu.subCursor = cursor; }
 
@@ -342,8 +344,9 @@ u16 GetGraftRollSpecies(void) { return sCaughtMonSpecies; }
 // Write category option text for the 5-category menu
 // ============================================================
 
-static u32 WriteCategoryOptionName(u8 category, u8 *dest)
+static u32 WriteCategoryOptionName(u8 displayPos, u8 *dest)
 {
+    u8 category = GetGraftMenuRealCategory(displayPos);
     switch (category)
     {
     case GRAFT_CATEGORY_ABILITY:
@@ -432,11 +435,52 @@ static u32 WriteSubmenuDetail(u8 category, u8 subCursor, u8 *dest)
 // StartGraftMenu — called from battle script to begin category menu
 // ============================================================
 
+
+// Category display order (shuffled for Patch/Graft balls)
+static EWRAM_DATA u8 sCategoryOrder[GRAFT_CATEGORY_COUNT];
+
+static void ShuffleCategoryOrder(void)
+{
+    u8 i, j, tmp;
+    for (i = GRAFT_CATEGORY_COUNT - 1; i > 0; i--)
+    {
+        j = Random() % (i + 1);
+        tmp = sCategoryOrder[i];
+        sCategoryOrder[i] = sCategoryOrder[j];
+        sCategoryOrder[j] = tmp;
+    }
+}
+
+u8 GetGraftMenuRealCategory(u8 displayPos)
+{
+    if (displayPos >= sGraftMenu.numCategories)
+        return GRAFT_CATEGORY_COUNT; // invalid
+    return sCategoryOrder[displayPos];
+}
+
 void StartGraftMenu(void)
 {
+    u8 i;
+    for (i = 0; i < GRAFT_CATEGORY_COUNT; i++)
+        sCategoryOrder[i] = i;
+    u8 ballId = ItemIdToBallId(gLastUsedItem);
     sGraftMenu.category = 0;
     sGraftMenu.subCursor = 0;
     sGraftMenu.phase = 0;
+    if (ballId == BALL_PATCH)
+    {
+        sGraftMenu.numCategories = 1;
+        ShuffleCategoryOrder();
+    }
+    else if (ballId == BALL_GRAFT)
+    {
+        sGraftMenu.numCategories = 3;
+        ShuffleCategoryOrder();
+    }
+    else
+    {
+        sGraftMenu.numCategories = GRAFT_CATEGORY_COUNT; // Splice Ball: all 5
+    }
 }
 
 // ============================================================
@@ -463,7 +507,7 @@ void UpdateGraftMenuCursor(u8 cursorPos)
     ConvertIntToDecimalStringN(gStringVar2, cursorPos + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
     StringAppend(gStringVar1, gStringVar2);
     StringAppend(gStringVar1, COMPOUND_STRING("/5"));
-    if (cursorPos < GRAFT_CATEGORY_COUNT - 1)
+    if (cursorPos < sGraftMenu.numCategories - 1)
         StringAppend(gStringVar1, COMPOUND_STRING("{DOWN_ARROW}"));
     else
         StringAppend(gStringVar1, COMPOUND_STRING(" "));
@@ -498,7 +542,7 @@ void UpdateGraftMenuCursorOverworld(u8 cursorPos)
     ConvertIntToDecimalStringN(gStringVar2, cursorPos + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
     StringAppend(gStringVar4, gStringVar2);
     StringAppend(gStringVar4, COMPOUND_STRING("/5"));
-    if (cursorPos < GRAFT_CATEGORY_COUNT - 1)
+    if (cursorPos < sGraftMenu.numCategories - 1)
         StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
     else
         StringAppend(gStringVar4, COMPOUND_STRING(" "));

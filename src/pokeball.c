@@ -380,6 +380,14 @@ const struct PokeBallSprite gPokeBalls[POKEBALL_COUNT] =
         POKE_BALL_SPRITE(GFX_TAG_CHERISH_BALL, gBallGfx_Cherish, gBallPal_Cherish),
         .itemId = ITEM_CHERISH_BALL,
     },
+        [BALL_PATCH] = {
+        POKE_BALL_SPRITE(GFX_TAG_POKE_BALL, gBallGfx_Poke, gBallPal_Poke),
+        .itemId = ITEM_PATCH_BALL,
+    },
+    [BALL_SPLICE] = {
+        POKE_BALL_SPRITE(GFX_TAG_ULTRA_BALL, gBallGfx_Ultra, gBallPal_Ultra),
+        .itemId = ITEM_SPLICE_BALL,
+    },
     [BALL_GRAFT] = {
     POKE_BALL_SPRITE(GFX_TAG_GRAFT_BALL, gBallGfx_Ultra, gBallPal_Ultra),
     .itemId = ITEM_GRAFT_BALL,
@@ -1415,7 +1423,9 @@ void LoadBallGfx(u8 ballId)
     case BALL_POKE ... BALL_MASTER:
     case BALL_NET ... BALL_NEST:
     case BALL_REPEAT:
-    case BALL_GRAFT:
+    case BALL_PATCH:
+        case BALL_GRAFT:
+        case BALL_SPLICE:
     case BALL_SAFARI:
         var = GetSpriteTileStartByTag(gPokeBalls[ballId].pic.tag);
         DecompressDataWithHeaderVram(gOpenPokeballGfx, (void *)(OBJ_VRAM0 + 0x100 + var * 32));
