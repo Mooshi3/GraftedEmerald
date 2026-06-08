@@ -28,6 +28,8 @@
 #include "scanline_effect.h"
 #include "script.h"
 #include "shop.h"
+#include "constants/flags.h"
+#include "event_data.h"
 #include "sound.h"
 #include "sprite.h"
 #include "string_util.h"
@@ -124,6 +126,35 @@ static void ShowShopMenuAfterExitingBuyOrSellMenu(u8 taskId);
 static void BuyMenuDrawGraphics(void);
 static void BuyMenuAddScrollIndicatorArrows(void);
 static void Task_BuyMenu(u8 taskId);
+
+// Returns the number of badges required to purchase an item.
+// 0 = always available. Used for graft item gating.
+static u8 GetItemBadgeRequirement(u16 itemId)
+{
+    switch (itemId)
+    {
+    case ITEM_GRAFT_BALL:
+        return 1;
+    case ITEM_SPLICE_BALL:
+    case ITEM_GRAFT_SPLICER:
+        return 3;
+    default:
+        return 0;
+    }
+}
+
+static u8 GetPlayerBadgeCount(void)
+{
+    u8 count = 0;
+    u32 i;
+    for (i = FLAG_BADGE01_GET; i < FLAG_BADGE01_GET + NUM_BADGES; i++)
+    {
+        if (FlagGet(i))
+            count++;
+    }
+    return count;
+}
+
 static void BuyMenuBuildListMenuTemplate(void);
 static void BuyMenuInitBgs(void);
 static void BuyMenuInitWindows(void);
@@ -556,14 +587,26 @@ static void BuyMenuFreeMemory(void)
     FreeAllWindowBuffers();
 }
 
+
+// Returns the number of badges required to purchase an item.
+// 0 = always available. Used for graft item gating.
 static void BuyMenuBuildListMenuTemplate(void)
 {
     u16 i;
 
     sListMenuItems = Alloc((sMartInfo.itemCount + 1) * sizeof(*sListMenuItems));
     sItemNames = Alloc((sMartInfo.itemCount + 1) * sizeof(*sItemNames));
+    // Filter items by badge requirement
+    u16 displayCount = 0;
+    u8 badgeCount = GetPlayerBadgeCount();
     for (i = 0; i < sMartInfo.itemCount; i++)
-        BuyMenuSetListEntry(&sListMenuItems[i], sMartInfo.itemList[i], sItemNames[i]);
+    {
+        if (GetItemBadgeRequirement(sMartInfo.itemList[i]) > badgeCount)
+            continue; // Skip items the player can't buy yet
+        BuyMenuSetListEntry(&sListMenuItems[displayCount], sMartInfo.itemList[i], sItemNames[displayCount]);
+        displayCount++;
+    }
+    sMartInfo.itemCount = displayCount;
 
     StringCopy(sItemNames[i], gText_Cancel2);
     sListMenuItems[i].name = sItemNames[i];
