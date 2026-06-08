@@ -680,28 +680,24 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
 #include "constants/rgb.h"
 
 // ---- Tunables ----------------------------------------------------------
-// Luminance bands are biased toward the midtones, where most sprite pixels
-// live, so the "base" and "light" shades get the resolution instead of
-// wasting two of four shades on near-empty highlight/shadow extremes.
-#define GRAFT_OUTLINE_LUM    4   // entries dimmer than this keep their original color (outlines)
-#define GRAFT_BAND_DARK_MAX  12  // lum <= this  -> dark shade
-#define GRAFT_BAND_BASE_MAX  20  // lum <= this  -> base shade
-#define GRAFT_BAND_LIGHT_MAX 26  // lum <= this  -> light shade; above -> highlight
-#define GRAFT_SAT_THRESHOLD  3   // RGB555 (max-min) below this = gray, no usable hue
-#define GRAFT_PAL_MAX        16  // GBA sprite palette size
+#define GRAFT_OUTLINE_LUM 4   // entries dimmer than this keep original color
+#define GRAFT_SAT_THRESHOLD 3 // RGB555 (max-min) below this = gray, no usable hue
+#define GRAFT_PAL_MAX 16      // GBA sprite palette size
+#define GRAFT_HUE_GAP_MIN 85 // minimum second-gap for dual-cluster; below = single hue
+
+// Luminance-adaptive neutral threshold:
+// Dark pixels: even slight tint counts (threshold ~0.04 of max delta)
+// Bright pixels: need clearly colored (threshold ~0.19 of max delta)
+// Linear ramp: threshold = 1 + (lum_norm * 6), in 5-bit delta units
+// Matches Python: 0.04 + t * 0.15 where t = (lum-4)/(31-4)
 
 // Weighted luminance: 0.30 R + 0.59 G + 0.11 B. Inputs 0..31, output 0..31.
-// (77 + 151 + 28 = 256, so >> 8 rescales cleanly.) A flat (r+g+b)/3 average
-// misbands blue-heavy sprites — exactly the kind you'd hit testing on a
-// Water-type like Mudkip — because green reads far brighter than blue.
 static u8 GraftLuminance(s16 r, s16 g, s16 b)
 {
     return (u8)((77 * r + 151 * g + 28 * b) >> 8);
 }
 
-// Integer hue on a 0..1535 wheel (256 units per sextant).
-// Returns FALSE when the color is too desaturated to carry a hue
-// (gray / white / black), so callers can route grays sensibly.
+// Integer hue on a 0..1535 wheel. Returns FALSE if too desaturated.
 static bool8 GraftHue(s16 r, s16 g, s16 b, u16 *outHue)
 {
     s16 maxc = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
@@ -713,11 +709,11 @@ static bool8 GraftHue(s16 r, s16 g, s16 b, u16 *outHue)
         return FALSE;
 
     if (maxc == r)
-        h = ((g - b) * 256) / delta;          // red sextant (may be negative)
+        h = ((g - b) * 256) / delta;
     else if (maxc == g)
-        h = 512 + ((b - r) * 256) / delta;    // green sextant
+        h = 512 + ((b - r) * 256) / delta;
     else
-        h = 1024 + ((r - g) * 256) / delta;   // blue sextant
+        h = 1024 + ((r - g) * 256) / delta;
 
     if (h < 0)
         h += 1536;
@@ -728,41 +724,88 @@ static bool8 GraftHue(s16 r, s16 g, s16 b, u16 *outHue)
     return TRUE;
 }
 
-// Luminance -> shade band. 0 = dark, 1 = base, 2 = light, 3 = highlight.
-static u8 GraftBandFromLum(u8 lum)
+// Luminance-adaptive neutral check. Returns TRUE if the pixel is "neutral"
+// (gray/white/black) and should NOT be recolored.
+// Dark pixels: low threshold (subtle tints are real color)
+// Bright pixels: high threshold (skip eye whites, pure grays)
+static bool8 GraftIsNeutral(s16 r5, s16 g5, s16 b5)
 {
-    if (lum <= GRAFT_BAND_DARK_MAX)  return 0;
-    if (lum <= GRAFT_BAND_BASE_MAX)  return 1;
-    if (lum <= GRAFT_BAND_LIGHT_MAX) return 2;
-    return 3;
+    s16 maxc = (r5 > g5) ? (r5 > b5 ? r5 : b5) : (g5 > b5 ? g5 : b5);
+    s16 minc = (r5 < g5) ? (r5 < b5 ? r5 : b5) : (g5 < b5 ? g5 : b5);
+    s16 delta = maxc - minc;
+    u8 lum = GraftLuminance(r5, g5, b5);
+    u8 threshold;
+
+    // t = (lum - OUTLINE_LUM) / (31 - OUTLINE_LUM), 0..1
+    // threshold = 1 + (t * 6), integer 5-bit delta threshold
+    // Maps to Python: 0.04 + t * 0.15 scaled to delta units
+    if (lum <= GRAFT_OUTLINE_LUM)
+        return (delta < 1);
+
+    {
+        // (lum - 4) * 6 / 27, clamped
+        s16 t256 = ((s16)(lum - GRAFT_OUTLINE_LUM) * 256) / (31 - GRAFT_OUTLINE_LUM);
+        // threshold in delta units: 1 + (t256 * 6) / 256
+        threshold = (u8)(1 + ((t256 * 6) >> 8));
+    }
+
+    return (delta < threshold);
 }
 
-// Build the shade of a type color for a given band.
-// dark  ~ 44% toward black; light ~ 56% toward white; highlight ~ 81%.
-static u16 GraftShade(const struct PlttData *type, u8 band)
+// Anchored luminance-preserving shade interpolation.
+// Dark pixels -> dark shade (7/16 of type color)
+// Mid pixels -> pure type color (full saturation guaranteed)
+// Bright pixels -> light shade (type + 9/16 blend toward white)
+// 
+// Two-segment: dark->base at t=0..0.5, base->light at t=0.5..1.0
+// This ensures the type color itself appears at the midpoint luminance,
+// preventing desaturation that a simple dark-to-light lerp would cause.
+static u16 GraftShadeContinuous(const struct PlttData *type, u8 lum, u8 minLum, u8 maxLum)
 {
     s16 tr = type->r, tg = type->g, tb = type->b;
+    s16 dr, dg, db;  // dark shade
+    s16 lr, lg, lb;  // light shade
     s16 r, g, b;
+    u16 t256;
 
-    switch (band)
+    // t = (lum - minLum) / (maxLum - minLum), as 0..256 fixed point
+    if (maxLum <= minLum)
+        t256 = 128;
+    else
+        t256 = (u16)(((s16)(lum - minLum) * 256) / (maxLum - minLum));
+
+    // Dark shade: type * 7/16
+    dr = (tr * 7) >> 4;
+    dg = (tg * 7) >> 4;
+    db = (tb * 7) >> 4;
+
+    // Light shade: type + (31 - type) * 9/16
+    lr = tr + (((31 - tr) * 9) >> 4);
+    lg = tg + (((31 - tg) * 9) >> 4);
+    lb = tb + (((31 - tb) * 9) >> 4);
+
+    if (t256 <= 128)
     {
-    case 0: // dark
-        r = (tr * 7) >> 4;  g = (tg * 7) >> 4;  b = (tb * 7) >> 4;
-        break;
-    case 2: // light
-        r = tr + (((31 - tr) * 9)  >> 4);
-        g = tg + (((31 - tg) * 9)  >> 4);
-        b = tb + (((31 - tb) * 9)  >> 4);
-        break;
-    case 3: // highlight
-        r = tr + (((31 - tr) * 13) >> 4);
-        g = tg + (((31 - tg) * 13) >> 4);
-        b = tb + (((31 - tb) * 13) >> 4);
-        break;
-    default: // 1 = base
-        r = tr;  g = tg;  b = tb;
-        break;
+        // Dark to base: lerp dr->tr with t mapped to [0, 256]
+        u16 subT = t256 * 2;  // 0..256
+        r = dr + (((tr - dr) * subT) >> 8);
+        g = dg + (((tg - dg) * subT) >> 8);
+        b = db + (((tb - db) * subT) >> 8);
     }
+    else
+    {
+        // Base to light: lerp tr->lr with t mapped to [0, 256]
+        u16 subT = (t256 - 128) * 2;  // 0..256
+        r = tr + (((lr - tr) * subT) >> 8);
+        g = tg + (((lg - tg) * subT) >> 8);
+        b = tb + (((lb - tb) * subT) >> 8);
+    }
+
+    // Clamp to 5-bit range
+    if (r < 0) r = 0; if (r > 31) r = 31;
+    if (g < 0) g = 0; if (g > 31) g = 31;
+    if (b < 0) b = 0; if (b > 31) b = 31;
+
     return RGB(r, g, b);
 }
 
@@ -770,12 +813,14 @@ void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u3
 {
     struct PlttData *c1 = (struct PlttData *)&type1Color;
     struct PlttData *c2 = (struct PlttData *)&type2Color;
-
     u16 hue[GRAFT_PAL_MAX];
-    u8  cluster[GRAFT_PAL_MAX];     // 0 -> type1, 1 -> type2
-    u8  valid[GRAFT_PAL_MAX];       // entry indices that carry a usable hue
-    u8  numValid = 0;
+    u8 cluster[GRAFT_PAL_MAX]; // 0 -> type1, 1 -> type2
+    u8 valid[GRAFT_PAL_MAX];   // entry indices that carry a usable hue
+    u8 numValid = 0;
     u16 i;
+
+    // Global luminance min/max across all colored slots
+    u8 globalMinLum = 31, globalMaxLum = 0;
 
     if (numEntries > GRAFT_PAL_MAX)
         numEntries = GRAFT_PAL_MAX;
@@ -785,32 +830,37 @@ void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u3
     {
         struct PlttData *src = (struct PlttData *)&gPlttBufferUnfaded[palOffset + i];
         s16 r = src->r, g = src->g, b = src->b;
+        u8 lum;
 
-        cluster[i] = 0; // default everything to type1 (grays, single-type, fallbacks)
+        cluster[i] = 0; // default type1
+        if (i == 0) continue; // transparent slot
+        lum = GraftLuminance(r, g, b);
+        if (lum < GRAFT_OUTLINE_LUM) continue; // outline / near-black
 
-        if (i == 0)
-            continue;                                   // transparent slot
-        if (GraftLuminance(r, g, b) < GRAFT_OUTLINE_LUM)
-            continue;                                   // outline / near-black
+        // Luminance-adaptive neutral check
+        if (GraftIsNeutral(r, g, b)) continue;
+
+        // Track global luminance range
+        if (lum < globalMinLum) globalMinLum = lum;
+        if (lum > globalMaxLum) globalMaxLum = lum;
+
         if (GraftHue(r, g, b, &hue[i]))
             valid[numValid++] = (u8)i;
     }
 
     // ---- Pass 2: for dual types with 2+ hues, split into two clusters by hue.
-    // Method: sort hues, find the TWO largest circular gaps; the two arcs they
-    // bound are the clusters. Deterministic, no iteration, no convergence pain.
     if (isDualType && numValid >= 2)
     {
         u8 j, k;
-        u16 g1size = 0, g2size = 0;   // magnitudes of the two largest gaps
-        u8  g1 = 0, g2 = 0;           // their positions (gap follows valid[pos])
-        u8  lo, hi, sizeB, sizeA;
+        u16 g1size = 0, g2size = 0;
+        u8 g1 = 0, g2 = 0;
+        u8 lo, hi, sizeB, sizeA;
         bool8 bigIsB;
 
-        // insertion sort valid[] by hue (<= 16 elements)
+        // insertion sort valid[] by hue
         for (j = 1; j < numValid; j++)
         {
-            u8  key = valid[j];
+            u8 key = valid[j];
             s16 m = (s16)j - 1;
             while (m >= 0 && hue[valid[m]] > hue[key])
             {
@@ -823,54 +873,190 @@ void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u3
         // two largest circular gaps
         for (k = 0; k < numValid; k++)
         {
-            u16 hCur  = hue[valid[k]];
+            u16 hCur = hue[valid[k]];
             u16 hNext = hue[valid[(k + 1) % numValid]];
-            u16 gap   = (k + 1 == numValid) ? (1536 - hCur + hNext) : (hNext - hCur);
-
-            if (gap > g1size)      { g2size = g1size; g2 = g1; g1size = gap; g1 = k; }
-            else if (gap > g2size) { g2size = gap;            g2 = k; }
+            u16 gap = (k + 1 == numValid) ? (1536 - hCur + hNext) : (hNext - hCur);
+            if (gap > g1size)
+            {
+                g2size = g1size; g2 = g1;
+                g1size = gap; g1 = k;
+            }
+            else if (gap > g2size)
+            {
+                g2size = gap; g2 = k;
+            }
         }
 
-        lo = (g1 < g2) ? g1 : g2;
-        hi = (g1 < g2) ? g2 : g1;
-        sizeB = hi - lo;                 // arc (lo+1 .. hi)
-        sizeA = numValid - sizeB;        // the rest, wrapping around
-        bigIsB = (sizeB > sizeA);        // larger group -> type1 ("body")
-
-        for (k = 0; k < numValid; k++)
+        // Check if second gap is big enough for dual clustering
+        if (g2size < GRAFT_HUE_GAP_MIN)
         {
-            bool8 inB = (k > lo && k <= hi);
-            if (inB)
-                cluster[valid[k]] = bigIsB ? 0 : 1;
-            else
-                cluster[valid[k]] = bigIsB ? 1 : 0;
+            // ---- Luminance fallback for single-hue sprites ----
+            // Split by brightness: top 40% brightest = type2 accent, rest = type1 body
+            u8 lums[GRAFT_PAL_MAX];
+            u8 lumOrder[GRAFT_PAL_MAX];
+            u8 nAccent;
+            u8 count0, count1;
+
+            for (k = 0; k < numValid; k++)
+            {
+                lums[k] = GraftLuminance(
+                    ((struct PlttData *)&gPlttBufferUnfaded[palOffset + valid[k]])->r,
+                    ((struct PlttData *)&gPlttBufferUnfaded[palOffset + valid[k]])->g,
+                    ((struct PlttData *)&gPlttBufferUnfaded[palOffset + valid[k]])->b
+                );
+                lumOrder[k] = k;
+            }
+
+            // Sort by luminance (insertion sort, small N)
+            for (j = 1; j < numValid; j++)
+            {
+                u8 keyIdx = lumOrder[j];
+                s16 m = (s16)j - 1;
+                while (m >= 0 && lums[lumOrder[m]] > lums[keyIdx])
+                {
+                    lumOrder[m + 1] = lumOrder[m];
+                    m--;
+                }
+                lumOrder[m + 1] = keyIdx;
+            }
+
+            // Top 40% = accent (type2), rest = body (type1)
+            nAccent = (numValid * 4) / 10;
+            if (nAccent < 1) nAccent = 1;
+
+            for (k = 0; k < numValid; k++)
+            {
+                u8 srcIdx = lumOrder[k];
+                cluster[valid[srcIdx]] = (k >= (numValid - nAccent)) ? 1 : 0;
+            }
+
+            // If type2 group is larger, swap so type1 is the bigger group
+            count0 = 0; count1 = 0;
+            for (k = 0; k < numValid; k++)
+            {
+                if (cluster[valid[k]] == 0) count0++;
+                else count1++;
+            }
+            if (count1 > count0)
+            {
+                for (k = 0; k < numValid; k++)
+                    cluster[valid[k]] = 1 - cluster[valid[k]];
+            }
+        }
+        else
+        {
+            // ---- Gap-based hue split ----
+            lo = (g1 < g2) ? g1 : g2;
+            hi = (g1 < g2) ? g2 : g1;
+            sizeB = hi - lo;
+            sizeA = numValid - sizeB;
+            bigIsB = (sizeB > sizeA);
+
+            for (k = 0; k < numValid; k++)
+            {
+                bool8 inB = (k > lo && k <= hi);
+                if (inB)
+                    cluster[valid[k]] = bigIsB ? 0 : 1;
+                else
+                    cluster[valid[k]] = bigIsB ? 1 : 0;
+            }
+
+            // ---- Rebalance: if split is too imbalanced, move border slots ----
+            {
+                u8 count0 = 0, count1 = 0;
+                u8 smallCount, minSize, need;
+                u8 smallCluster, bigCluster;
+                u16 avgSmallHue;
+                s32 bestDist, bestSlot;
+
+                for (k = 0; k < numValid; k++)
+                {
+                    if (cluster[valid[k]] == 0) count0++;
+                    else count1++;
+                }
+
+                smallCount = (count0 < count1) ? count0 : count1;
+                minSize = (numValid * 3) / 10; // at least 30%
+                if (minSize < 2) minSize = 2;
+
+                if (smallCount < minSize)
+                {
+                    smallCluster = (count0 < count1) ? 0 : 1;
+                    bigCluster = 1 - smallCluster;
+
+                    // Average hue of small group
+                    avgSmallHue = 0;
+                    {
+                        u8 sc = 0;
+                        for (k = 0; k < numValid; k++)
+                        {
+                            if (cluster[valid[k]] == smallCluster)
+                            {
+                                avgSmallHue += hue[valid[k]];
+                                sc++;
+                            }
+                        }
+                        if (sc > 0) avgSmallHue /= sc;
+                    }
+
+                    need = minSize - smallCount;
+
+                    // Move border slots from big group closest to small group centroid
+                    while (need > 0)
+                    {
+                        bestSlot = -1;
+                        bestDist = 9999;
+                        for (k = 0; k < numValid; k++)
+                        {
+                            u16 hd;
+                            if (cluster[valid[k]] != bigCluster) continue;
+                            // Circular hue distance
+                            hd = abs((s16)hue[valid[k]] - (s16)avgSmallHue);
+                            if (hd > 768) hd = 1536 - hd;
+                            if ((s16)hd < bestDist)
+                            {
+                                bestDist = (s16)hd;
+                                bestSlot = k;
+                            }
+                        }
+                        if (bestSlot < 0) break;
+                        cluster[valid[bestSlot]] = smallCluster;
+                        need--;
+                    }
+                }
+            }
         }
     }
 
-    // ---- Pass 3: write the swapped palette
+    // ---- Pass 3: write the swapped palette using continuous shading ----
     for (i = 0; i < numEntries; i++)
     {
         struct PlttData *src = (struct PlttData *)&gPlttBufferUnfaded[palOffset + i];
         s16 r = src->r, g = src->g, b = src->b;
         u8 lum;
 
-        if (i == 0)
-            continue;                                          // keep transparent
+        if (i == 0) continue; // keep transparent
 
         lum = GraftLuminance(r, g, b);
         if (lum < GRAFT_OUTLINE_LUM)
         {
-            gPlttBufferFaded[palOffset + i] = gPlttBufferUnfaded[palOffset + i]; // outline stays
+            gPlttBufferFaded[palOffset + i] = gPlttBufferUnfaded[palOffset + i];
+            continue;
+        }
+
+        // Skip neutral (gray/white) pixels
+        if (GraftIsNeutral(r, g, b))
+        {
+            gPlttBufferFaded[palOffset + i] = gPlttBufferUnfaded[palOffset + i];
             continue;
         }
 
         {
             const struct PlttData *tc = (cluster[i] == 0) ? c1 : c2;
-            gPlttBufferFaded[palOffset + i] = GraftShade(tc, GraftBandFromLum(lum));
+            gPlttBufferFaded[palOffset + i] = GraftShadeContinuous(tc, lum, globalMinLum, globalMaxLum);
         }
     }
 }
-
 
 // Check if a player battler has any grafted types that differ from
 // the species' natural types. Returns the effective types and which
