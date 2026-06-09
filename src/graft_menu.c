@@ -599,38 +599,39 @@ static EWRAM_DATA bool8 sEnemyGraftViewerOpen;
 
 void ShowEnemyGrafts(enum BattlerId battler)
 {
-    struct Pokemon *mon;
     struct BoxPokemon *boxMon;
     u8 graftFlags;
+    u8 partySlot;
+    enum BattlerId enemyBattler;
+    u8 *ptr;
     u8 i;
     u16 moveId;
 
-    // Get the active enemy battler's mon directly
-    mon = &gEnemyParty[gBattlerPartyIndexes[GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)]];
-    boxMon = &mon->box;
+    enemyBattler = BATTLE_OPPOSITE(battler);
+    partySlot = gBattlerPartyIndexes[enemyBattler];
+    boxMon = &gEnemyParty[partySlot].box;
     graftFlags = boxMon->graftFlags;
 
     sEnemyGraftViewerOpen = TRUE;
 
-    // Use same setup as MoveSelectionDisplayMoveDescription
     LoadMessageBoxAndBorderGfx();
     DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
 
-    StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
+    ptr = StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
 
     if (graftFlags == 0)
     {
-        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts.\pR/B: close"));
+        ptr = StringAppend(ptr, COMPOUND_STRING("\pNo grafts."));
     }
     else
     {
-        StringAppend(gStringVar4, COMPOUND_STRING("\p"));
+        ptr = StringAppend(ptr, COMPOUND_STRING("\p"));
 
         if (graftFlags & GRAFT_FLAG_ABILITY)
         {
-            StringAppend(gStringVar4, COMPOUND_STRING("Ability: "));
-            StringAppend(gStringVar4, gAbilitiesInfo[GetGraftedAbilityFromBoxMon(boxMon)].name);
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+            ptr = StringAppend(ptr, COMPOUND_STRING("Ability: "));
+            ptr = StringCopy(ptr, gAbilitiesInfo[boxMon->graftAbility].name);
+            ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
         }
 
         if (graftFlags & GRAFT_FLAG_TYPE)
@@ -639,9 +640,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
             {
                 if (boxMon->graftTypes[i] != 0xFF)
                 {
-                    StringAppend(gStringVar4, COMPOUND_STRING("Type: "));
-                    StringAppend(gStringVar4, gTypesInfo[boxMon->graftTypes[i]].name);
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                    ptr = StringAppend(ptr, COMPOUND_STRING("Type: "));
+                    ptr = StringCopy(ptr, gTypesInfo[boxMon->graftTypes[i]].name);
+                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
@@ -653,9 +654,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
                 moveId = boxMon->graftMoves[i];
                 if (moveId != MOVE_NONE)
                 {
-                    StringAppend(gStringVar4, COMPOUND_STRING("Move: "));
-                    StringAppend(gStringVar4, gMovesInfo[moveId].name);
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                    ptr = StringAppend(ptr, COMPOUND_STRING("Move: "));
+                    ptr = StringCopy(ptr, gMovesInfo[moveId].name);
+                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
@@ -666,21 +667,21 @@ void ShowEnemyGrafts(enum BattlerId battler)
             {
                 if (boxMon->graftStatOverrides[i] != 0)
                 {
-                    StringAppend(gStringVar4, GetStatNameString(i));
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                    ptr = StringAppend(ptr, GetStatNameString(i));
+                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
 
         if (graftFlags & GRAFT_FLAG_NATURE)
         {
-            StringAppend(gStringVar4, COMPOUND_STRING("Nature: "));
-            StringAppend(gStringVar4, gNaturesInfo[boxMon->hiddenNatureModifier].name);
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+            ptr = StringAppend(ptr, COMPOUND_STRING("Nature: "));
+            ptr = StringCopy(ptr, gNaturesInfo[boxMon->hiddenNatureModifier].name);
+            ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
         }
-
-        StringAppend(gStringVar4, COMPOUND_STRING("\pR/B: close"));
     }
+
+    ptr = StringAppend(ptr, COMPOUND_STRING("\pR/B: close"));
 
     BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
     CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
