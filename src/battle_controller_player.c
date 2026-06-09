@@ -825,7 +825,6 @@ void HandleInputChooseMove(enum BattlerId battler)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
             TryMoveSelectionDisplayMoveDescription(battler);
             TryChangeZTrigger(battler, gMoveSelectionCursor[battler]);
         }
@@ -843,7 +842,6 @@ void HandleInputChooseMove(enum BattlerId battler)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
             TryMoveSelectionDisplayMoveDescription(battler);
             TryChangeZTrigger(battler, gMoveSelectionCursor[battler]);
         }
@@ -860,7 +858,6 @@ void HandleInputChooseMove(enum BattlerId battler)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
             TryMoveSelectionDisplayMoveDescription(battler);
             TryChangeZTrigger(battler, gMoveSelectionCursor[battler]);
         }
@@ -878,7 +875,6 @@ void HandleInputChooseMove(enum BattlerId battler)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
             TryMoveSelectionDisplayMoveDescription(battler);
             TryChangeZTrigger(battler, gMoveSelectionCursor[battler]);
         }
@@ -918,7 +914,6 @@ void HandleInputChooseMove(enum BattlerId battler)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
         }
     }
     else if (JOY_NEW(B_MOVE_DESCRIPTION_BUTTON) &&
@@ -959,7 +954,6 @@ static void ReloadMoveNames(enum BattlerId battler)
             MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
         MoveSelectionDisplayPpNumber(battler);
         MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
     }
 }
 
@@ -1119,7 +1113,6 @@ void HandleMoveSwitching(enum BattlerId battler)
             MoveSelectionDisplayPpString(battler);
         MoveSelectionDisplayPpNumber(battler);
         MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
         AssignUsableZMoves(battler, moveInfo->moves);
     }
     else if (JOY_NEW(B_BUTTON | SELECT_BUTTON))
@@ -1139,7 +1132,6 @@ void HandleMoveSwitching(enum BattlerId battler)
             MoveSelectionDisplayPpString(battler);
         MoveSelectionDisplayPpNumber(battler);
         MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
     }
     else if (JOY_NEW(DPAD_LEFT))
     {
@@ -1758,6 +1750,7 @@ static void MoveSelectionDisplayMoveType(enum BattlerId battler)
     end = StringCopy(txtPtr, gTypesInfo[type].name);
 
     PrependFontIdToFit(txtPtr, end, FONT_NORMAL, WindowWidthPx(B_WIN_MOVE_TYPE) - 25);
+    StringAppend(gDisplayedStringBattle, COMPOUND_STRING("\nR:Grafts"));
     BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_MOVE_TYPE);
 }
 
@@ -2169,7 +2162,6 @@ void InitMoveSelectionsVarsAndStrings(enum BattlerId battler)
         MoveSelectionDisplayPpString(battler);
     MoveSelectionDisplayPpNumber(battler);
     MoveSelectionDisplayMoveType(battler);
-    ShowGraftHint();
     
 }
 
