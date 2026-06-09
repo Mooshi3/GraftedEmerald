@@ -1,5 +1,8 @@
 #include "global.h"
 #include "graft_menu.h"
+#include "battle_util.h"
+#include "battle_setup.h"
+#include "pokemon.h"
 #include "constants/pokeball.h"
 #include "graft_data.h"
 #include "battle.h"
@@ -582,6 +585,131 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
     return TRUE;
 }
 
+
+
+// ============================================================
+// Enemy Graft Viewer - R button in move select
+// ============================================================
+
+static EWRAM_DATA u8 sEnemyGraftViewerWindowId;
+
+void ShowEnemyGrafts(enum BattlerId battler)
+{
+    u8 partySlot;
+    struct BoxPokemon *boxMon;
+    u8 graftFlags;
+    u8 i;
+    u16 moveId;
+
+    partySlot = gBattlerPartyIndexes[GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)];
+    boxMon = &gEnemyParty[partySlot].box;
+    graftFlags = boxMon->graftFlags;
+
+    struct WindowTemplate winTemplate = {
+        .bg = 0,
+        .tilemapLeft = 1,
+        .tilemapTop = 2,
+        .width = 28,
+        .height = 16,
+        .paletteNum = 15,
+        .baseBlock = 0x100,
+    };
+    sEnemyGraftViewerWindowId = AddWindow(&winTemplate);
+    if (sEnemyGraftViewerWindowId == WINDOW_NONE)
+        return;
+
+    FillWindowPixelBuffer(sEnemyGraftViewerWindowId, PIXEL_FILL(0));
+    DrawStdWindowFrame(sEnemyGraftViewerWindowId, FALSE);
+    PutWindowTilemap(sEnemyGraftViewerWindowId);
+
+    StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
+
+    if (graftFlags == 0)
+    {
+        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts detected."));
+    }
+    else
+    {
+        StringAppend(gStringVar4, COMPOUND_STRING("\p"));
+
+        // Ability
+        if (graftFlags & GRAFT_FLAG_ABILITY)
+        {
+            StringAppend(gStringVar4, COMPOUND_STRING("Ability: "));
+            StringAppend(gStringVar4, gAbilitiesInfo[GetGraftedAbilityFromBoxMon(boxMon)].name);
+            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+        }
+
+        // Types
+        if (graftFlags & GRAFT_FLAG_TYPE)
+        {
+            for (i = 0; i < 2; i++)
+            {
+                if (boxMon->graftTypes[i] != 0xFF)
+                {
+                    StringAppend(gStringVar4, COMPOUND_STRING("Type: "));
+                    StringAppend(gStringVar4, gTypesInfo[boxMon->graftTypes[i]].name);
+                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                }
+            }
+        }
+
+        // Moves
+        if (graftFlags & GRAFT_FLAG_MOVE)
+        {
+            for (i = 0; i < MAX_MON_MOVES; i++)
+            {
+                moveId = boxMon->graftMoves[i];
+                if (moveId != MOVE_NONE)
+                {
+                    StringAppend(gStringVar4, COMPOUND_STRING("Move: "));
+                    StringAppend(gStringVar4, gMovesInfo[moveId].name);
+                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                }
+            }
+        }
+
+        // Stats
+        if (graftFlags & GRAFT_FLAG_STAT)
+        {
+            for (i = 0; i < 6; i++)
+            {
+                if (boxMon->graftStatOverrides[i] != 0)
+                {
+                    StringAppend(gStringVar4, GetStatNameString(i));
+                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+                }
+            }
+        }
+
+        // Nature
+        if (graftFlags & GRAFT_FLAG_NATURE)
+        {
+            StringAppend(gStringVar4, COMPOUND_STRING("Nature: "));
+            StringAppend(gStringVar4, gNaturesInfo[boxMon->hiddenNatureModifier].name);
+            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
+        }
+    }
+
+    StringAppend(gStringVar4, COMPOUND_STRING("\pR/B: close"));
+    BattlePutTextOnWindow(gStringVar4, sEnemyGraftViewerWindowId);
+    CopyWindowToVram(sEnemyGraftViewerWindowId, COPYWIN_GFX);
+}
+
+void HideEnemyGrafts(void)
+{
+    if (sEnemyGraftViewerWindowId != WINDOW_NONE)
+    {
+        ClearStdWindowAndFrame(sEnemyGraftViewerWindowId, TRUE);
+        RemoveWindow(sEnemyGraftViewerWindowId);
+        sEnemyGraftViewerWindowId = WINDOW_NONE;
+    }
+}
+
+bool8 IsEnemyGraftViewerOpen(void)
+{
+    return sEnemyGraftViewerWindowId != WINDOW_NONE;
+}
 
 // ============================================================
 // Old GenerateGraftRoll stubs (kept for compat, not used anymore)
