@@ -506,7 +506,9 @@ void UpdateGraftMenuCursor(u8 cursorPos)
     StringAppend(gStringVar1, COMPOUND_STRING(" "));
     ConvertIntToDecimalStringN(gStringVar2, cursorPos + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
     StringAppend(gStringVar1, gStringVar2);
-    StringAppend(gStringVar1, COMPOUND_STRING("/5"));
+    StringAppend(gStringVar1, COMPOUND_STRING("/"));
+    ConvertIntToDecimalStringN(gStringVar2, sGraftMenu.numCategories, STR_CONV_MODE_LEFT_ALIGN, 1);
+    StringAppend(gStringVar1, gStringVar2);
     if (cursorPos < sGraftMenu.numCategories - 1)
         StringAppend(gStringVar1, COMPOUND_STRING("{DOWN_ARROW}"));
     else
@@ -541,7 +543,9 @@ void UpdateGraftMenuCursorOverworld(u8 cursorPos)
     StringAppend(gStringVar4, COMPOUND_STRING(" "));
     ConvertIntToDecimalStringN(gStringVar2, cursorPos + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
     StringAppend(gStringVar4, gStringVar2);
-    StringAppend(gStringVar4, COMPOUND_STRING("/5"));
+    StringAppend(gStringVar4, COMPOUND_STRING("/"));
+    ConvertIntToDecimalStringN(gStringVar2, sGraftMenu.numCategories, STR_CONV_MODE_LEFT_ALIGN, 1);
+    StringAppend(gStringVar4, gStringVar2);
     if (cursorPos < sGraftMenu.numCategories - 1)
         StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
     else

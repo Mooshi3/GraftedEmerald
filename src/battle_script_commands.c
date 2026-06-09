@@ -6549,13 +6549,19 @@ static void Cmd_graftmenu(void)
             gBattleCommunication[CURSOR_POSITION]--;
             UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
         }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < 4
+        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < GetGraftMenuNumCategories() - 1
                 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
         {
             PlaySE(SE_SELECT);
             gBattleCommunication[CURSOR_POSITION]++;
             UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
         }
+            if (JOY_NEW(B_BUTTON))
+            {
+                PlaySE(SE_SELECT);
+                BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
+                gBattleCommunication[MULTIUSE_STATE] = 100;
+            }
         if (JOY_NEW(A_BUTTON))
             {
                 PlaySE(SE_SELECT);
@@ -7236,6 +7242,9 @@ case 3: // Wait for party menu to return to battle
                     gBattlescriptCurrInstr = cmd->nextInstr;
                 }
                 break;
+        case 100: // B button skip
+            gBattlescriptCurrInstr = cmd->nextInstr;
+            break;
     }
 }
 
