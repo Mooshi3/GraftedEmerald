@@ -927,7 +927,11 @@ void HandleInputChooseMove(enum BattlerId battler)
         if (JOY_NEW(R_BUTTON) || JOY_NEW(B_BUTTON))
         {
             HideEnemyGrafts();
-            PlaySE(SE_SELECT);
+            // Redraw normal move info after closing
+            if (B_SHOW_EFFECTIVENESS)
+                MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
+            MoveSelectionDisplayPpNumber(battler);
+            MoveSelectionDisplayMoveType(battler);
         }
     }
     else if (JOY_NEW(R_BUTTON))
@@ -2162,6 +2166,8 @@ void PlayerHandleChooseMove(enum BattlerId battler)
 
 void InitMoveSelectionsVarsAndStrings(enum BattlerId battler)
 {
+    if (IsEnemyGraftViewerOpen())
+        HideEnemyGrafts();
     LoadTypeIcons(battler);
     MoveSelectionDisplayMoveNames(battler);
     gMultiUsePlayerCursor = 0xFF;

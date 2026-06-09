@@ -6,8 +6,8 @@
 #include "constants/pokeball.h"
 #include "graft_data.h"
 #include "battle.h"
-#include "battle_setup.h"
-#include "pokemon.h"
+#include "sound.h"
+#include "constants/songs.h"
 #include "battle_main.h"
 #include "move.h"
 #include "text.h"
@@ -599,32 +599,33 @@ static EWRAM_DATA bool8 sEnemyGraftViewerOpen;
 
 void ShowEnemyGrafts(enum BattlerId battler)
 {
-    u8 partySlot;
+    struct Pokemon *mon;
     struct BoxPokemon *boxMon;
     u8 graftFlags;
     u8 i;
     u16 moveId;
 
-    partySlot = gBattlerPartyIndexes[GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)];
-    boxMon = &gEnemyParty[partySlot].box;
+    // Get the active enemy battler's mon directly
+    mon = &gEnemyParty[gBattlerPartyIndexes[GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)]];
+    boxMon = &mon->box;
     graftFlags = boxMon->graftFlags;
 
     sEnemyGraftViewerOpen = TRUE;
 
-    FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0xE));
+    // Use same setup as MoveSelectionDisplayMoveDescription
+    LoadMessageBoxAndBorderGfx();
     DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
 
     StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
 
     if (graftFlags == 0)
     {
-        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts detected.\pR/B: close"));
+        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts.\pR/B: close"));
     }
     else
     {
         StringAppend(gStringVar4, COMPOUND_STRING("\p"));
 
-        // Ability
         if (graftFlags & GRAFT_FLAG_ABILITY)
         {
             StringAppend(gStringVar4, COMPOUND_STRING("Ability: "));
@@ -632,7 +633,6 @@ void ShowEnemyGrafts(enum BattlerId battler)
             StringAppend(gStringVar4, COMPOUND_STRING("\n"));
         }
 
-        // Types
         if (graftFlags & GRAFT_FLAG_TYPE)
         {
             for (i = 0; i < 2; i++)
@@ -646,7 +646,6 @@ void ShowEnemyGrafts(enum BattlerId battler)
             }
         }
 
-        // Moves
         if (graftFlags & GRAFT_FLAG_MOVE)
         {
             for (i = 0; i < MAX_MON_MOVES; i++)
@@ -661,7 +660,6 @@ void ShowEnemyGrafts(enum BattlerId battler)
             }
         }
 
-        // Stats
         if (graftFlags & GRAFT_FLAG_STAT)
         {
             for (i = 0; i < 6; i++)
@@ -674,7 +672,6 @@ void ShowEnemyGrafts(enum BattlerId battler)
             }
         }
 
-        // Nature
         if (graftFlags & GRAFT_FLAG_NATURE)
         {
             StringAppend(gStringVar4, COMPOUND_STRING("Nature: "));
@@ -694,9 +691,16 @@ void HideEnemyGrafts(void)
     if (sEnemyGraftViewerOpen)
     {
         sEnemyGraftViewerOpen = FALSE;
+        // Match how the L button description dismiss works
+        if (gCategoryIconSpriteId != 0xFF)
+        {
+            DestroySprite(&gSprites[gCategoryIconSpriteId]);
+            gCategoryIconSpriteId = 0xFF;
+        }
         FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0));
         ClearStdWindowAndFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
         CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_GFX);
+        PlaySE(SE_SELECT);
     }
 }
 
