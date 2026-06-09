@@ -66,8 +66,6 @@ void SetSelectedGraftCategory(u8 category);
 u8 GetGraftMenuNumCategories(void);
 u8 GetGraftMenuRealCategory(u8 displayPos);
 void ShowEnemyGrafts(enum BattlerId battler);
-void ShowGraftHint(void);
-void HideGraftHint(void);
 void HideEnemyGrafts(void);
 bool8 IsEnemyGraftViewerOpen(void);
 u8 GetGraftMenuSubCursor(void);

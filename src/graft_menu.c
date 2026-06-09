@@ -588,49 +588,14 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
 
 
 
-// ============================================================
-// R:Grafts hint window for move select screen
-// ============================================================
 
-static EWRAM_DATA u8 sGraftHintWindowId;
-
-void ShowGraftHint(void)
-{
-    struct WindowTemplate winTemplate = {
-        .bg = 0,
-        .tilemapLeft = 1,
-        .tilemapTop = 57,
-        .width = 7,
-        .height = 2,
-        .paletteNum = 5,
-        .baseBlock = 0x03C0,
-    };
-    sGraftHintWindowId = AddWindow(&winTemplate);
-    if (sGraftHintWindowId == WINDOW_NONE)
-        return;
-    FillWindowPixelBuffer(sGraftHintWindowId, PIXEL_FILL(0xE));
-    DrawStdWindowFrame(sGraftHintWindowId, FALSE);
-    PutWindowTilemap(sGraftHintWindowId);
-    StringCopy(gStringVar4, COMPOUND_STRING("R:Grafts"));
-    BattlePutTextOnWindow(gStringVar4, sGraftHintWindowId);
-    CopyWindowToVram(sGraftHintWindowId, COPYWIN_GFX);
-}
-
-void HideGraftHint(void)
-{
-    if (sGraftHintWindowId != WINDOW_NONE)
-    {
-        ClearStdWindowAndFrame(sGraftHintWindowId, TRUE);
-        RemoveWindow(sGraftHintWindowId);
-        sGraftHintWindowId = WINDOW_NONE;
-    }
-}
 
 // ============================================================
 // Enemy Graft Viewer - R button in move select
+// Uses B_WIN_MOVE_DESCRIPTION (same window as L button move info)
 // ============================================================
 
-static EWRAM_DATA u8 sEnemyGraftViewerWindowId;
+static EWRAM_DATA bool8 sEnemyGraftViewerOpen;
 
 void ShowEnemyGrafts(enum BattlerId battler)
 {
@@ -644,28 +609,16 @@ void ShowEnemyGrafts(enum BattlerId battler)
     boxMon = &gEnemyParty[partySlot].box;
     graftFlags = boxMon->graftFlags;
 
-    struct WindowTemplate winTemplate = {
-        .bg = 0,
-        .tilemapLeft = 10,
-        .tilemapTop = 2,
-        .width = 12,
-        .height = 6,
-        .paletteNum = 15,
-        .baseBlock = 0x03D0,
-    };
-    sEnemyGraftViewerWindowId = AddWindow(&winTemplate);
-    if (sEnemyGraftViewerWindowId == WINDOW_NONE)
-        return;
+    sEnemyGraftViewerOpen = TRUE;
 
-    FillWindowPixelBuffer(sEnemyGraftViewerWindowId, PIXEL_FILL(0));
-    DrawStdWindowFrame(sEnemyGraftViewerWindowId, FALSE);
-    PutWindowTilemap(sEnemyGraftViewerWindowId);
+    FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0xE));
+    DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
 
     StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
 
     if (graftFlags == 0)
     {
-        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts detected."));
+        StringAppend(gStringVar4, COMPOUND_STRING("\pNo grafts detected.\pR/B: close"));
     }
     else
     {
@@ -728,26 +681,28 @@ void ShowEnemyGrafts(enum BattlerId battler)
             StringAppend(gStringVar4, gNaturesInfo[boxMon->hiddenNatureModifier].name);
             StringAppend(gStringVar4, COMPOUND_STRING("\n"));
         }
+
+        StringAppend(gStringVar4, COMPOUND_STRING("\pR/B: close"));
     }
 
-    StringAppend(gStringVar4, COMPOUND_STRING("\pR/B: close"));
-    BattlePutTextOnWindow(gStringVar4, sEnemyGraftViewerWindowId);
-    CopyWindowToVram(sEnemyGraftViewerWindowId, COPYWIN_GFX);
+    BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
+    CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
 }
 
 void HideEnemyGrafts(void)
 {
-    if (sEnemyGraftViewerWindowId != WINDOW_NONE)
+    if (sEnemyGraftViewerOpen)
     {
-        ClearStdWindowAndFrame(sEnemyGraftViewerWindowId, TRUE);
-        RemoveWindow(sEnemyGraftViewerWindowId);
-        sEnemyGraftViewerWindowId = WINDOW_NONE;
+        sEnemyGraftViewerOpen = FALSE;
+        FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0));
+        ClearStdWindowAndFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
+        CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_GFX);
     }
 }
 
 bool8 IsEnemyGraftViewerOpen(void)
 {
-    return sEnemyGraftViewerWindowId != WINDOW_NONE;
+    return sEnemyGraftViewerOpen;
 }
 
 // ============================================================
