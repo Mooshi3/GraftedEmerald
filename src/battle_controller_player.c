@@ -1688,6 +1688,7 @@ static void MoveSelectionDisplayMoveNames(enum BattlerId battler)
 static void MoveSelectionDisplayPpString(enum BattlerId battler)
 {
     StringCopy(gDisplayedStringBattle, gText_MoveInterfacePP);
+    StringAppend(gDisplayedStringBattle, COMPOUND_STRING("   R:Grafts"));
     BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_PP);
 }
 
