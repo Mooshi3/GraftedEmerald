@@ -922,6 +922,18 @@ void HandleInputChooseMove(enum BattlerId battler)
         gBattleStruct->descriptionSubmenu = TRUE;
         TryMoveSelectionDisplayMoveDescription(battler);
     }
+    else if (IsEnemyGraftViewerOpen())
+    {
+        if (JOY_NEW(R_BUTTON) || JOY_NEW(B_BUTTON))
+        {
+            HideEnemyGrafts();
+            PlaySE(SE_SELECT);
+        }
+    }
+    else if (JOY_NEW(R_BUTTON))
+    {
+        ShowEnemyGrafts(battler);
+    }
     else if (JOY_NEW(START_BUTTON))
     {
         if (gBattleStruct->gimmick.usableGimmick[battler] != GIMMICK_NONE
@@ -1688,7 +1700,6 @@ static void MoveSelectionDisplayMoveNames(enum BattlerId battler)
 static void MoveSelectionDisplayPpString(enum BattlerId battler)
 {
     StringCopy(gDisplayedStringBattle, gText_MoveInterfacePP);
-    StringAppend(gDisplayedStringBattle, COMPOUND_STRING("   R:Grafts"));
     BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_PP);
 }
 
@@ -1750,7 +1761,6 @@ static void MoveSelectionDisplayMoveType(enum BattlerId battler)
     end = StringCopy(txtPtr, gTypesInfo[type].name);
 
     PrependFontIdToFit(txtPtr, end, FONT_NORMAL, WindowWidthPx(B_WIN_MOVE_TYPE) - 25);
-    StringAppend(gDisplayedStringBattle, COMPOUND_STRING("\nR:Grafts"));
     BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_MOVE_TYPE);
 }
 
