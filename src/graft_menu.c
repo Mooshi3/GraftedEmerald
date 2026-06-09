@@ -603,7 +603,7 @@ void ShowGraftHint(void)
         .width = 7,
         .height = 2,
         .paletteNum = 5,
-        .baseBlock = 0x0360,
+        .baseBlock = 0x03C0,
     };
     sGraftHintWindowId = AddWindow(&winTemplate);
     if (sGraftHintWindowId == WINDOW_NONE)
@@ -651,7 +651,7 @@ void ShowEnemyGrafts(enum BattlerId battler)
         .width = 12,
         .height = 6,
         .paletteNum = 15,
-        .baseBlock = 0x0370,
+        .baseBlock = 0x03D0,
     };
     sEnemyGraftViewerWindowId = AddWindow(&winTemplate);
     if (sEnemyGraftViewerWindowId == WINDOW_NONE)
