@@ -603,9 +603,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
     u8 graftFlags;
     u8 partySlot;
     enum BattlerId enemyBattler;
-    u8 *ptr;
     u8 i;
     u16 moveId;
+    u8 *ptr;
 
     enemyBattler = BATTLE_OPPOSITE(battler);
     partySlot = gBattlerPartyIndexes[enemyBattler];
@@ -621,17 +621,16 @@ void ShowEnemyGrafts(enum BattlerId battler)
 
     if (graftFlags == 0)
     {
-        ptr = StringAppend(ptr, COMPOUND_STRING("\pNo grafts."));
+        ptr = StringAppend(ptr, gText_NewLine);
+        ptr = StringAppend(ptr, COMPOUND_STRING("No grafts."));
     }
     else
     {
-        ptr = StringAppend(ptr, COMPOUND_STRING("\p"));
-
         if (graftFlags & GRAFT_FLAG_ABILITY)
         {
+            ptr = StringAppend(ptr, gText_NewLine);
             ptr = StringAppend(ptr, COMPOUND_STRING("Ability: "));
             ptr = StringCopy(ptr, gAbilitiesInfo[boxMon->graftAbility].name);
-            ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
         }
 
         if (graftFlags & GRAFT_FLAG_TYPE)
@@ -640,9 +639,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
             {
                 if (boxMon->graftTypes[i] != 0xFF)
                 {
+                    ptr = StringAppend(ptr, gText_NewLine);
                     ptr = StringAppend(ptr, COMPOUND_STRING("Type: "));
                     ptr = StringCopy(ptr, gTypesInfo[boxMon->graftTypes[i]].name);
-                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
@@ -654,9 +653,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
                 moveId = boxMon->graftMoves[i];
                 if (moveId != MOVE_NONE)
                 {
+                    ptr = StringAppend(ptr, gText_NewLine);
                     ptr = StringAppend(ptr, COMPOUND_STRING("Move: "));
                     ptr = StringCopy(ptr, gMovesInfo[moveId].name);
-                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
@@ -667,25 +666,27 @@ void ShowEnemyGrafts(enum BattlerId battler)
             {
                 if (boxMon->graftStatOverrides[i] != 0)
                 {
+                    ptr = StringAppend(ptr, gText_NewLine);
                     ptr = StringAppend(ptr, GetStatNameString(i));
-                    ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
                 }
             }
         }
 
         if (graftFlags & GRAFT_FLAG_NATURE)
         {
+            ptr = StringAppend(ptr, gText_NewLine);
             ptr = StringAppend(ptr, COMPOUND_STRING("Nature: "));
             ptr = StringCopy(ptr, gNaturesInfo[boxMon->hiddenNatureModifier].name);
-            ptr = StringAppend(ptr, COMPOUND_STRING("\n"));
         }
     }
 
-    ptr = StringAppend(ptr, COMPOUND_STRING("\pR/B: close"));
+    ptr = StringAppend(ptr, gText_NewLine);
+    ptr = StringAppend(ptr, COMPOUND_STRING("R/B: close"));
 
     BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
     CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
 }
+
 
 void HideEnemyGrafts(void)
 {
