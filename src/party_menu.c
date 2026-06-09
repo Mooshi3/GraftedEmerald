@@ -3379,6 +3379,15 @@ static void FinishTwoMonAction(u8 taskId)
 static void CursorCb_Cancel1(u8 taskId)
 {
     PlaySE(SE_SELECT);
+    // If in graft action, exit party menu and go back to category selection
+    if (gPartyMenu.action == PARTY_ACTION_GRAFT)
+    {
+        gGraftSelectedPartySlot = 0xFF; // sentinel: cancelled
+        PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
+        PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
+        Task_ExitPartyMenu(taskId);
+        return;
+    }
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
     if (gPartyMenu.menuType == PARTY_MENU_TYPE_DAYCARE)
