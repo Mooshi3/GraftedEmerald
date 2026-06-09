@@ -36,6 +36,10 @@ LilycoveCity_DepartmentStore_2F_Pokemart1:
 	.2byte ITEM_ICE_HEAL
 	.2byte ITEM_AWAKENING
 	.2byte ITEM_FLUFFY_TAIL
+.2byte ITEM_PATCH_BALL
+.2byte ITEM_GRAFT_BALL
+.2byte ITEM_SPLICE_BALL
+.2byte ITEM_GRAFT_SPLICER
 	pokemartlistend
 
 LilycoveCity_DepartmentStore_2F_EventScript_ClerkRight::
