@@ -587,6 +587,45 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
 
 
 
+
+// ============================================================
+// R:Grafts hint window for move select screen
+// ============================================================
+
+static EWRAM_DATA u8 sGraftHintWindowId;
+
+void ShowGraftHint(void)
+{
+    struct WindowTemplate winTemplate = {
+        .bg = 0,
+        .tilemapLeft = 1,
+        .tilemapTop = 57,
+        .width = 7,
+        .height = 2,
+        .paletteNum = 5,
+        .baseBlock = 0x0340,
+    };
+    sGraftHintWindowId = AddWindow(&winTemplate);
+    if (sGraftHintWindowId == WINDOW_NONE)
+        return;
+    FillWindowPixelBuffer(sGraftHintWindowId, PIXEL_FILL(0xE));
+    DrawStdWindowFrame(sGraftHintWindowId, FALSE);
+    PutWindowTilemap(sGraftHintWindowId);
+    StringCopy(gStringVar4, COMPOUND_STRING("R:Grafts"));
+    BattlePutTextOnWindow(gStringVar4, sGraftHintWindowId);
+    CopyWindowToVram(sGraftHintWindowId, COPYWIN_GFX);
+}
+
+void HideGraftHint(void)
+{
+    if (sGraftHintWindowId != WINDOW_NONE)
+    {
+        ClearStdWindowAndFrame(sGraftHintWindowId, TRUE);
+        RemoveWindow(sGraftHintWindowId);
+        sGraftHintWindowId = WINDOW_NONE;
+    }
+}
+
 // ============================================================
 // Enemy Graft Viewer - R button in move select
 // ============================================================

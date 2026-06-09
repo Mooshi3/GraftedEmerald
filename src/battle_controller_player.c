@@ -2161,6 +2161,7 @@ void InitMoveSelectionsVarsAndStrings(enum BattlerId battler)
         MoveSelectionDisplayPpString(battler);
     MoveSelectionDisplayPpNumber(battler);
     MoveSelectionDisplayMoveType(battler);
+    ShowGraftHint();
 }
 
 static void PlayerHandleChooseItem(enum BattlerId battler)
