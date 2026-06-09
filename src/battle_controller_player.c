@@ -924,14 +924,21 @@ void HandleInputChooseMove(enum BattlerId battler)
     }
     else if (IsEnemyGraftViewerOpen())
     {
-        if (JOY_NEW(R_BUTTON) || JOY_NEW(B_BUTTON))
+        if (JOY_NEW(R_BUTTON))
+        {
+            struct BoxPokemon *boxMon = &gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(battler)]].box;
+            u16 species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
+            EnemyGraftViewerNextPage(boxMon, species);
+            PlaySE(SE_SELECT);
+        }
+        else if (JOY_NEW(B_BUTTON))
         {
             HideEnemyGrafts();
-            // Redraw normal move info after closing
             if (B_SHOW_EFFECTIVENESS)
                 MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
             MoveSelectionDisplayPpNumber(battler);
             MoveSelectionDisplayMoveType(battler);
+            PlaySE(SE_SELECT);
         }
     }
     else if (JOY_NEW(R_BUTTON))

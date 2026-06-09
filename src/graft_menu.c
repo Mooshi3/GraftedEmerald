@@ -595,7 +595,10 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
 // Uses B_WIN_MOVE_DESCRIPTION (same window as L button move info)
 // ============================================================
 
+static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 graftFlags, u8 page);
 static EWRAM_DATA bool8 sEnemyGraftViewerOpen;
+static EWRAM_DATA u8 sEnemyGraftViewerPage;
+static EWRAM_DATA u8 sEnemyGraftViewerFlags;
 
 void ShowEnemyGrafts(enum BattlerId battler)
 {
@@ -603,97 +606,145 @@ void ShowEnemyGrafts(enum BattlerId battler)
     u8 graftFlags;
     u8 partySlot;
     enum BattlerId enemyBattler;
-    u8 i;
-    u16 moveId;
-    u8 *ptr;
+    u16 species;
 
     enemyBattler = BATTLE_OPPOSITE(battler);
     partySlot = gBattlerPartyIndexes[enemyBattler];
     boxMon = &gEnemyParty[partySlot].box;
     graftFlags = boxMon->graftFlags;
+    species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
 
     sEnemyGraftViewerOpen = TRUE;
+    sEnemyGraftViewerPage = 0;
+    sEnemyGraftViewerFlags = graftFlags;
 
     LoadMessageBoxAndBorderGfx();
     DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
 
-    ptr = StringCopy(gStringVar4, COMPOUND_STRING("ENEMY GRAFTS:"));
-
-    if (graftFlags == 0)
-    {
-        ptr = StringAppend(ptr, gText_NewLine);
-        ptr = StringAppend(ptr, COMPOUND_STRING("No grafts."));
-    }
-    else
-    {
-        if (graftFlags & GRAFT_FLAG_ABILITY)
-        {
-            ptr = StringAppend(ptr, gText_NewLine);
-            ptr = StringAppend(ptr, COMPOUND_STRING("Ability: "));
-            ptr = StringCopy(ptr, gAbilitiesInfo[boxMon->graftAbility].name);
-        }
-
-        if (graftFlags & GRAFT_FLAG_TYPE)
-        {
-            for (i = 0; i < 2; i++)
-            {
-                if (boxMon->graftTypes[i] != 0xFF)
-                {
-                    ptr = StringAppend(ptr, gText_NewLine);
-                    ptr = StringAppend(ptr, COMPOUND_STRING("Type: "));
-                    ptr = StringCopy(ptr, gTypesInfo[boxMon->graftTypes[i]].name);
-                }
-            }
-        }
-
-        if (graftFlags & GRAFT_FLAG_MOVE)
-        {
-            for (i = 0; i < MAX_MON_MOVES; i++)
-            {
-                moveId = boxMon->graftMoves[i];
-                if (moveId != MOVE_NONE)
-                {
-                    ptr = StringAppend(ptr, gText_NewLine);
-                    ptr = StringAppend(ptr, COMPOUND_STRING("Move: "));
-                    ptr = StringCopy(ptr, gMovesInfo[moveId].name);
-                }
-            }
-        }
-
-        if (graftFlags & GRAFT_FLAG_STAT)
-        {
-            for (i = 0; i < 6; i++)
-            {
-                if (boxMon->graftStatOverrides[i] != 0)
-                {
-                    ptr = StringAppend(ptr, gText_NewLine);
-                    ptr = StringAppend(ptr, GetStatNameString(i));
-                }
-            }
-        }
-
-        if (graftFlags & GRAFT_FLAG_NATURE)
-        {
-            ptr = StringAppend(ptr, gText_NewLine);
-            ptr = StringAppend(ptr, COMPOUND_STRING("Nature: "));
-            ptr = StringCopy(ptr, gNaturesInfo[boxMon->hiddenNatureModifier].name);
-        }
-    }
-
-    ptr = StringAppend(ptr, gText_NewLine);
-    ptr = StringAppend(ptr, COMPOUND_STRING("R/B: close"));
+    EnemyGraftViewerDrawPage(boxMon, species, graftFlags, 0);
 
     BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
     CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
 }
 
+void EnemyGraftViewerNextPage(struct BoxPokemon *boxMon, u16 species)
+{
+    u8 graftFlags = sEnemyGraftViewerFlags;
+    u8 page = sEnemyGraftViewerPage + 1;
+    u8 tried = 0;
+
+    while (tried < 5)
+    {
+        if (page >= 5)
+            page = 0;
+        if ((page == 0 && (graftFlags & GRAFT_FLAG_TYPE))
+         || (page == 1 && (graftFlags & GRAFT_FLAG_ABILITY))
+         || (page == 2 && (graftFlags & GRAFT_FLAG_MOVE))
+         || (page == 3 && (graftFlags & GRAFT_FLAG_STAT))
+         || (page == 4 && (graftFlags & GRAFT_FLAG_NATURE)))
+            break;
+        page++;
+        tried++;
+    }
+    if (tried >= 5)
+        return;
+
+    sEnemyGraftViewerPage = page;
+    FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0));
+    DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
+    EnemyGraftViewerDrawPage(boxMon, species, graftFlags, page);
+    BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
+    CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
+}
+
+static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 graftFlags, u8 page)
+{
+    u8 *ptr = &gStringVar4[0];
+    u8 i;
+    u16 moveId;
+
+    if (page == 0 && (graftFlags & GRAFT_FLAG_TYPE))
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("TYPES"));
+        ptr = StringAppend(ptr, gText_NewLine);
+        for (i = 0; i < 2; i++)
+        {
+            if (boxMon->graftTypes[i] != 0xFF)
+            {
+                ptr = StringAppend(ptr, COMPOUND_STRING("Type "));
+                ptr = ConvertIntToDecimalStringN(ptr, i + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
+                ptr = StringAppend(ptr, COMPOUND_STRING(": "));
+                ptr = StringCopy(ptr, gTypesInfo[boxMon->graftTypes[i]].name);
+                ptr = StringAppend(ptr, COMPOUND_STRING(" (was "));
+                ptr = StringCopy(ptr, gTypesInfo[gSpeciesInfo[species].types[i]].name);
+                ptr = StringAppend(ptr, COMPOUND_STRING(")"));
+                ptr = StringAppend(ptr, gText_NewLine);
+            }
+        }
+    }
+    else if (page == 1 && (graftFlags & GRAFT_FLAG_ABILITY))
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("ABILITY"));
+        ptr = StringAppend(ptr, gText_NewLine);
+        ptr = StringCopy(ptr, gAbilitiesInfo[boxMon->graftAbility].name);
+        ptr = StringAppend(ptr, gText_NewLine);
+    }
+    else if (page == 2 && (graftFlags & GRAFT_FLAG_MOVE))
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("MOVES"));
+        ptr = StringAppend(ptr, gText_NewLine);
+        for (i = 0; i < MAX_MON_MOVES; i++)
+        {
+            moveId = boxMon->graftMoves[i];
+            if (moveId != MOVE_NONE)
+            {
+                ptr = StringCopy(ptr, gMovesInfo[moveId].name);
+                ptr = StringAppend(ptr, gText_NewLine);
+            }
+        }
+    }
+    else if (page == 3 && (graftFlags & GRAFT_FLAG_STAT))
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("STATS"));
+        ptr = StringAppend(ptr, gText_NewLine);
+        for (i = 0; i < 6; i++)
+        {
+            if (boxMon->graftStatOverrides[i] != 0)
+            {
+                ptr = StringAppend(ptr, GetStatNameString(i));
+                ptr = StringAppend(ptr, COMPOUND_STRING(": "));
+                ptr = ConvertIntToDecimalStringN(ptr, (&gSpeciesInfo[species].baseHP)[i], STR_CONV_MODE_LEFT_ALIGN, 3);
+                ptr = StringAppend(ptr, COMPOUND_STRING(">"));
+                ptr = ConvertIntToDecimalStringN(ptr, boxMon->graftStatOverrides[i], STR_CONV_MODE_LEFT_ALIGN, 3);
+                ptr = StringAppend(ptr, gText_NewLine);
+            }
+        }
+    }
+    else if (page == 4 && (graftFlags & GRAFT_FLAG_NATURE))
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("NATURE"));
+        ptr = StringAppend(ptr, gText_NewLine);
+        ptr = StringCopy(ptr, gNaturesInfo[boxMon->hiddenNatureModifier].name);
+        ptr = StringAppend(ptr, gText_NewLine);
+    }
+    else
+    {
+        ptr = StringCopy(ptr, COMPOUND_STRING("No grafts."));
+        ptr = StringAppend(ptr, gText_NewLine);
+    }
+
+    // Footer: page counter + controls
+    ptr = StringAppend(ptr, gText_NewLine);
+    ptr = ConvertIntToDecimalStringN(ptr, page + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
+    ptr = StringAppend(ptr, COMPOUND_STRING("/5 R:next B:close"));
+}
 
 void HideEnemyGrafts(void)
 {
     if (sEnemyGraftViewerOpen)
     {
         sEnemyGraftViewerOpen = FALSE;
-        // Match how the L button description dismiss works
+        sEnemyGraftViewerPage = 0;
         if (gCategoryIconSpriteId != 0xFF)
         {
             DestroySprite(&gSprites[gCategoryIconSpriteId]);
@@ -710,6 +761,7 @@ bool8 IsEnemyGraftViewerOpen(void)
 {
     return sEnemyGraftViewerOpen;
 }
+
 
 // ============================================================
 // Old GenerateGraftRoll stubs (kept for compat, not used anymore)
