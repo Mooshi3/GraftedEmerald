@@ -2050,9 +2050,6 @@ u8 CreateNPCTrainerPartyFromTrainer(struct Pokemon *party, const struct Trainer 
                 SetMonData(&party[i], MON_DATA_TERA_TYPE, &data);
             }
             CalculateMonStats(&party[i]);
-            // Apply enemy grafts based on nearby route species pool
-            if (i == 0)
-                ApplyTrainerGrafts(party, monsCount);
 
             if (B_TRAINER_CLASS_POKE_BALLS >= GEN_7 && ball == -1)
             {
@@ -2060,6 +2057,8 @@ u8 CreateNPCTrainerPartyFromTrainer(struct Pokemon *party, const struct Trainer 
                 SetMonData(&party[i], MON_DATA_POKEBALL, &ball);
             }
         }
+        // Apply enemy grafts after full party is created
+        ApplyTrainerGrafts(party, monsCount);
     }
 
     return trainer->partySize;

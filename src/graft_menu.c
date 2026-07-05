@@ -615,13 +615,29 @@ void ShowEnemyGrafts(enum BattlerId battler)
     species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
 
     sEnemyGraftViewerOpen = TRUE;
-    sEnemyGraftViewerPage = 0;
     sEnemyGraftViewerFlags = graftFlags;
 
+    // Find first page that actually has grafts
+    {
+        u8 firstPage = 0;
+        while (firstPage < 5)
+        {
+            if ((firstPage == 0 && (graftFlags & GRAFT_FLAG_TYPE))
+             || (firstPage == 1 && (graftFlags & GRAFT_FLAG_ABILITY))
+             || (firstPage == 2 && (graftFlags & GRAFT_FLAG_MOVE))
+             || (firstPage == 3 && (graftFlags & GRAFT_FLAG_STAT))
+             || (firstPage == 4 && (graftFlags & GRAFT_FLAG_NATURE)))
+                break;
+            firstPage++;
+        }
+        sEnemyGraftViewerPage = firstPage;
+    }
+
     LoadMessageBoxAndBorderGfx();
+    FillWindowPixelBuffer(B_WIN_MOVE_DESCRIPTION, PIXEL_FILL(0));
     DrawStdWindowFrame(B_WIN_MOVE_DESCRIPTION, FALSE);
 
-    EnemyGraftViewerDrawPage(boxMon, species, graftFlags, 0);
+    EnemyGraftViewerDrawPage(boxMon, species, graftFlags, sEnemyGraftViewerPage);
 
     BattlePutTextOnWindow(gStringVar4, B_WIN_MOVE_DESCRIPTION);
     CopyWindowToVram(B_WIN_MOVE_DESCRIPTION, COPYWIN_FULL);
@@ -663,9 +679,27 @@ static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 
     u8 i;
     u16 moveId;
 
+    // Compute pagination
+    u8 graftCount = 0, pageIndex = 0, lastGraftPage = 0xFF;
+    for (i = 0; i < 5; i++)
+    {
+        bool8 has = FALSE;
+        if (i == 0 && (graftFlags & GRAFT_FLAG_TYPE)) has = TRUE;
+        else if (i == 1 && (graftFlags & GRAFT_FLAG_ABILITY)) has = TRUE;
+        else if (i == 2 && (graftFlags & GRAFT_FLAG_MOVE)) has = TRUE;
+        else if (i == 3 && (graftFlags & GRAFT_FLAG_STAT)) has = TRUE;
+        else if (i == 4 && (graftFlags & GRAFT_FLAG_NATURE)) has = TRUE;
+        if (has) { graftCount++; if (i == page) pageIndex = graftCount; lastGraftPage = i; }
+    }
+
     if (page == 0 && (graftFlags & GRAFT_FLAG_TYPE))
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("TYPES"));
+        ptr = StringCopy(ptr, COMPOUND_STRING("TYPES "));
+        ptr = ConvertIntToDecimalStringN(ptr, pageIndex, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ptr = StringAppend(ptr, COMPOUND_STRING("/"));
+        ptr = ConvertIntToDecimalStringN(ptr, graftCount, STR_CONV_MODE_LEFT_ALIGN, 1);
+        if (page == lastGraftPage) ptr = StringAppend(ptr, COMPOUND_STRING(" R:close"));
+        else ptr = StringAppend(ptr, COMPOUND_STRING(" R:next"));
         ptr = StringAppend(ptr, gText_NewLine);
         for (i = 0; i < 2; i++)
         {
@@ -684,14 +718,24 @@ static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 
     }
     else if (page == 1 && (graftFlags & GRAFT_FLAG_ABILITY))
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("ABILITY"));
+        ptr = StringCopy(ptr, COMPOUND_STRING("ABILITY "));
+        ptr = ConvertIntToDecimalStringN(ptr, pageIndex, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ptr = StringAppend(ptr, COMPOUND_STRING("/"));
+        ptr = ConvertIntToDecimalStringN(ptr, graftCount, STR_CONV_MODE_LEFT_ALIGN, 1);
+        if (page == lastGraftPage) ptr = StringAppend(ptr, COMPOUND_STRING(" R:close"));
+        else ptr = StringAppend(ptr, COMPOUND_STRING(" R:next"));
         ptr = StringAppend(ptr, gText_NewLine);
         ptr = StringCopy(ptr, gAbilitiesInfo[boxMon->graftAbility].name);
         ptr = StringAppend(ptr, gText_NewLine);
     }
     else if (page == 2 && (graftFlags & GRAFT_FLAG_MOVE))
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("MOVES"));
+        ptr = StringCopy(ptr, COMPOUND_STRING("MOVES "));
+        ptr = ConvertIntToDecimalStringN(ptr, pageIndex, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ptr = StringAppend(ptr, COMPOUND_STRING("/"));
+        ptr = ConvertIntToDecimalStringN(ptr, graftCount, STR_CONV_MODE_LEFT_ALIGN, 1);
+        if (page == lastGraftPage) ptr = StringAppend(ptr, COMPOUND_STRING(" R:close"));
+        else ptr = StringAppend(ptr, COMPOUND_STRING(" R:next"));
         ptr = StringAppend(ptr, gText_NewLine);
         for (i = 0; i < MAX_MON_MOVES; i++)
         {
@@ -705,7 +749,12 @@ static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 
     }
     else if (page == 3 && (graftFlags & GRAFT_FLAG_STAT))
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("STATS"));
+        ptr = StringCopy(ptr, COMPOUND_STRING("STATS "));
+        ptr = ConvertIntToDecimalStringN(ptr, pageIndex, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ptr = StringAppend(ptr, COMPOUND_STRING("/"));
+        ptr = ConvertIntToDecimalStringN(ptr, graftCount, STR_CONV_MODE_LEFT_ALIGN, 1);
+        if (page == lastGraftPage) ptr = StringAppend(ptr, COMPOUND_STRING(" R:close"));
+        else ptr = StringAppend(ptr, COMPOUND_STRING(" R:next"));
         ptr = StringAppend(ptr, gText_NewLine);
         for (i = 0; i < 6; i++)
         {
@@ -722,21 +771,21 @@ static void EnemyGraftViewerDrawPage(struct BoxPokemon *boxMon, u16 species, u8 
     }
     else if (page == 4 && (graftFlags & GRAFT_FLAG_NATURE))
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("NATURE"));
+        ptr = StringCopy(ptr, COMPOUND_STRING("NATURE "));
+        ptr = ConvertIntToDecimalStringN(ptr, pageIndex, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ptr = StringAppend(ptr, COMPOUND_STRING("/"));
+        ptr = ConvertIntToDecimalStringN(ptr, graftCount, STR_CONV_MODE_LEFT_ALIGN, 1);
+        if (page == lastGraftPage) ptr = StringAppend(ptr, COMPOUND_STRING(" R:close"));
+        else ptr = StringAppend(ptr, COMPOUND_STRING(" R:next"));
         ptr = StringAppend(ptr, gText_NewLine);
         ptr = StringCopy(ptr, gNaturesInfo[boxMon->hiddenNatureModifier].name);
         ptr = StringAppend(ptr, gText_NewLine);
     }
     else
     {
-        ptr = StringCopy(ptr, COMPOUND_STRING("No grafts."));
+        ptr = StringCopy(ptr, COMPOUND_STRING("No grafts. R:close"));
         ptr = StringAppend(ptr, gText_NewLine);
     }
-
-    // Footer: page counter + controls
-    ptr = StringAppend(ptr, gText_NewLine);
-    ptr = ConvertIntToDecimalStringN(ptr, page + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-    ptr = StringAppend(ptr, COMPOUND_STRING("/5 R:next B:close"));
 }
 
 void HideEnemyGrafts(void)
@@ -762,8 +811,29 @@ bool8 IsEnemyGraftViewerOpen(void)
     return sEnemyGraftViewerOpen;
 }
 
-
-// ============================================================
+bool8 IsEnemyGraftViewerOnLastPage(void)
+{
+    u8 graftFlags = sEnemyGraftViewerFlags;
+    u8 currentPage = sEnemyGraftViewerPage;
+    u8 lastPage = 0xFF;
+    u8 graftCount = 0;
+    u8 i;
+    for (i = 0; i < 5; i++)
+    {
+        if ((i == 0 && (graftFlags & GRAFT_FLAG_TYPE))
+         || (i == 1 && (graftFlags & GRAFT_FLAG_ABILITY))
+         || (i == 2 && (graftFlags & GRAFT_FLAG_MOVE))
+         || (i == 3 && (graftFlags & GRAFT_FLAG_STAT))
+         || (i == 4 && (graftFlags & GRAFT_FLAG_NATURE)))
+        {
+            lastPage = i;
+            graftCount++;
+        }
+    }
+    if (graftCount == 0)
+        return TRUE;
+    return (currentPage == lastPage);
+}
 // Old GenerateGraftRoll stubs (kept for compat, not used anymore)
 // ============================================================
 

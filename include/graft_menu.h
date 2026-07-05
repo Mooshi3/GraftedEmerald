@@ -69,6 +69,7 @@ void ShowEnemyGrafts(enum BattlerId battler);
 void EnemyGraftViewerNextPage(struct BoxPokemon *boxMon, u16 species);
 void HideEnemyGrafts(void);
 bool8 IsEnemyGraftViewerOpen(void);
+bool8 IsEnemyGraftViewerOnLastPage(void);
 u8 GetGraftMenuSubCursor(void);
 void SetGraftMenuSubCursor(u8 cursor);
 

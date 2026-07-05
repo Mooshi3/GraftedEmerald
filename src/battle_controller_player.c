@@ -900,6 +900,8 @@ void HandleInputChooseMove(enum BattlerId battler)
         if (JOY_NEW(B_MOVE_DESCRIPTION_BUTTON) || JOY_NEW(A_BUTTON) || JOY_NEW(B_BUTTON))
         {
             gBattleStruct->descriptionSubmenu = FALSE;
+            if (IsEnemyGraftViewerOpen())
+                HideEnemyGrafts();
             if (gCategoryIconSpriteId != 0xFF)
             {
                 DestroySprite(&gSprites[gCategoryIconSpriteId]);
@@ -926,9 +928,21 @@ void HandleInputChooseMove(enum BattlerId battler)
     {
         if (JOY_NEW(R_BUTTON))
         {
+            // R cycles to next page; if on last page, closes (toggle behavior)
             struct BoxPokemon *boxMon = &gEnemyParty[gBattlerPartyIndexes[BATTLE_OPPOSITE(battler)]].box;
             u16 species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
-            EnemyGraftViewerNextPage(boxMon, species);
+            if (IsEnemyGraftViewerOnLastPage())
+            {
+                HideEnemyGrafts();
+                if (B_SHOW_EFFECTIVENESS)
+                    MoveSelectionDisplayMoveEffectiveness(CheckTargetTypeEffectiveness(battler), battler);
+                MoveSelectionDisplayPpNumber(battler);
+                MoveSelectionDisplayMoveType(battler);
+            }
+            else
+            {
+                EnemyGraftViewerNextPage(boxMon, species);
+            }
             PlaySE(SE_SELECT);
         }
         else if (JOY_NEW(B_BUTTON))
