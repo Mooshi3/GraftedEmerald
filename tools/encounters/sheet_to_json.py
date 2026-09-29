@@ -60,6 +60,10 @@ AREA_MAPS = {
     'ABANDONED SHIP': ['ABANDONED_SHIP_ROOMS_B1F', 'ABANDONED_SHIP_HIDDEN_FLOOR_CORRIDORS'],
     'UNDERWATER 124': ['UNDERWATER_ROUTE124'],
     'UNDERWATER 126': ['UNDERWATER_ROUTE126'],
+    'MIRAGE TOWER': ['MIRAGE_TOWER_1F', 'MIRAGE_TOWER_2F', 'MIRAGE_TOWER_3F', 'MIRAGE_TOWER_4F'],
+    'ARTISAN CAVE': ['ARTISAN_CAVE_1F', 'ARTISAN_CAVE_B1F'],
+    'GRANITE CAVE B2F': ['GRANITE_CAVE_B2F', 'GRANITE_CAVE_STEVENS_ROOM'],
+    'ALTERING CAVE': ['ALTERING_CAVE'],  # the default set; the other 8 only appear through a mystery event
 }
 
 
@@ -244,6 +248,15 @@ def map_entries(entries, mapname):
     return [e for e in emerald(entries) if e['map'] == 'MAP_' + mapname]
 
 
+def new_water_entry(entries, mapname):
+    """Create an untimed entry with an empty surfing table for a map that has water tiles but no table."""
+    label = 'g' + ''.join(part.capitalize() if not part[0].isdigit() else '_' + part for part in mapname.split('_'))
+    e = {'map': 'MAP_' + mapname, 'base_label': label,
+         'water_mons': {'encounter_rate': 4, 'mons': [{'min_level': 1, 'max_level': 1, 'species': 'SPECIES_NONE'} for _ in range(5)]}}
+    entries.append(e)
+    return e
+
+
 def set_species(field, species):
     for slot, sid in zip(field['mons'], species):
         slot['species'] = sid
@@ -340,9 +353,15 @@ def main():
                 for mapname in maps:
                     e = find_entry(entries, mapname, 'Day')
                     if e is None or 'water_mons' not in e:
-                        if len(maps) == 1:
-                            problems.append(f'{where}: {mapname} has no surfing table')
-                        continue
+                        if not MAP_TILES.get(mapname, (False, False))[1]:
+                            if len(maps) == 1:
+                                problems.append(f'{where}: {mapname} has no water tiles that trigger encounters')
+                            continue
+                        if e is None:
+                            e = new_water_entry(entries, mapname)
+                        else:
+                            e['water_mons'] = new_water_entry([], mapname)['water_mons']
+                        notes.append(f'{mapname}: created a surfing table')
                     set_species(e['water_mons'], species)
                     for slot in e['water_mons']['mons']:
                         slot['min_level'], slot['max_level'] = row['levels']
@@ -369,7 +388,7 @@ def main():
                 notes.append(f"{e['base_label']}: {field} not in the sheet (kept as is)")
         for field in ('land_mons', 'water_mons', 'fishing_mons', 'rock_smash_mons'):
             if field in e and any(m['species'] == 'SPECIES_UNOWN' for m in e[field]['mons']) \
-                    and not e['map'].startswith('MAP_CAVE_OF_ORIGIN'):
+                    and not e['map'].startswith(('MAP_CAVE_OF_ORIGIN', 'MAP_ALTERING_CAVE')):
                 warnings.append(f"{e['base_label']}: {field} still has Unown placeholders")
 
     # 4. Postgame legendaries.
