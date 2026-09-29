@@ -3573,6 +3573,7 @@ static void DoBattleIntro(void)
         u16 ga = gEnemyParty[graftSlot].box.graftAbility;
         if (ga != GRAFT_ABILITY_NONE)
             gBattleMons[battler].ability = (enum Ability)ga;
+            DebugPrintf("[GRAFT] enemy b%d graftAbil=%d abilNum=%d final=%d species=%d", battler, ga, gBattleMons[battler].abilityNum, gBattleMons[battler].ability, gBattleMons[battler].species);
     }
                 gBattleStruct->battlerState[battler].hpOnSwitchout = gBattleMons[battler].hp;
                 memset(&gBattleMons[battler].volatiles, 0, sizeof(struct Volatiles));
