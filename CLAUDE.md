@@ -60,15 +60,14 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 Test baseline (2026-09-29): full `make check` has 0 failures (4503 passed; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
 
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
 
 Next:
 1. Upstream merge (expansion 1.17.1+).
-4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
-5. Done: breeding inheritance (`InheritGrafts`, `src/graft_data.c`). A parent holding a Graft Knot (sold with the Splicer, 3 badges) passes all its grafts; if both parents hold one, each graft comes from a random one of them. Without a knot, each graft has a 25% chance (`GRAFT_INHERIT_CHANCE`) to pass from a random parent that has it. Nature grafts aren't inherited (Everstone covers nature). Hatching keeps the egg's grafts.
-6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
-7. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
-8. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
-9. Someday: visual smoke tests (script mGBA to press buttons and screenshot UI flows). Deferred: expensive, and the test ROM covers the data paths.
+2. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
+3. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
+4. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
+5. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
+6. Someday: visual smoke tests (script mGBA to press buttons and screenshot UI flows). Deferred: expensive, and the test ROM covers the data paths.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).
