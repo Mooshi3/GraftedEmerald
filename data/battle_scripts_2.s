@@ -5,6 +5,7 @@
 #include "constants/battle_anim.h"
 #include "constants/battle_string_ids.h"
 #include "constants/moves.h"
+#include "constants/items.h"
 #include "constants/songs.h"
 #include "constants/game_stat.h"
 	.include "asm/macros.inc"
@@ -192,9 +193,9 @@ BattleScript_SafariBallThrow::
 BattleScript_SuccessBallThrow::
 	setbyte sMON_CAUGHT, TRUE
 	incrementgamestat GAME_STAT_POKEMON_CAPTURES
-	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36D, BattleScript_GraftBallCatch
-	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36E, BattleScript_GraftBallCatch
-	jumpifhalfword CMP_EQUAL, gLastThrownBall, 0x36A, BattleScript_GraftBallCatch
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, ITEM_PATCH_BALL, BattleScript_GraftBallCatch
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, ITEM_SPLICE_BALL, BattleScript_GraftBallCatch
+	jumpifhalfword CMP_EQUAL, gLastThrownBall, ITEM_GRAFT_BALL, BattleScript_GraftBallCatch
 	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
 	jumpifbyte CMP_NOT_EQUAL, sEXP_CATCH, TRUE, BattleScript_TryPrintCaughtMonInfo
 	setbyte sGIVEEXP_STATE, 0
@@ -218,6 +219,8 @@ BattleScript_TryNicknameCaughtMon::
 	goto BattleScript_SuccessBallThrowEnd
 BattleScript_GiveCaughtMonEnd::
 	givecaughtmon BattleScript_SuccessBallThrowEnd
+	goto BattleScript_SuccessBallThrowEnd
+
 BattleScript_GraftBallCatch::
 	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
 	waitmessage B_WAIT_TIME_LONG

@@ -56,13 +56,18 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 
 ## Roadmap / decisions log
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests.
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.
+
+Known test failures vs upstream: every battle test that throws a ball times out (being bisected). Upstream passes these.
 
 Next:
 1. Sheet → encounter JSON converter, then the post-game legendary mechanic.
 2. Move grafts: when the mon knows 4 moves, always offer "forget a move?" (Graft Ball and Splicer both), and put the forgotten move in the relearner even if it was grafted.
 3. Upstream merge (expansion 1.17.1+).
 4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
-5. Ideas to design with Jacob: graft inheritance through breeding; an Ungrafter that clears grafts (and their relearner entries); an in-game encounter dex (GraftedDex is the out-of-game prototype and needs UI polish).
+5. Breeding inheritance, designed for competitive control (netplay PvP is the long-term goal): grafts pass down like IVs, and a held item makes it deterministic ("this is my Huge Power Ditto"). Proposal pending Jacob's OK: a parent holding a new Graft Knot passes all its grafts; without it, nothing is inherited.
+6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
+7. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
+8. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).
