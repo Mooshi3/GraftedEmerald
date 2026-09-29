@@ -3,6 +3,10 @@
 #include "pokemon_storage_system.h"
 #include "save.h"
 #include "test/test.h"
+#include "event_data.h"
+#include "pokedex.h"
+#include "wild_encounter.h"
+#include "constants/map_groups.h"
 
 // Regression tests for graft persistence. Grafts live on BoxPokemon, so every
 // path that copies a mon (party <-> PC, BoxMonToMon, save/load) must carry them.
@@ -111,4 +115,26 @@ TEST("HP grafts are refused on husks but other stats are not")
     CreateRandomMonWithIVs(&mon, SPECIES_SHEDINJA, 50, 0);
     EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP));
     EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), 1);
+}
+
+TEST("Postgame legendaries take the 1% slot only after the Champion win, until caught")
+{
+    u16 species = SPECIES_NONE;
+    u8 level = 0;
+    gSaveBlock1Ptr->location.mapGroup = MAP_GROUP(MAP_ROUTE101);
+    gSaveBlock1Ptr->location.mapNum = MAP_NUM(MAP_ROUTE101);
+    GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_KUBFU), FLAG_SET_SEEN); // seen doesn't count
+
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+    EXPECT(!TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
+
+    FlagSet(FLAG_SYS_GAME_CLEAR);
+    EXPECT(TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
+    EXPECT_EQ(species, SPECIES_KUBFU);
+    EXPECT(level >= 50 && level <= 55);
+    EXPECT(!TryGetPostgameLegendary(WILD_AREA_WATER, &species, &level));
+
+    GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_KUBFU), FLAG_SET_CAUGHT);
+    EXPECT(!TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
+    FlagClear(FLAG_SYS_GAME_CLEAR);
 }

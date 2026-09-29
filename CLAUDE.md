@@ -51,7 +51,7 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 - Every non-legendary family has a home. Keep canon encounters where possible, except overused ones. Theme matters: no fish on land, deep-sea mons in the sea, and so on.
 - Game-breaking abilities stay past the halfway point through placement. Huge/Pure Power holders appear from 5 badges: Meditite on Mt. Pyre, Azurill on Route 120, Marill only via surfing.
 - Existing land levels are kept. Surfing scales by region: 20–30 around Dewford and Slateport, 30–35 around Lilycove and Mossdeep, 35–40 from Pacifidlog on.
-- **Post-game legendaries:** after the first Champion win, each legendary takes its area's 1% slot until caught. Hoenn's own legendaries keep their canon events. Mythicals, Ultra Beasts and Paradox Pokémon are held for a later wave.
+- **Post-game legendaries:** after the first Champion win (`FLAG_SYS_GAME_CLEAR`), each legendary takes its area's last 1% slot (land slot 12, surf slot 5) until it's registered as caught in the Pokédex (`TryGetPostgameLegendary`, `src/wild_encounter.c`). Hoenn's own legendaries keep their canon events. Mythicals, Ultra Beasts and Paradox Pokémon are held for a later wave.
 - The sheet lives at `tools/encounters/Grafted_Encounter_Tables.xlsx`. `tools/encounters/sheet_to_json.py` generates `src/data/wild_encounters.json` and `src/data/graft_postgame_legendaries.h` from it (see the README there). Never hand-edit Emerald maps in the JSON.
 - Aqua Hideout has no tiles that trigger land encounters, so its sheet row does nothing (waiting on Jacob). Areas not in the sheet yet (still vanilla): Mirage Tower, Desert Underpass, Artisan Cave, Altering Cave, Granite Cave B2F, Steven's room/cave, surfing on Routes 111/119/120/121, Victory Road B2F water.
 
@@ -63,7 +63,7 @@ Test baseline (2026-09-29): full `make check` has 0 failures (4503 passed; the r
 Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
 
 Next:
-1. Post-game legendary mechanic (the table is generated; the wild-encounter hook isn't written yet).
+1. Open question: should Graft Ball harvests register as caught in the Pokédex? Right now they don't, so a harvested legendary keeps appearing.
 2. Move grafts: when the mon knows 4 moves, always offer "forget a move?" (Graft Ball and Splicer both), and put the forgotten move in the relearner even if it was grafted.
 3. Upstream merge (expansion 1.17.1+).
 4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.

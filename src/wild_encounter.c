@@ -3,6 +3,7 @@
 #include "battle_pike.h"
 #include "battle_pyramid.h"
 #include "event_data.h"
+#include "pokedex.h"
 #include "fieldmap.h"
 #include "fishing.h"
 #include "follower_npc.h"
@@ -483,6 +484,44 @@ void CreateWildMon(u16 species, u8 level)
 #define TRY_GET_ABILITY_INFLUENCED_WILD_MON_INDEX(wildPokemon, type, ability, ptr, count) TryGetAbilityInfluencedWildMonIndex(wildPokemon, type, ability, ptr)
 #endif
 
+// GRAFT: after the first Champion win, each area's legendary takes over its last 1% slot until
+// the player has caught one. Generated from the encounter sheet's "Postgame Legendaries" tab.
+struct PostgameLegendary
+{
+    u16 map;
+    u8 timeOfDay; // TIMES_OF_DAY_COUNT = any time
+    u8 area;
+    u16 species;
+    u8 minLevel;
+    u8 maxLevel;
+};
+#include "data/graft_postgame_legendaries.h"
+
+bool32 TryGetPostgameLegendary(enum WildPokemonArea area, u16 *species, u8 *level)
+{
+    u32 i;
+    u16 map = gSaveBlock1Ptr->location.mapNum | (gSaveBlock1Ptr->location.mapGroup << 8);
+    enum TimeOfDay timeOfDay;
+
+    if (!FlagGet(FLAG_SYS_GAME_CLEAR) || InBattlePike() || CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
+        return FALSE;
+    timeOfDay = GetTimeOfDayForEncounters(GetCurrentMapWildMonHeaderId(), area);
+    for (i = 0; i < ARRAY_COUNT(sPostgameLegendaries); i++)
+    {
+        const struct PostgameLegendary *legend = &sPostgameLegendaries[i];
+        if (legend->map != map || legend->area != area)
+            continue;
+        if (legend->timeOfDay != TIMES_OF_DAY_COUNT && legend->timeOfDay != timeOfDay)
+            continue;
+        if (GetSetPokedexFlag(SpeciesToNationalPokedexNum(legend->species), FLAG_GET_CAUGHT))
+            return FALSE;
+        *species = legend->species;
+        *level = legend->minLevel + Random() % (legend->maxLevel - legend->minLevel + 1);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static bool8 TryGenerateWildMon(const struct WildPokemonInfo *wildMonInfo, enum WildPokemonArea area, u8 flags)
 {
     u8 wildMonIndex = 0;
@@ -531,13 +570,17 @@ static bool8 TryGenerateWildMon(const struct WildPokemonInfo *wildMonInfo, enum 
         break;
     }
 
+    u16 species = wildMonInfo->wildPokemon[wildMonIndex].species;
     level = ChooseWildMonLevel(wildMonInfo->wildPokemon, wildMonIndex, area);
+    if ((area == WILD_AREA_LAND && wildMonIndex == LAND_WILD_COUNT - 1)
+     || (area == WILD_AREA_WATER && wildMonIndex == WATER_WILD_COUNT - 1))
+        TryGetPostgameLegendary(area, &species, &level);
     if (flags & WILD_CHECK_REPEL && !IsWildLevelAllowedByRepel(level))
         return FALSE;
     if (gMapHeader.mapLayoutId != LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS && flags & WILD_CHECK_KEEN_EYE && !IsAbilityAllowingEncounter(level))
         return FALSE;
 
-    CreateWildMon(wildMonInfo->wildPokemon[wildMonIndex].species, level);
+    CreateWildMon(species, level);
     return TRUE;
 }
 
