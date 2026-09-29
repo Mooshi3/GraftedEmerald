@@ -69,7 +69,7 @@ Next:
 5. Breeding inheritance, designed for competitive control (netplay PvP is the long-term goal): grafts pass down like IVs, and a held item makes it deterministic ("this is my Huge Power Ditto"). Approved: a parent holding a new Graft Knot passes all its grafts (if both parents hold one and conflict, each egg picks one at random). Without a knot, each graft still has a lower chance to pass from a random parent (start at 25%, tune in playtesting).
 6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
 7. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
-9. Someday: visual smoke tests (script mGBA to press buttons and screenshot UI flows). Deferred: expensive, and the test ROM covers the data paths.
 8. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
+9. Someday: visual smoke tests (script mGBA to press buttons and screenshot UI flows). Deferred: expensive, and the test ROM covers the data paths.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).
