@@ -3435,7 +3435,6 @@ u32 AbilityBattleEffects(enum AbilityEffect caseID, enum BattlerId battler, enum
             }
             break;
         case ABILITY_INTIMIDATE:
-            DebugPrintf("[GRAFT] INTIMIDATE check: battler=%d shouldTrigger=%d opposingEmpty=%d ability=%d", battler, shouldAbilityTrigger, IsOpposingSideEmpty(battler), gLastUsedAbility);
             if (shouldAbilityTrigger && !IsOpposingSideEmpty(battler))
             {
                 SaveBattlerAttacker(gBattlerAttacker);

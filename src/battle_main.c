@@ -3422,33 +3422,7 @@ const u8* FaintClearSetData(enum BattlerId battler)
 
     gBattleMons[battler].types[0] = GetSpeciesType(gBattleMons[battler].species, 0);
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
-    // GRAFT: Override types/ability from graft data for player AND enemy mons
-    if (GetBattlerSide(battler) == B_SIDE_PLAYER)
-    {
-        u8 graftSlot = gBattlerPartyIndexes[battler];
-        u8 gt = GetGraftedType(graftSlot, 0);
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[0] = gt;
-        gt = GetGraftedType(graftSlot, 1);
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[1] = gt;
-        u16 ga = GetGraftedAbility(graftSlot);
-        if (ga != GRAFT_ABILITY_NONE)
-            gBattleMons[battler].ability = (enum Ability)ga;
-    }
-    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
-    {
-        u8 graftSlot = gBattlerPartyIndexes[battler];
-        u8 gt = gEnemyParty[graftSlot].box.graftTypes[0];
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[0] = gt;
-        gt = gEnemyParty[graftSlot].box.graftTypes[1];
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[1] = gt;
-        u16 ga = gEnemyParty[graftSlot].box.graftAbility;
-        if (ga != GRAFT_ABILITY_NONE)
-            gBattleMons[battler].ability = (enum Ability)ga;
-    }
+    ApplyBattlerGraftOverrides(battler);
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
 
     Ai_UpdateFaintData(battler);
@@ -3548,33 +3522,7 @@ static void DoBattleIntro(void)
                 gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
                 gBattleMons[battler].types[2] = TYPE_MYSTERY;
                 gBattleMons[battler].ability = GetAbilityBySpecies(gBattleMons[battler].species, gBattleMons[battler].abilityNum);
-                if (GetBattlerSide(battler) == B_SIDE_PLAYER)
-        {
-                    u8 graftSlot = gBattlerPartyIndexes[battler];
-                    u8 gt = GetGraftedType(graftSlot, 0);
-                    if (gt != GRAFT_TYPE_NONE)
-                        gBattleMons[battler].types[0] = gt;
-                    gt = GetGraftedType(graftSlot, 1);
-                    if (gt != GRAFT_TYPE_NONE)
-                        gBattleMons[battler].types[1] = gt;
-                    u16 ga = GetGraftedAbility(graftSlot);
-                    if (ga != GRAFT_ABILITY_NONE)
-                        gBattleMons[battler].ability = (enum Ability)ga;
-                }
-    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
-    {
-        u8 graftSlot = gBattlerPartyIndexes[battler];
-        u8 gt = gEnemyParty[graftSlot].box.graftTypes[0];
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[0] = gt;
-        gt = gEnemyParty[graftSlot].box.graftTypes[1];
-        if (gt != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[1] = gt;
-        u16 ga = gEnemyParty[graftSlot].box.graftAbility;
-        if (ga != GRAFT_ABILITY_NONE)
-            gBattleMons[battler].ability = (enum Ability)ga;
-            DebugPrintf("[GRAFT] enemy b%d graftAbil=%d abilNum=%d final=%d species=%d", battler, ga, gBattleMons[battler].abilityNum, gBattleMons[battler].ability, gBattleMons[battler].species);
-    }
+                ApplyBattlerGraftOverrides(battler);
                 gBattleStruct->battlerState[battler].hpOnSwitchout = gBattleMons[battler].hp;
                 memset(&gBattleMons[battler].volatiles, 0, sizeof(struct Volatiles));
                 for (i = 0; i < NUM_BATTLE_STATS; i++)

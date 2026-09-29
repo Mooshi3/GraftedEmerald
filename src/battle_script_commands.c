@@ -5321,24 +5321,7 @@ static void Cmd_switchindataupdate(void)
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
     gBattleMons[battler].ability = GetAbilityBySpecies(gBattleMons[battler].species, gBattleMons[battler].abilityNum);
 
-    // GRAFT: Override type and ability from graft data if present
-    {
-        u8 graftPartySlot = gBattlerPartyIndexes[battler];
-        u8 graftedType;
-        u16 graftedAbility;
-        if (GetBattlerSide(battler) == B_SIDE_PLAYER)
-        {
-            graftedType = GetGraftedType(graftPartySlot, 0);
-            if (graftedType != GRAFT_TYPE_NONE)
-                gBattleMons[battler].types[0] = graftedType;
-            graftedType = GetGraftedType(graftPartySlot, 1);
-            if (graftedType != GRAFT_TYPE_NONE)
-                gBattleMons[battler].types[1] = graftedType;
-            graftedAbility = GetGraftedAbility(graftPartySlot);
-            if (graftedAbility != GRAFT_ABILITY_NONE)
-                gBattleMons[battler].ability = graftedAbility;
-        }
-    }
+    ApplyBattlerGraftOverrides(battler);
     #if TESTING
     if (gTestRunnerEnabled)
     {

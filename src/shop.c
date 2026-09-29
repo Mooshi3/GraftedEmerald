@@ -587,12 +587,15 @@ static void BuyMenuFreeMemory(void)
     FreeAllWindowBuffers();
 }
 
-
-// Returns the number of badges required to purchase an item.
-// 0 = always available. Used for graft item gating.
 static void BuyMenuBuildListMenuTemplate(void)
 {
     u16 i;
+
+    // GRAFT: itemCount is overwritten with the filtered count below, so recount
+    // from the full list in case the buy menu is built more than once per visit.
+    for (i = 0; sMartInfo.itemList[i]; i++)
+        ;
+    sMartInfo.itemCount = i;
 
     sListMenuItems = Alloc((sMartInfo.itemCount + 1) * sizeof(*sListMenuItems));
     sItemNames = Alloc((sMartInfo.itemCount + 1) * sizeof(*sItemNames));
@@ -608,9 +611,9 @@ static void BuyMenuBuildListMenuTemplate(void)
     }
     sMartInfo.itemCount = displayCount;
 
-    StringCopy(sItemNames[i], gText_Cancel2);
-    sListMenuItems[i].name = sItemNames[i];
-    sListMenuItems[i].id = LIST_CANCEL;
+    StringCopy(sItemNames[displayCount], gText_Cancel2);
+    sListMenuItems[displayCount].name = sItemNames[displayCount];
+    sListMenuItems[displayCount].id = LIST_CANCEL;
 
     gMultiuseListMenuTemplate = sShopBuyMenuListTemplate;
     gMultiuseListMenuTemplate.items = sListMenuItems;

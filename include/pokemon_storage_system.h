@@ -1,7 +1,7 @@
 #ifndef GUARD_POKEMON_STORAGE_SYSTEM_H
 #define GUARD_POKEMON_STORAGE_SYSTEM_H
 
-#define TOTAL_BOXES_COUNT       10
+#define TOTAL_BOXES_COUNT       11 // GRAFT: grafts make BoxPokemon 100 bytes; 11 is the most that fits in 9 sectors
 #define IN_BOX_ROWS             5 // Number of rows, 6 Pokémon per row
 #define IN_BOX_COLUMNS          6 // Number of columns, 5 Pokémon per column
 #define IN_BOX_COUNT            (IN_BOX_ROWS * IN_BOX_COLUMNS)

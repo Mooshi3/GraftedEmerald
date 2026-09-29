@@ -311,7 +311,7 @@ static void AddMapEncountersToPool(u8 mapGroup, u8 mapNum)
                 enc->landMonsInfo, enc->waterMonsInfo,
                 enc->rockSmashMonsInfo, enc->fishingMonsInfo
             };
-            const u8 counts[] = { LAND_WILD_COUNT, WATER_WILD_COUNT, ROCK_WILD_COUNT, 12 }; // fishing varies, 12 is safe upper bound
+            const u8 counts[] = { LAND_WILD_COUNT, WATER_WILD_COUNT, ROCK_WILD_COUNT, FISH_WILD_COUNT };
             for (u32 t = 0; t < 4; t++)
             {
                 if (infos[t] == NULL)
@@ -1056,6 +1056,21 @@ void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u3
             gPlttBufferFaded[palOffset + i] = GraftShadeContinuous(tc, lum, globalMinLum, globalMaxLum);
         }
     }
+}
+
+// Overwrite a battler's types and ability with its grafts, if it has any.
+// Call after gBattleMons[battler] has been filled with the species defaults.
+// Works for both sides: the grafts live on the party mon's BoxPokemon.
+void ApplyBattlerGraftOverrides(u32 battler)
+{
+    const struct BoxPokemon *boxMon = &GetBattlerMon(battler)->box;
+
+    if (boxMon->graftTypes[0] != GRAFT_TYPE_NONE)
+        gBattleMons[battler].types[0] = boxMon->graftTypes[0];
+    if (boxMon->graftTypes[1] != GRAFT_TYPE_NONE)
+        gBattleMons[battler].types[1] = boxMon->graftTypes[1];
+    if (boxMon->graftAbility != GRAFT_ABILITY_NONE)
+        gBattleMons[battler].ability = boxMon->graftAbility;
 }
 
 // Check if a player battler has any grafted types that differ from
