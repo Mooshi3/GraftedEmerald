@@ -86,3 +86,29 @@ TEST("Save slots do not overlap the Hall of Fame sectors")
     EXPECT_LE(NUM_SECTORS_PER_SLOT * NUM_SAVE_SLOTS, SECTOR_ID_HOF_1);
     EXPECT_LE(sizeof(struct PokemonStorage), SECTOR_DATA_SIZE * (SECTOR_ID_PKMN_STORAGE_END - SECTOR_ID_PKMN_STORAGE_START + 1));
 }
+
+TEST("Grafting Wonder Guard makes the host a 1 HP husk, and removing it restores HP")
+{
+    struct Pokemon mon;
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    u32 maxHP = GetMonData(&mon, MON_DATA_MAX_HP);
+    SetGraftedAbilityOnMon(&mon, ABILITY_WONDER_GUARD);
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), 1);
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_HP), 1);
+    SetGraftedAbilityOnMon(&mon, ABILITY_INTIMIDATE);
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), maxHP);
+}
+
+TEST("HP grafts are refused on husks but other stats are not")
+{
+    struct Pokemon mon;
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_HP));
+    SetGraftedAbilityOnMon(&mon, ABILITY_WONDER_GUARD);
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP));
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_DEF));
+
+    CreateRandomMonWithIVs(&mon, SPECIES_SHEDINJA, 50, 0);
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP));
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), 1);
+}

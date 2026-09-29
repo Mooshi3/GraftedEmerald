@@ -1870,7 +1870,7 @@ void CalculateMonStats(struct Pokemon *mon)
         return;
 #endif
 
-    if (species == SPECIES_SHEDINJA)
+    if (IsGraftHusk(&mon->box))
     {
         newMaxHP = 1;
     }

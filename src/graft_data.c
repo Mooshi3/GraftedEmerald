@@ -3,6 +3,7 @@
 #include "graft_data.h"
 #include "move.h"
 #include "constants/species.h"
+#include "constants/abilities.h"
 #include "palette.h"
 #include "constants/rgb.h"
 #include "battle_main.h"
@@ -102,8 +103,7 @@ void SetGraftedAbility(u8 partySlot, u16 ability)
 {
     if (partySlot >= PARTY_SIZE)
         return;
-    gPlayerParty[partySlot].box.graftAbility = ability;
-    gPlayerParty[partySlot].box.graftFlags |= GRAFT_FLAG_ABILITY;
+    SetGraftedAbilityOnMon(&gPlayerParty[partySlot], ability);
 }
 
 // Apply a move graft to a party mon
@@ -235,13 +235,35 @@ u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon)
     }
     return count;
 }
-bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex)
+// Shedinja, and anything grafted with Wonder Guard, is a hollow husk: max HP is always 1.
+// The drawback travels with the ability, the same way Shedinja fusions work in other games.
+bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
 {
+    if (boxMon->graftAbility == ABILITY_WONDER_GUARD)
+        return TRUE;
+    return GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES) == SPECIES_SHEDINJA;
+}
+
+static const u8 sText_HuskHPGraft[] = _("A hollow husk can't hold\nan HP graft!");
+static const u8 sText_StatGraftLimit[] = _("Stat graft limit reached!\nNeed more badges.");
+
+// Returns the message explaining why this stat graft is refused, or NULL if it is allowed.
+const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex)
+{
+    if (statIndex == STAT_HP && IsGraftHusk(boxMon))
+        return sText_HuskHPGraft;
     // Overwriting an existing graft slot is always free
     if (statIndex < 6 && boxMon->graftStatOverrides[statIndex] != 0)
-        return TRUE;
+        return NULL;
     // New slot: check against cap
-    return CountStatGraftsOnBoxMon(boxMon) < GetStatGraftCap();
+    if (CountStatGraftsOnBoxMon(boxMon) >= GetStatGraftCap())
+        return sText_StatGraftLimit;
+    return NULL;
+}
+
+bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex)
+{
+    return GetStatGraftRejectReason(boxMon, statIndex) == NULL;
 }
 
 // ============================================================
@@ -268,6 +290,7 @@ void SetGraftedAbilityOnMon(struct Pokemon *mon, u16 ability)
 {
     mon->box.graftAbility = ability;
     mon->box.graftFlags |= GRAFT_FLAG_ABILITY;
+    CalculateMonStats(mon); // Wonder Guard grafts change max HP
 }
 
 void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId)
@@ -532,6 +555,8 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
             for (u8 s = 0; s < 6; s++)
             {
                 if (statUsed[s])
+                    continue;
+                if (s == STAT_HP && IsGraftHusk(&mon->box))
                     continue;
                 u8 donorStat = GetSpeciesBaseStatGraft(donor, s);
                 if (donorStat > GetEffectiveBaseStat(mon, s))

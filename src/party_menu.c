@@ -8836,9 +8836,10 @@ void Task_GraftSplicer(u8 taskId)
         if (graftType == GRAFT_MENU_STAT)
         {
             u8 targetSlot = gPartyMenu.slotId;
-            if (!CanApplyStatGraft(&gPlayerParty[targetSlot].box, GetSelectedGraftStatIndex()))
+            const u8 *rejectReason = GetStatGraftRejectReason(&gPlayerParty[targetSlot].box, GetSelectedGraftStatIndex());
+            if (rejectReason != NULL)
             {
-                StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                StringExpandPlaceholders(gStringVar4, rejectReason);
                 DisplayPartyMenuMessage(gStringVar4, TRUE);
                 ScheduleBgCopyTilemapToVram(2);
                 sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;

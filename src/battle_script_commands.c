@@ -7049,11 +7049,12 @@ case 3: // Wait for party menu to return to battle
                     if (gBattleCommunication[CURSOR_POSITION] == 0)
                     {
                         u8 partySlot = ResolveGraftTargetSlot();
-                    if (CanApplyStatGraft(&gPlayerParty[partySlot].box, GetSelectedGraftStatIndex()))
+                    const u8 *rejectReason = GetStatGraftRejectReason(&gPlayerParty[partySlot].box, GetSelectedGraftStatIndex());
+                    if (rejectReason == NULL)
                     SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
                     else
                     {
-                        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                        StringExpandPlaceholders(gStringVar4, rejectReason);
                         FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
                         BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
                         gBattleCommunication[MULTIUSE_STATE] = 22;
