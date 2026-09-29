@@ -18,7 +18,7 @@ u8 GetGraftedType(u8 partySlot, u8 typeIndex)
 {
     if (partySlot >= PARTY_SIZE || typeIndex > 1)
         return GRAFT_TYPE_NONE;
-    u8 val = gPlayerParty[partySlot].box.graftTypes[typeIndex];
+    u8 val = gParties[B_TRAINER_PLAYER][partySlot].box.graftTypes[typeIndex];
     if (val == GRAFT_TYPE_NONE)
         return GRAFT_TYPE_NONE;
     return val;
@@ -29,8 +29,8 @@ void SetGraftedType(u8 partySlot, u8 typeIndex, u8 type)
 {
     if (partySlot >= PARTY_SIZE || typeIndex > 1)
         return;
-    gPlayerParty[partySlot].box.graftTypes[typeIndex] = type;
-    gPlayerParty[partySlot].box.graftFlags |= GRAFT_FLAG_TYPE;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftTypes[typeIndex] = type;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftFlags |= GRAFT_FLAG_TYPE;
 }
 
 // Get grafted stat for a party mon
@@ -38,7 +38,7 @@ u16 GetGraftedStat(u8 partySlot, u8 statIndex)
 {
     if (partySlot >= PARTY_SIZE || statIndex >= 6)
         return GRAFT_STAT_NONE;
-    u8 val = gPlayerParty[partySlot].box.graftStatOverrides[statIndex];
+    u8 val = gParties[B_TRAINER_PLAYER][partySlot].box.graftStatOverrides[statIndex];
     if (val == 0) // 0 = no override
         return GRAFT_STAT_NONE;
     return val;
@@ -49,9 +49,9 @@ void SetGraftedStat(u8 partySlot, u8 statIndex, u16 statValue)
 {
     if (partySlot >= PARTY_SIZE || statIndex >= 6)
         return;
-    gPlayerParty[partySlot].box.graftStatOverrides[statIndex] = (u8)statValue;
-    CalculateMonStats(&gPlayerParty[partySlot]);
-    gPlayerParty[partySlot].box.graftFlags |= GRAFT_FLAG_STAT;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftStatOverrides[statIndex] = (u8)statValue;
+    CalculateMonStats(&gParties[B_TRAINER_PLAYER][partySlot]);
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftFlags |= GRAFT_FLAG_STAT;
 }
 
 // Get effective type from a struct Pokemon pointer (checks grafts first)
@@ -84,7 +84,7 @@ u16 GetGraftedAbility(u8 partySlot)
 {
     if (partySlot >= PARTY_SIZE)
         return GRAFT_ABILITY_NONE;
-    u16 val = gPlayerParty[partySlot].box.graftAbility;
+    u16 val = gParties[B_TRAINER_PLAYER][partySlot].box.graftAbility;
     if (val == GRAFT_ABILITY_NONE)
         return GRAFT_ABILITY_NONE;
     return val;
@@ -95,7 +95,7 @@ void SetGraftedAbility(u8 partySlot, u16 ability)
 {
     if (partySlot >= PARTY_SIZE)
         return;
-    SetGraftedAbilityOnMon(&gPlayerParty[partySlot], ability);
+    SetGraftedAbilityOnMon(&gParties[B_TRAINER_PLAYER][partySlot], ability);
 }
 
 static bool32 IsLevelUpMoveOf(u16 species, u16 move)
@@ -151,10 +151,10 @@ void ClearGraftData(u8 partySlot)
 {
     if (partySlot >= PARTY_SIZE)
         return;
-    gPlayerParty[partySlot].box.graftTypes[0] = GRAFT_TYPE_NONE;
-    gPlayerParty[partySlot].box.graftTypes[1] = GRAFT_TYPE_NONE;
-    gPlayerParty[partySlot].box.graftAbility = GRAFT_ABILITY_NONE;
-    gPlayerParty[partySlot].box.graftFlags = 0;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftTypes[0] = GRAFT_TYPE_NONE;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftTypes[1] = GRAFT_TYPE_NONE;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftAbility = GRAFT_ABILITY_NONE;
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftFlags = 0;
 }
 
 // Set grafted nature for a party mon
@@ -162,9 +162,9 @@ void SetGraftedNature(u8 partySlot, u8 natureId)
 {
     if (partySlot >= PARTY_SIZE)
         return;
-    SetMonData(&gPlayerParty[partySlot], MON_DATA_HIDDEN_NATURE, &natureId);
-    CalculateMonStats(&gPlayerParty[partySlot]);
-    gPlayerParty[partySlot].box.graftFlags |= GRAFT_FLAG_NATURE;
+    SetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_HIDDEN_NATURE, &natureId);
+    CalculateMonStats(&gParties[B_TRAINER_PLAYER][partySlot]);
+    gParties[B_TRAINER_PLAYER][partySlot].box.graftFlags |= GRAFT_FLAG_NATURE;
 }
 
 // Initialize all graft data (called on new game)
@@ -239,7 +239,7 @@ bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
 {
     if (boxMon->graftAbility == ABILITY_WONDER_GUARD)
         return TRUE;
-    return GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES) == SPECIES_SHEDINJA;
+    return HasShedinjaHPHandling(GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES));
 }
 
 static const u8 sText_HuskHPGraft[] = _("It won't have any effect.");
@@ -332,7 +332,7 @@ static void AddMapEncountersToPool(u8 mapGroup, u8 mapNum)
                 enc->landMonsInfo, enc->waterMonsInfo,
                 enc->rockSmashMonsInfo, enc->fishingMonsInfo
             };
-            const u8 counts[] = { LAND_WILD_COUNT, WATER_WILD_COUNT, ROCK_WILD_COUNT, FISH_WILD_COUNT };
+            const u8 counts[] = { NUM_LAND_MONS_ENCOUNTER_SLOTS, NUM_WATER_MONS_ENCOUNTER_SLOTS, NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS, NUM_FISHING_MONS_ENCOUNTER_SLOTS };
             for (u32 t = 0; t < 4; t++)
             {
                 if (infos[t] == NULL)
@@ -660,8 +660,11 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;
-    for (u8 i = 0; i < count; i++)
-        ApplyEnemyGrafts(&party[i], graftCount);
+    for (u8 i = 0; i < count && i < PARTY_SIZE; i++)
+    {
+        if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE)
+            ApplyEnemyGrafts(&party[i], graftCount);
+    }
 }
 
 // Blend sprite palette for grafted type tinting.
@@ -1152,17 +1155,6 @@ void InheritGrafts(struct BoxPokemon *egg, struct BoxPokemon *parentA, struct Bo
     }
 }
 
-// Copy every graft field (used when an egg hatches into a freshly created mon).
-void CopyGrafts(struct BoxPokemon *dest, const struct BoxPokemon *src)
-{
-    dest->graftTypes[0] = src->graftTypes[0];
-    dest->graftTypes[1] = src->graftTypes[1];
-    dest->graftAbility = src->graftAbility;
-    dest->graftFlags = src->graftFlags;
-    memcpy(dest->graftStatOverrides, src->graftStatOverrides, sizeof(dest->graftStatOverrides));
-    memcpy(dest->graftMoves, src->graftMoves, sizeof(dest->graftMoves));
-}
-
 // Overwrite a battler's types and ability with its grafts, if it has any.
 // Call after gBattleMons[battler] has been filled with the species defaults.
 // Works for both sides: the grafts live on the party mon's BoxPokemon.
@@ -1189,24 +1181,10 @@ bool8 GetBattlerGraftedTypeInfo(u8 battler, u8 *effectiveType1, u8 *effectiveTyp
     u8 gType1, gType2;
     struct Pokemon *mon;
 
-    if (GetBattlerSide(battler) == B_SIDE_PLAYER)
-    {
-        partySlot = gBattlerPartyIndexes[battler];
-        if (partySlot >= PARTY_SIZE)
-            return FALSE;
-        mon = &gPlayerParty[partySlot];
-    }
-    else if (GetBattlerSide(battler) == B_SIDE_OPPONENT)
-    {
-        partySlot = gBattlerPartyIndexes[battler];
-        if (partySlot >= PARTY_SIZE)
-            return FALSE;
-        mon = &gEnemyParty[partySlot];
-    }
-    else
-    {
+    partySlot = gBattlerPartyIndexes[battler];
+    if (partySlot >= PARTY_SIZE)
         return FALSE;
-    }
+    mon = GetBattlerMon(battler); // right party for either side, including multi battles
 
     species = GetMonData(mon, MON_DATA_SPECIES);
     speciesType1 = gSpeciesInfo[species].types[0];

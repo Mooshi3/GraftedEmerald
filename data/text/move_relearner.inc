@@ -47,6 +47,9 @@ MoveRelearner_Text_TMMoveLWR::
 MoveRelearner_Text_TutorMoveLWR::
 	.string "tutor move$"
 
+MoveRelearner_Text_GraftMoveLWR::
+	.string "graft move$"
+
 MoveRelearner_Text_MoveLWR::
 	.string "move$"
 

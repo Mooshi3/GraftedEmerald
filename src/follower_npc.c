@@ -573,7 +573,7 @@ static void Task_BindSurfBlobToFollowerNPC(u8 taskId)
     struct ObjectEvent *npc = &gObjectEvents[GetFollowerNPCObjectId()];
     // Wait for the jump animation.
     bool32 animStatus = ObjectEventClearHeldMovementIfFinished(npc);
-    if (animStatus == 0)
+    if (!animStatus)
         return;
 
     // Bind the blob to the follower.
@@ -590,7 +590,7 @@ static void Task_FinishSurfDismount(u8 taskId)
     // Wait for the animation to finish.
     bool32 animStatus = ObjectEventClearHeldMovementIfFinished(npc);
 
-    if (animStatus == 0)
+    if (!animStatus)
     {
         // Temporarily stop running.
         if (TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_DASH) && ObjectEventClearHeldMovementIfFinished(&gObjectEvents[gPlayerAvatar.objectEventId]))
@@ -611,7 +611,7 @@ static void Task_FinishSurfDismount(u8 taskId)
 static void Task_ReallowPlayerMovement(u8 taskId)
 {
     bool32 animStatus = ObjectEventClearHeldMovementIfFinished(&gObjectEvents[GetFollowerNPCObjectId()]);
-    if (animStatus == 0)
+    if (!animStatus)
     {
         // Temporarily stop running.
         if (TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_DASH)
@@ -685,6 +685,7 @@ void Task_FollowerNPCOutOfDoor(u8 taskId)
         }
         break;
     case REALLOW_MOVEMENT:
+    {
         struct MapPosition position;
         enum Direction playerDirection;
 
@@ -701,6 +702,7 @@ void Task_FollowerNPCOutOfDoor(u8 taskId)
         }
         DestroyTask(taskId);
         break;
+    }
     }
 }
 
@@ -1173,9 +1175,9 @@ static void ChooseFirstThreeEligibleMons(void)
 
     for (i = 0; i < PARTY_SIZE; i++)
     {
-        if (GetMonData(&gPlayerParty[i], MON_DATA_HP) != 0
-         && GetMonData(&gPlayerParty[i], MON_DATA_IS_EGG) == FALSE
-         && GetMonData(&gPlayerParty[i], MON_DATA_SPECIES) != SPECIES_NONE)
+        if (GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_HP) != 0
+         && GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_IS_EGG) == FALSE
+         && GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_SPECIES) != SPECIES_NONE)
         {
             gSelectedOrderFromParty[count] = (i + 1);
             count++;
@@ -1376,20 +1378,11 @@ void FollowerNPC_HandleSprite(void)
 
 enum Direction DetermineFollowerNPCDirection(struct ObjectEvent *player, struct ObjectEvent *follower)
 {
-    s32 delta_x = follower->currentCoords.x - player->currentCoords.x;
-    s32 delta_y = follower->currentCoords.y - player->currentCoords.y;
-
-    if (delta_x < 0)
-        return DIR_EAST;
-    else if (delta_x > 0)
-        return DIR_WEST;
-
-    if (delta_y < 0)
-        return DIR_SOUTH;
-    else if (delta_y > 0)
-        return DIR_NORTH;
-
-    return DIR_NONE;
+    if (player->currentCoords.x == follower->currentCoords.x
+     && player->currentCoords.y == follower->currentCoords.y)
+        return DIR_NONE;
+        
+    return DetermineObjectEventDirectionFromObject(player, follower);
 }
 
 u32 GetFollowerNPCObjectId(void)
@@ -1524,12 +1517,6 @@ void FollowerNPC_FollowerToWater(void)
     // Prepare for making the follower do the jump and spawn the surf blob right in front of the follower's location.
     NPCFollow(&gObjectEvents[gPlayerAvatar.objectEventId], MOVEMENT_ACTION_JUMP_DOWN, TRUE);
     SetFollowerNPCData(FNPC_DATA_SURF_BLOB, FNPC_SURF_BLOB_NEW);
-}
-
-void FollowerNPC_SetIndicatorToRecreateSurfBlob(void)
-{
-    if (PlayerHasFollowerNPC())
-        SetFollowerNPCData(FNPC_DATA_SURF_BLOB, FNPC_SURF_BLOB_RECREATE);
 }
 
 void FollowerNPC_BindToSurfBlobOnReloadScreen(void)
@@ -1683,11 +1670,6 @@ bool32 FollowerNPCIsBattlePartner(void)
     return FALSE;
 }
 
-u32 GetFollowerNPCBattlePartner(void)
-{
-    return GetFollowerNPCData(FNPC_DATA_BATTLE_PARTNER);
-}
-
 bool32 IsNPCFollowerWildBattle(void)
 {
     if (FollowerNPCIsBattlePartner() && FNPC_FLAG_PARTNER_WILD_BATTLES != 0
@@ -1702,12 +1684,15 @@ void PrepareForFollowerNPCBattle(void)
     // Load the partner party if the NPC follower should participate.
     if (gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER && FollowerNPCIsBattlePartner())
     {
-        SavePlayerParty();
-        ChooseFirstThreeEligibleMons();
-        ReducePlayerPartyToSelectedMons();
-        VarSet(VAR_0x8004, FRONTIER_UTIL_FUNC_SET_DATA);
-        VarSet(VAR_0x8005, FRONTIER_DATA_SELECTED_MON_ORDER);
-        CallFrontierUtilFunc();
+        if (!AreMultiPartiesFullTeams())
+        {
+            SavePlayerParty();
+            ChooseFirstThreeEligibleMons();
+            ReducePlayerPartyToSelectedMons();
+            VarSet(VAR_0x8004, FRONTIER_UTIL_FUNC_SET_DATA);
+            VarSet(VAR_0x8005, FRONTIER_DATA_SELECTED_MON_ORDER);
+            CallFrontierUtilFunc();
+        }
         gPartnerTrainerId = TRAINER_PARTNER(GetFollowerNPCData(FNPC_DATA_BATTLE_PARTNER));
         FillPartnerParty(gPartnerTrainerId);
     }
@@ -1715,9 +1700,12 @@ void PrepareForFollowerNPCBattle(void)
 
 void RestorePartyAfterFollowerNPCBattle(void)
 {
-    VarSet(VAR_0x8004, FRONTIER_UTIL_FUNC_SAVE_PARTY);
-    CallFrontierUtilFunc();
-    LoadPlayerParty();
+    if (!AreMultiPartiesFullTeams())
+    {
+        VarSet(VAR_0x8004, FRONTIER_UTIL_FUNC_SAVE_PARTY);
+        CallFrontierUtilFunc();
+        LoadPlayerParty();
+    }
 }
 
 void FollowerNPC_TryRemoveFollowerOnWhiteOut(void)
@@ -1837,38 +1825,10 @@ void ScriptFaceFollowerNPC(struct ScriptContext *ctx)
     if (!FNPC_ENABLE_NPC_FOLLOWERS || !PlayerHasFollowerNPC())
         return;
 
-    enum Direction playerDirection, followerDirection;
     struct ObjectEvent *player, *follower;
     player = &gObjectEvents[gPlayerAvatar.objectEventId];
     follower = &gObjectEvents[GetFollowerNPCData(FNPC_DATA_OBJ_ID)];
-
-    if (follower->invisible == FALSE)
-    {
-        playerDirection = DetermineFollowerNPCDirection(player, follower);
-        followerDirection = playerDirection;
-
-        //Flip direction.
-        switch (playerDirection)
-        {
-        case DIR_NORTH:
-            playerDirection = DIR_SOUTH;
-            break;
-        case DIR_SOUTH:
-            playerDirection = DIR_NORTH;
-            break;
-        case DIR_WEST:
-            playerDirection = DIR_EAST;
-            break;
-        case DIR_EAST:
-            playerDirection = DIR_WEST;
-            break;
-        default:
-            break;
-        }
-
-        ObjectEventTurn(player, playerDirection);
-        ObjectEventTurn(follower, followerDirection);
-    }
+    ObjectEventsTurnToEachOther(player, follower);
 }
 
 static const u8 *const FollowerNPCHideMovementsSpeedTable[][4] =

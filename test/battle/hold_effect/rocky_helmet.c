@@ -17,7 +17,6 @@ SINGLE_BATTLE_TEST("Rocky Helmet damages attacker even if damage is blocked by D
         TURN { MOVE(opponent, MOVE_SHADOW_SNEAK); }
     } SCENE {
         ANIMATION(ANIM_TYPE_MOVE, MOVE_SHADOW_SNEAK, opponent);
-        ANIMATION(ANIM_TYPE_GENERAL, B_ANIM_HELD_ITEM_EFFECT, player);
         HP_BAR(opponent);
     }
 }
@@ -39,7 +38,7 @@ SINGLE_BATTLE_TEST("Rocky Helmet does not trigger contact damage again after a l
         ABILITY_POPUP(opponent, ABILITY_LINGERING_AROMA);
         HP_BAR(player, damage: maxHP / 6);
         MESSAGE("Machamp was hurt by the opposing Oinkologne's Rocky Helmet!");
-        MESSAGE("The Pokémon was hit 1 time(s)!");
+        MESSAGE("The Pokémon was hit 1 time!");
         NONE_OF {
             HP_BAR(player);
             MESSAGE("Machamp was hurt by the opposing Oinkologne's Rocky Helmet!");

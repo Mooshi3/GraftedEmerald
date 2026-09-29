@@ -105,7 +105,7 @@ SINGLE_BATTLE_TEST("Guard Dog does not activate if Intimidate is blocked by Mist
         TURN { SWITCH(opponent, 1); }
     } SCENE {
         ANIMATION(ANIM_TYPE_MOVE, MOVE_MIST, player);
-        MESSAGE("Your team became shrouded in mist!");
+        MESSAGE("Okidogi surrounds itself with a protective mist!");
         ABILITY_POPUP(opponent, ABILITY_INTIMIDATE);
         NONE_OF {
             ABILITY_POPUP(player, ABILITY_GUARD_DOG);
@@ -120,7 +120,7 @@ SINGLE_BATTLE_TEST("Guard Dog does not activate if Intimidate is blocked by Mist
 SINGLE_BATTLE_TEST("Guard Dog does not activate if Intimidate cannot lower Attack at minimum stage")
 {
     GIVEN {
-        ASSUME(GetMoveEffect(MOVE_CHARM) == EFFECT_ATTACK_DOWN_2);
+        ASSUME_STAT_CHANGE(MOVE_CHARM, attack: -2);
         PLAYER(SPECIES_OKIDOGI) { Ability(ABILITY_GUARD_DOG); }
         OPPONENT(SPECIES_WOBBUFFET);
         OPPONENT(SPECIES_ARBOK) { Ability(ABILITY_INTIMIDATE); }

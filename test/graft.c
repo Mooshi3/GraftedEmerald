@@ -60,11 +60,11 @@ TEST("Grafts round-trip through BoxMonToMon")
 TEST("Grafts survive depositing a mon in the PC and withdrawing it")
 {
     struct Pokemon mon;
-    CreateRandomMonWithIVs(&gPlayerParty[0], SPECIES_WOBBUFFET, 50, 0);
-    GiveTestGrafts(&gPlayerParty[0]);
-    u32 atk = GetMonData(&gPlayerParty[0], MON_DATA_ATK);
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 50, 0);
+    GiveTestGrafts(&gParties[B_TRAINER_PLAYER][0]);
+    u32 atk = GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_ATK);
 
-    SetBoxMonAt(TOTAL_BOXES_COUNT - 1, IN_BOX_COUNT - 1, &gPlayerParty[0].box);
+    SetBoxMonAt(TOTAL_BOXES_COUNT - 1, IN_BOX_COUNT - 1, &gParties[B_TRAINER_PLAYER][0].box);
     ExpectTestGrafts(GetBoxedMonPtr(TOTAL_BOXES_COUNT - 1, IN_BOX_COUNT - 1));
 
     BoxMonAtToMon(TOTAL_BOXES_COUNT - 1, IN_BOX_COUNT - 1, &mon);

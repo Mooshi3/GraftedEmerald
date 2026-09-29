@@ -32,7 +32,7 @@ u8 ResolveGraftTargetSlot(void)
     s32 i;
     for (i = 0; i < PARTY_SIZE; i++)
     {
-        if (GetMonData(&gPlayerParty[i], MON_DATA_PERSONALITY) == gGraftSelectedPartyPersonality)
+        if (GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_PERSONALITY) == gGraftSelectedPartyPersonality)
             return (u8)i;
     }
     return gGraftSelectedPartySlot; // fallback
@@ -160,7 +160,7 @@ void GatherGraftSourceDataBattle(void)
 void GatherGraftSourceDataPartyMon(u8 partySlot)
 {
     u8 i;
-    struct Pokemon *mon = &gPlayerParty[partySlot];
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][partySlot];
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     u32 personality = GetMonData(mon, MON_DATA_PERSONALITY);
 
@@ -567,9 +567,9 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
     case GRAFT_MENU_MOVE:
         // Both graft flows handle moves before getting here (with a forget-a-move prompt when
         // the mon knows 4). Never overwrite a move silently: only fill an empty slot.
-        if (GiveMoveToMon(&gPlayerParty[partySlot], sSelectedOption.value) == MON_HAS_MAX_MOVES)
+        if (GiveMoveToMon(&gParties[B_TRAINER_PLAYER][partySlot], sSelectedOption.value) == MON_HAS_MAX_MOVES)
             return FALSE;
-        RecordGraftMove(&gPlayerParty[partySlot].box, sSelectedOption.value);
+        RecordGraftMove(&gParties[B_TRAINER_PLAYER][partySlot].box, sSelectedOption.value);
         break;
     case GRAFT_MENU_ABILITY:
         SetGraftedAbility(partySlot, sSelectedOption.value);
@@ -578,7 +578,7 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
         SetGraftedType(partySlot, sGraftMenu.subCursor, (u8)sSelectedOption.value);
         break;
     case GRAFT_MENU_STAT:
-        if (!CanApplyStatGraft(&gPlayerParty[partySlot].box, sSelectedOption.statIndex))
+        if (!CanApplyStatGraft(&gParties[B_TRAINER_PLAYER][partySlot].box, sSelectedOption.statIndex))
             return FALSE;
         SetGraftedStat(partySlot, sSelectedOption.statIndex, sSelectedOption.statValue);
         break;
@@ -612,9 +612,9 @@ void ShowEnemyGrafts(enum BattlerId battler)
     enum BattlerId enemyBattler;
     u16 species;
 
-    enemyBattler = BATTLE_OPPOSITE(battler);
+    enemyBattler = GetOppositeBattler(battler);
     partySlot = gBattlerPartyIndexes[enemyBattler];
-    boxMon = &gEnemyParty[partySlot].box;
+    boxMon = &GetBattlerMon(enemyBattler)->box;
     graftFlags = boxMon->graftFlags;
     species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
 

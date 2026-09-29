@@ -79,7 +79,7 @@ static u8 TranslateBigMonSizeTableIndex(u16 a)
     return i;
 }
 
-static u32 GetMonSize(u16 species, u16 b)
+static u32 GetMonSize(enum Species species, u16 b)
 {
     u64 unk2;
     u64 unk4;
@@ -118,7 +118,7 @@ static u8* ReturnHeightStringNoWhitespace(u32 size)
     return heightStr;
 }
 
-static u8 CompareMonSize(u16 species, u16 *sizeRecord)
+static u8 CompareMonSize(enum Species species, u16 *sizeRecord)
 {
     if (gSpecialVar_Result == PARTY_NOTHING_CHOSEN)
     {
@@ -153,7 +153,7 @@ static u8 CompareMonSize(u16 species, u16 *sizeRecord)
 }
 
 // Stores species name in gStringVar1, trainer's name in gStringVar2, and size in gStringVar3
-static void GetMonSizeRecordInfo(u16 species, u16 *sizeRecord)
+static void GetMonSizeRecordInfo(enum Species species, u16 *sizeRecord)
 {
     u32 size = GetMonSize(species, *sizeRecord);
 
@@ -207,11 +207,6 @@ void CompareLotadSize(void)
     gSpecialVar_Result = CompareMonSize(SPECIES_LOTAD, sizeRecord);
 }
 
-void InitHeracrossSizeRecord(void)
-{
-    VarSet(VAR_HERACROSS_SIZE_RECORD, DEFAULT_MAX_SIZE);
-}
-
 void GetHeracrossSizeRecordInfo(void)
 {
     u16 *sizeRecord = GetVarPointer(VAR_HERACROSS_SIZE_RECORD);
@@ -224,11 +219,6 @@ void CompareHeracrossSize(void)
     u16 *sizeRecord = GetVarPointer(VAR_HERACROSS_SIZE_RECORD);
 
     gSpecialVar_Result = CompareMonSize(SPECIES_HERACROSS, sizeRecord);
-}
-
-void InitMagikarpSizeRecord(void)
-{
-    VarSet(VAR_MAGIKARP_SIZE_RECORD, DEFAULT_MAX_SIZE_MAGIKARP);
 }
 
 void GetMagikarpSizeRecordInfo(void)

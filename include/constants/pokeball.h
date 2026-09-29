@@ -37,4 +37,6 @@ enum PokeBall
     POKEBALL_COUNT
 };
 
+#define BALL_RANDOM (POKEBALL_COUNT + 1)
+
 #endif // GUARD_CONSTANTS_POKEBALL_H
