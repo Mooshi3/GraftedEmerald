@@ -212,7 +212,8 @@ WILD_BATTLE_TEST("Capture: when CRITICAL_CAPTURE_IF_OWNED is enabled, failed cap
 WILD_BATTLE_TEST("Capture: ball data is properly set in captured pokemon")
 {
     u32 item = ITEM_NONE;
-    for (enum PokeBall ballId = BALL_STRANGE; ballId < POKEBALL_COUNT; ballId++)
+    // GRAFT: Patch/Graft/Splice Balls consume the caught mon for grafts instead of keeping it.
+    for (enum PokeBall ballId = BALL_STRANGE; ballId < BALL_PATCH; ballId++)
     {
         PARAMETRIZE(item = gPokeBalls[ballId].itemId);
     }

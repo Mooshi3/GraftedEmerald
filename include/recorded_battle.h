@@ -5,7 +5,7 @@
 #include "link.h"
 #include "random.h"
 
-#define BATTLER_RECORD_SIZE 664
+#define BATTLER_RECORD_SIZE 604 // GRAFT: 664 in vanilla; grafts make the 12 saved party mons 240 bytes bigger
 
 struct RecordedBattleSave
 {

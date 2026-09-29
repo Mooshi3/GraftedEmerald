@@ -56,9 +56,7 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 
 ## Roadmap / decisions log
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.
-
-Known test failures vs upstream: every battle test that throws a ball times out (being bisected). Upstream passes these.
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
 
 Next:
 1. Sheet → encounter JSON converter, then the post-game legendary mechanic.
