@@ -184,3 +184,26 @@ TEST("Without a Graft Knot, grafts are inherited some of the time")
     EXPECT_GT(inherited, 20);
     EXPECT_LT(inherited, 90);
 }
+
+TEST("Grafted move history skips duplicates and keeps the newest moves when full")
+{
+    struct Pokemon mon;
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    RecordGraftMove(&mon.box, MOVE_FLAMETHROWER);
+    RecordGraftMove(&mon.box, MOVE_FLAMETHROWER);
+    RecordGraftMove(&mon.box, MOVE_SURF);
+    RecordGraftMove(&mon.box, MOVE_THUNDERBOLT);
+    RecordGraftMove(&mon.box, MOVE_ICE_BEAM);
+    EXPECT_EQ(mon.box.graftMoves[0], MOVE_FLAMETHROWER);
+    EXPECT_EQ(mon.box.graftMoves[3], MOVE_ICE_BEAM);
+    // Full: the oldest entry makes room for the newest
+    RecordGraftMove(&mon.box, MOVE_PSYCHIC);
+    EXPECT_EQ(mon.box.graftMoves[0], MOVE_SURF);
+    EXPECT_EQ(mon.box.graftMoves[3], MOVE_PSYCHIC);
+    // An entry the species relearns by level-up anyway (Wobbuffet: Counter) is replaced first
+    mon.box.graftMoves[1] = MOVE_COUNTER;
+    RecordGraftMove(&mon.box, MOVE_EARTHQUAKE);
+    EXPECT_EQ(mon.box.graftMoves[0], MOVE_SURF);
+    EXPECT_EQ(mon.box.graftMoves[3], MOVE_EARTHQUAKE);
+    EXPECT(mon.box.graftFlags & GRAFT_FLAG_MOVE);
+}

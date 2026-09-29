@@ -465,17 +465,7 @@ static void Cmd_graftrecordmove(void)
 {
     // Record the move that was just learned via the graft learn flow
     // in the graftMoves history for move relearner
-    u8 partySlot = gBattleStruct->expGetterMonId;
-    u16 moveId = gMoveToLearn;
-    u8 i;
-    for (i = 0; i < 4; i++)
-    {
-        if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
-        {
-            gPlayerParty[partySlot].box.graftMoves[i] = moveId;
-            break;
-        }
-    }
+    RecordGraftMove(&gPlayerParty[gBattleStruct->expGetterMonId].box, gMoveToLearn);
     gBattlescriptCurrInstr++;
 }
 
@@ -6662,14 +6652,7 @@ case 3: // Wait for party menu to return to battle
                                     break;
                                 }
                             }
-                            for (k = 0; k < 4; k++)
-                            {
-                                if (gPlayerParty[slot].box.graftMoves[k] == MOVE_NONE)
-                                {
-                                    gPlayerParty[slot].box.graftMoves[k] = moveId;
-                                    break;
-                                }
-                            }
+                            RecordGraftMove(&gPlayerParty[slot].box, moveId);
                             gBattlescriptCurrInstr = cmd->nextInstr;
                         }
                         else
@@ -7136,17 +7119,7 @@ case 3: // Wait for party menu to return to battle
                                     if (GetMonData(&gPlayerParty[slot], MON_DATA_MOVE1 + i) == MOVE_NONE)
                                     {
                                         SetMonMoveSlot(&gPlayerParty[slot], gMoveToLearn, i);
-                                        {
-                                            u8 g;
-                                            for (g = 0; g < 4; g++)
-                                            {
-                                                if (gPlayerParty[slot].box.graftMoves[g] == MOVE_NONE)
-                                                {
-                                                    gPlayerParty[slot].box.graftMoves[g] = gMoveToLearn;
-                                                    break;
-                                                }
-                                            }
-                                        }
+                                        RecordGraftMove(&gPlayerParty[slot].box, gMoveToLearn);
                                         break;
                                     }
                                 }

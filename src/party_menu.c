@@ -5579,17 +5579,7 @@ static void Task_LearnNextMoveOrClosePartyMenu(u8 taskId)
             // record the graft move and consume the item before closing.
             if (gGraftLearnMovePending)
             {
-                u8 targetSlot = gPartyMenu.slotId;
-                u16 moveId = gPartyMenu.data1;
-                u8 g;
-                for (g = 0; g < 4; g++)
-                {
-                    if (gPlayerParty[targetSlot].box.graftMoves[g] == MOVE_NONE)
-                    {
-                        gPlayerParty[targetSlot].box.graftMoves[g] = moveId;
-                        break;
-                    }
-                }
+                RecordGraftMove(&gPlayerParty[gPartyMenu.slotId].box, gPartyMenu.data1);
                 RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
                 gGraftLearnMovePending = FALSE;
             }
@@ -8910,7 +8900,7 @@ void Task_GraftSplicer(u8 taskId)
 bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                 if (!graftResult && GetSelectedGraftType() == GRAFT_MENU_STAT)
                 {
-                    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Stat graft limit reached!\nNeed more badges."));
+                    StringExpandPlaceholders(gStringVar4, GetStatGraftRejectReason(&gPlayerParty[targetSlot].box, GetSelectedGraftStatIndex()));
                     DisplayPartyMenuMessage(gStringVar4, TRUE);
                     ScheduleBgCopyTilemapToVram(2);
                     sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
@@ -9005,16 +8995,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                 if (result != MON_HAS_MAX_MOVES)
                 {
                     // Had empty slot
-                    u8 g;
-                    for (g = 0; g < 4; g++)
-                    {
-                        if (gPlayerParty[targetSlot].box.graftMoves[g] == MOVE_NONE)
-                        {
-                            gPlayerParty[targetSlot].box.graftMoves[g] = moveId;
-                            break;
-                        }
-                    }
-                    // graft flags set via ApplyMoveGraft
+                    RecordGraftMove(&gPlayerParty[targetSlot].box, moveId);
                     GetMonNickname(mon, gStringVar1);
                     StringCopy(gStringVar2, GetMoveName(moveId));
                     StringExpandPlaceholders(gStringVar4, sText_SplicerMoveReplaced);
@@ -9081,18 +9062,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
             {
                 // Move was forgotten and new one learned by summary screen
                 // Record in graftMoves
-                u8 targetSlot = gPartyMenu.slotId;
-                u8 g;
-                u16 moveId = sPartyMenuInternal->data[2];
-                for (g = 0; g < 4; g++)
-                {
-                    if (gPlayerParty[targetSlot].box.graftMoves[g] == MOVE_NONE)
-                    {
-                        gPlayerParty[targetSlot].box.graftMoves[g] = moveId;
-                        break;
-                    }
-                }
-                // graft flags set via ApplyMoveGraft
+                RecordGraftMove(&gPlayerParty[gPartyMenu.slotId].box, sPartyMenuInternal->data[2]);
                 gGraftLearnMovePending = FALSE;
             }
             GetMonNickname(&gPlayerParty[gPartyMenu.slotId2], gStringVar1);

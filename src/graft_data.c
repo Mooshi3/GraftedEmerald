@@ -98,46 +98,52 @@ void SetGraftedAbility(u8 partySlot, u16 ability)
     SetGraftedAbilityOnMon(&gPlayerParty[partySlot], ability);
 }
 
-// Apply a move graft to a party mon
-void ApplyMoveGraft(u8 partySlot, u16 moveId)
+static bool32 IsLevelUpMoveOf(u16 species, u16 move)
 {
-    struct Pokemon *mon = &gPlayerParty[partySlot];
-    u8 emptySlot = MAX_MON_MOVES;
-    u8 i;
+    const struct LevelUpMove *learnset = GetSpeciesLevelUpLearnset(species);
+    u32 i;
+    for (i = 0; learnset != NULL && learnset[i].move != LEVEL_UP_MOVE_END; i++)
+    {
+        if (learnset[i].move == move)
+            return TRUE;
+    }
+    return FALSE;
+}
 
-    // Find an empty move slot
+// Record a grafted move in the mon's relearner history, so it can be relearned after it's
+// forgotten. Duplicates are skipped. The history holds MAX_MON_MOVES entries; when it's full,
+// an entry the species can relearn by level-up anyway is replaced first, otherwise the oldest.
+void RecordGraftMove(struct BoxPokemon *boxMon, u16 move)
+{
+    u32 i, evict = 0;
+    u16 species;
+
+    if (move == MOVE_NONE)
+        return;
+    boxMon->graftFlags |= GRAFT_FLAG_MOVE;
     for (i = 0; i < MAX_MON_MOVES; i++)
     {
-        if (GetMonData(mon, MON_DATA_MOVE1 + i) == MOVE_NONE)
+        if (boxMon->graftMoves[i] == move)
+            return;
+        if (boxMon->graftMoves[i] == MOVE_NONE)
         {
-            emptySlot = i;
+            boxMon->graftMoves[i] = move;
+            return;
+        }
+    }
+    species = GetBoxMonData(boxMon, MON_DATA_SPECIES);
+    for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        if (IsLevelUpMoveOf(species, boxMon->graftMoves[i]))
+        {
+            evict = i;
             break;
         }
     }
-
-    // If all 4 moves are known, overwrite the last slot
-    // TODO: Show move deletion dialog instead of silent overwrite
-    if (emptySlot >= MAX_MON_MOVES)
-        emptySlot = MAX_MON_MOVES - 1;
-
-    // Teach the move
-    SetMonData(mon, MON_DATA_MOVE1 + emptySlot, &moveId);
-    {
-        u8 pp = GetMovePP(moveId);
-        SetMonData(mon, MON_DATA_PP1 + emptySlot, &pp);
-    }
-
-    // Record graft move in history for move relearner
-    for (i = 0; i < 4; i++)
-    {
-        if (gPlayerParty[partySlot].box.graftMoves[i] == MOVE_NONE)
-        {
-            gPlayerParty[partySlot].box.graftMoves[i] = moveId;
-            break;
-        }
-    }
-
-    mon->box.graftFlags |= GRAFT_FLAG_MOVE;
+    // Keep oldest-to-newest order: close the gap, append the new move at the end.
+    for (i = evict; i < MAX_MON_MOVES - 1; i++)
+        boxMon->graftMoves[i] = boxMon->graftMoves[i + 1];
+    boxMon->graftMoves[MAX_MON_MOVES - 1] = move;
 }
 
 // Clear all graft data for a party slot
@@ -570,16 +576,7 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
             if (slot == 0xFF)
                 continue;
             SetMonMoveSlot(mon, move, slot);
-            mon->box.graftFlags |= GRAFT_FLAG_MOVE;
-            // Record in graftMoves for relearner
-            for (u8 g = 0; g < 4; g++)
-            {
-                if (mon->box.graftMoves[g] == MOVE_NONE)
-                {
-                    mon->box.graftMoves[g] = move;
-                    break;
-                }
-            }
+            RecordGraftMove(&mon->box, move);
             applied++;
         }
         else if (kind == GK_ABILITY)

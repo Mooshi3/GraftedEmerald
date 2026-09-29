@@ -21,7 +21,6 @@ u8 GetMonEffectiveBaseStat(u16 species, u8 partySlot, u8 statIndex);
 u16 GetGraftedAbility(u8 partySlot);
 void SetGraftedAbility(u8 partySlot, u16 ability);
 void SetGraftedNature(u8 partySlot, u8 natureId);
-void ApplyMoveGraft(u8 partySlot, u16 moveId);
 void ClearGraftData(u8 partySlot);
 void InitGraftData(void);
 
@@ -32,6 +31,7 @@ bool8 GetBattlerGraftedTypeInfo(u8 battler, u8 *effectiveType1, u8 *effectiveTyp
 void ApplyBattlerGraftOverrides(u32 battler);
 void InheritGrafts(struct BoxPokemon *egg, struct BoxPokemon *parentA, struct BoxPokemon *parentB);
 void CopyGrafts(struct BoxPokemon *dest, const struct BoxPokemon *src);
+void RecordGraftMove(struct BoxPokemon *boxMon, u16 move);
 u8 GetEffectiveTypeFromMon(struct Pokemon *mon, u8 typeIndex);
 u8 GetEffectiveTypeFromBoxMon(struct BoxPokemon *boxMon, u8 typeIndex);
 

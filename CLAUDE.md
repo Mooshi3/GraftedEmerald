@@ -32,7 +32,7 @@ Graft fields live on `struct BoxPokemon`, outside the encrypted `secure` union (
 
 - BoxPokemon is 100 bytes (80 in vanilla). The PC has **11 boxes**, the most that fits in the vanilla 9 storage sectors. Don't add save sectors: the slots end right before the Hall of Fame sectors, and `src/save.c` asserts that.
 - Stat grafts feed `CalculateMonStats`. Ability grafts are read by `GetMonAbility`. In battle, `ApplyBattlerGraftOverrides()` sets types and ability on intro, switch-in and faint, for both sides. Use that one function; don't copy-paste override blocks.
-- Move grafts are recorded in `graftMoves[]` and show up in the move relearner.
+- Move grafts: both the Graft Ball flow (battle script) and the Splicer ask which move to forget when the mon knows 4. Every grafted move is recorded with `RecordGraftMove()` into `graftMoves[]` (the relearner history), which dedupes and, when its 4 entries are full, evicts a move the species can relearn by level-up first, otherwise the oldest.
 - Type grafts recolor the sprite (`ApplyGraftTypePaletteSwap`). The recolor algorithm is a hue-cluster plus luminance shade approach that still needs work. Jacob's reference tooling (`recolor.py`, `palette_lab.py`) lives outside the repo.
 
 ### Rules
@@ -63,9 +63,7 @@ Test baseline (2026-09-29): full `make check` has 0 failures (4503 passed; the r
 Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
 
 Next:
-1. Move-graft forget-a-move flow.
-2. Move grafts: when the mon knows 4 moves, always offer "forget a move?" (Graft Ball and Splicer both), and put the forgotten move in the relearner even if it was grafted.
-3. Upstream merge (expansion 1.17.1+).
+1. Upstream merge (expansion 1.17.1+).
 4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
 5. Done: breeding inheritance (`InheritGrafts`, `src/graft_data.c`). A parent holding a Graft Knot (sold with the Splicer, 3 badges) passes all its grafts; if both parents hold one, each graft comes from a random one of them. Without a knot, each graft has a 25% chance (`GRAFT_INHERIT_CHANCE`) to pass from a random parent that has it. Nature grafts aren't inherited (Everstone covers nature). Hatching keeps the egg's grafts.
 6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.

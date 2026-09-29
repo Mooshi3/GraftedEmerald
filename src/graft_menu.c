@@ -565,7 +565,11 @@ bool8 ApplyGraftFromMenuToSlot(u8 partySlot)
     switch (sSelectedOption.graftType)
     {
     case GRAFT_MENU_MOVE:
-        ApplyMoveGraft(partySlot, sSelectedOption.value);
+        // Both graft flows handle moves before getting here (with a forget-a-move prompt when
+        // the mon knows 4). Never overwrite a move silently: only fill an empty slot.
+        if (GiveMoveToMon(&gPlayerParty[partySlot], sSelectedOption.value) == MON_HAS_MAX_MOVES)
+            return FALSE;
+        RecordGraftMove(&gPlayerParty[partySlot].box, sSelectedOption.value);
         break;
     case GRAFT_MENU_ABILITY:
         SetGraftedAbility(partySlot, sSelectedOption.value);
