@@ -670,6 +670,24 @@ const struct ItemInfo gItemsInfo[] =
         .iconPalette = gItemIconPalette_UltraBall,
     },
 
+// Graft Knot: a Day Care parent holding it passes all its grafts to the egg.
+[ITEM_GRAFT_KNOT] =
+{
+    .name = ITEM_NAME("Graft Knot"),
+    .price = 3000,
+    .description = COMPOUND_STRING(
+        "A Day Care parent\n"
+        "holding it passes\n"
+        "all its grafts on."),
+    .pocket = POCKET_ITEMS,
+    .sortType = ITEM_TYPE_HELD_ITEM,
+    .type = ITEM_USE_BAG_MENU,
+    .fieldUseFunc = ItemUseOutOfBattle_CannotUse,
+    .flingPower = 10,
+    .iconPic = gItemIcon_DestinyKnot,
+    .iconPalette = gItemIconPalette_DestinyKnot,
+},
+
 // Graft Splicer
 [ITEM_GRAFT_SPLICER] = {
     .name = ITEM_NAME("Graft Splicer"),

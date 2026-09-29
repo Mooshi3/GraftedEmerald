@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_data.h"
 #include "pokemon.h"
 #include "battle.h"
 #include "daycare.h"
@@ -1087,6 +1088,7 @@ static void _GiveEggFromDaycare(struct DayCare *daycare)
         AlterEggSpeciesWithIncenseItem(&species, daycare);
     SetInitialEggData(&egg, species, daycare);
     InheritIVs(&egg, daycare);
+    InheritGrafts(&egg.box, &daycare->mons[0].mon, &daycare->mons[1].mon);
     InheritPokeball(&egg, &daycare->mons[parentSlots[1]].mon, &daycare->mons[parentSlots[0]].mon);
     BuildEggMoveset(&egg, &daycare->mons[parentSlots[1]].mon, &daycare->mons[parentSlots[0]].mon);
     if (P_ABILITY_INHERITANCE >= GEN_6)

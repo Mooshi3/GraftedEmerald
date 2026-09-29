@@ -1080,6 +1080,92 @@ void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u3
     }
 }
 
+// ============================================================
+// Breeding
+// ============================================================
+#define GRAFT_INHERIT_CHANCE 25 // % per graft when no parent holds a Graft Knot
+
+// Picks which parent (if any) passes one graft. hasA/hasB: whether each parent has this graft.
+// A parent holding a Graft Knot always passes its grafts; if both hold one, a random one of them
+// does. Otherwise a random parent that has the graft passes it with GRAFT_INHERIT_CHANCE.
+static struct BoxPokemon *PickGraftDonor(struct BoxPokemon *parentA, struct BoxPokemon *parentB, bool32 hasA, bool32 hasB)
+{
+    bool32 knotA = hasA && GetBoxMonData(parentA, MON_DATA_HELD_ITEM) == ITEM_GRAFT_KNOT;
+    bool32 knotB = hasB && GetBoxMonData(parentB, MON_DATA_HELD_ITEM) == ITEM_GRAFT_KNOT;
+
+    if (knotA || knotB)
+    {
+        if (knotA && knotB)
+            return (Random() & 1) ? parentA : parentB;
+        return knotA ? parentA : parentB;
+    }
+    if (!(hasA || hasB) || Random() % 100 >= GRAFT_INHERIT_CHANCE)
+        return NULL;
+    if (hasA && hasB)
+        return (Random() & 1) ? parentA : parentB;
+    return hasA ? parentA : parentB;
+}
+
+// Copy grafts from the Day Care parents onto a new egg. Nature grafts are not inherited:
+// they work like mints, and the Everstone already handles nature.
+void InheritGrafts(struct BoxPokemon *egg, struct BoxPokemon *parentA, struct BoxPokemon *parentB)
+{
+    struct BoxPokemon *donor;
+    u32 i, j, count = 0;
+
+    for (i = 0; i < 2; i++)
+    {
+        donor = PickGraftDonor(parentA, parentB, parentA->graftTypes[i] != GRAFT_TYPE_NONE, parentB->graftTypes[i] != GRAFT_TYPE_NONE);
+        if (donor != NULL)
+        {
+            egg->graftTypes[i] = donor->graftTypes[i];
+            egg->graftFlags |= GRAFT_FLAG_TYPE;
+        }
+    }
+    donor = PickGraftDonor(parentA, parentB, parentA->graftAbility != GRAFT_ABILITY_NONE, parentB->graftAbility != GRAFT_ABILITY_NONE);
+    if (donor != NULL)
+    {
+        egg->graftAbility = donor->graftAbility;
+        egg->graftFlags |= GRAFT_FLAG_ABILITY;
+    }
+    for (i = 0; i < NUM_STATS; i++)
+    {
+        donor = PickGraftDonor(parentA, parentB, parentA->graftStatOverrides[i] != 0, parentB->graftStatOverrides[i] != 0);
+        if (donor != NULL)
+        {
+            egg->graftStatOverrides[i] = donor->graftStatOverrides[i];
+            egg->graftFlags |= GRAFT_FLAG_STAT;
+        }
+    }
+    // Grafted moves (relearner history): each move is its own graft.
+    for (i = 0; i < 2 * MAX_MON_MOVES && count < MAX_MON_MOVES; i++)
+    {
+        struct BoxPokemon *owner = (i < MAX_MON_MOVES) ? parentA : parentB;
+        struct BoxPokemon *other = (i < MAX_MON_MOVES) ? parentB : parentA;
+        u16 move = owner->graftMoves[i % MAX_MON_MOVES];
+        bool32 dup = FALSE;
+        if (move == MOVE_NONE)
+            continue;
+        for (j = 0; j < count; j++)
+            dup |= (egg->graftMoves[j] == move);
+        if (dup || PickGraftDonor(owner, other, TRUE, FALSE) == NULL)
+            continue;
+        egg->graftMoves[count++] = move;
+        egg->graftFlags |= GRAFT_FLAG_MOVE;
+    }
+}
+
+// Copy every graft field (used when an egg hatches into a freshly created mon).
+void CopyGrafts(struct BoxPokemon *dest, const struct BoxPokemon *src)
+{
+    dest->graftTypes[0] = src->graftTypes[0];
+    dest->graftTypes[1] = src->graftTypes[1];
+    dest->graftAbility = src->graftAbility;
+    dest->graftFlags = src->graftFlags;
+    memcpy(dest->graftStatOverrides, src->graftStatOverrides, sizeof(dest->graftStatOverrides));
+    memcpy(dest->graftMoves, src->graftMoves, sizeof(dest->graftMoves));
+}
+
 // Overwrite a battler's types and ability with its grafts, if it has any.
 // Call after gBattleMons[battler] has been filled with the species defaults.
 // Works for both sides: the grafts live on the party mon's BoxPokemon.

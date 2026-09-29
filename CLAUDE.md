@@ -63,11 +63,11 @@ Test baseline (2026-09-29): full `make check` has 0 failures (4503 passed; the r
 Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 604 bytes instead of 664).
 
 Next:
-1. Graft Knot (breeding inheritance), then the move-graft forget-a-move flow.
+1. Move-graft forget-a-move flow.
 2. Move grafts: when the mon knows 4 moves, always offer "forget a move?" (Graft Ball and Splicer both), and put the forgotten move in the relearner even if it was grafted.
 3. Upstream merge (expansion 1.17.1+).
 4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
-5. Breeding inheritance, designed for competitive control (netplay PvP is the long-term goal): grafts pass down like IVs, and a held item makes it deterministic ("this is my Huge Power Ditto"). Approved: a parent holding a new Graft Knot passes all its grafts (if both parents hold one and conflict, each egg picks one at random). Without a knot, each graft still has a lower chance to pass from a random parent (start at 25%, tune in playtesting).
+5. Done: breeding inheritance (`InheritGrafts`, `src/graft_data.c`). A parent holding a Graft Knot (sold with the Splicer, 3 badges) passes all its grafts; if both parents hold one, each graft comes from a random one of them. Without a knot, each graft has a 25% chance (`GRAFT_INHERIT_CHANCE`) to pass from a random parent that has it. Nature grafts aren't inherited (Everstone covers nature). Hatching keeps the egg's grafts.
 6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
 7. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
 8. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.

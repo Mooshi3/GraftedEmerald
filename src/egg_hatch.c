@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_data.h"
 #include "pokemon.h"
 #include "egg_hatch.h"
 #include "pokedex.h"
@@ -353,6 +354,10 @@ static void CreateHatchedMon(struct Pokemon *egg, struct Pokemon *temp)
     SetMonData(temp, MON_DATA_POKERUS, &pokerus);
     SetMonData(temp, MON_DATA_MODERN_FATEFUL_ENCOUNTER, &isModernFatefulEncounter);
     SetMonData(temp, MON_DATA_POKEBALL, &ball);
+
+    // GRAFT: the hatchling keeps the grafts the egg inherited.
+    CopyGrafts(&temp->box, &egg->box);
+    CalculateMonStats(temp);
 
     *egg = *temp;
 }

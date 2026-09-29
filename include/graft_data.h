@@ -30,6 +30,8 @@ void InitGraftData(void);
 void ApplyGraftTypePaletteSwap(u16 palOffset, u16 numEntries, u32 type1Color, u32 type2Color, bool8 isDualType);
 bool8 GetBattlerGraftedTypeInfo(u8 battler, u8 *effectiveType1, u8 *effectiveType2);
 void ApplyBattlerGraftOverrides(u32 battler);
+void InheritGrafts(struct BoxPokemon *egg, struct BoxPokemon *parentA, struct BoxPokemon *parentB);
+void CopyGrafts(struct BoxPokemon *dest, const struct BoxPokemon *src);
 u8 GetEffectiveTypeFromMon(struct Pokemon *mon, u8 typeIndex);
 u8 GetEffectiveTypeFromBoxMon(struct BoxPokemon *boxMon, u8 typeIndex);
 

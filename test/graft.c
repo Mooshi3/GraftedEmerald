@@ -6,6 +6,7 @@
 #include "event_data.h"
 #include "pokedex.h"
 #include "wild_encounter.h"
+#include "constants/items.h"
 #include "constants/map_groups.h"
 
 // Regression tests for graft persistence. Grafts live on BoxPokemon, so every
@@ -137,4 +138,49 @@ TEST("Postgame legendaries take the 1% slot only after the Champion win, until c
     GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_KUBFU), FLAG_SET_CAUGHT);
     EXPECT(!TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
     FlagClear(FLAG_SYS_GAME_CLEAR);
+}
+
+TEST("A parent holding a Graft Knot passes all its grafts to the egg")
+{
+    struct Pokemon parentA, parentB, egg;
+    u16 knot = ITEM_GRAFT_KNOT;
+    CreateRandomMonWithIVs(&parentA, SPECIES_DITTO, 50, 0);
+    CreateRandomMonWithIVs(&parentB, SPECIES_WOBBUFFET, 50, 0);
+    GiveTestGrafts(&parentA);
+    SetMonData(&parentA, MON_DATA_HELD_ITEM, &knot);
+    CreateRandomMonWithIVs(&egg, SPECIES_WYNAUT, 1, 0);
+
+    InheritGrafts(&egg.box, &parentA.box, &parentB.box);
+    ExpectTestGrafts(&egg.box);
+}
+
+TEST("Without a Graft Knot, a parent with no grafts passes nothing")
+{
+    struct Pokemon parentA, parentB, egg;
+    CreateRandomMonWithIVs(&parentA, SPECIES_DITTO, 50, 0);
+    CreateRandomMonWithIVs(&parentB, SPECIES_WOBBUFFET, 50, 0);
+    CreateRandomMonWithIVs(&egg, SPECIES_WYNAUT, 1, 0);
+
+    InheritGrafts(&egg.box, &parentA.box, &parentB.box);
+    EXPECT_EQ(egg.box.graftFlags, 0);
+    EXPECT_EQ(egg.box.graftAbility, GRAFT_ABILITY_NONE);
+}
+
+TEST("Without a Graft Knot, grafts are inherited some of the time")
+{
+    struct Pokemon parentA, parentB, egg;
+    u32 i, inherited = 0;
+    CreateRandomMonWithIVs(&parentA, SPECIES_DITTO, 50, 0);
+    CreateRandomMonWithIVs(&parentB, SPECIES_WOBBUFFET, 50, 0);
+    SetGraftedAbilityOnMon(&parentA, ABILITY_INTIMIDATE);
+    for (i = 0; i < 200; i++)
+    {
+        CreateRandomMonWithIVs(&egg, SPECIES_WYNAUT, 1, 0);
+        InheritGrafts(&egg.box, &parentA.box, &parentB.box);
+        if (egg.box.graftAbility == ABILITY_INTIMIDATE)
+            inherited++;
+    }
+    // 25% chance: expect roughly 50 of 200, never all or none
+    EXPECT_GT(inherited, 20);
+    EXPECT_LT(inherited, 90);
 }

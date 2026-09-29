@@ -137,6 +137,7 @@ static u8 GetItemBadgeRequirement(u16 itemId)
         return 1;
     case ITEM_SPLICE_BALL:
     case ITEM_GRAFT_SPLICER:
+    case ITEM_GRAFT_KNOT:
         return 3;
     default:
         return 0;
