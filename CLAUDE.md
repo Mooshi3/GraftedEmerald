@@ -65,7 +65,7 @@ Next:
 2. Move grafts: when the mon knows 4 moves, always offer "forget a move?" (Graft Ball and Splicer both), and put the forgotten move in the relearner even if it was grafted.
 3. Upstream merge (expansion 1.17.1+).
 4. New-game options: shiny odds (currently hard-coded `SHINY_ODDS 128`); challenge settings for level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
-5. Breeding inheritance, designed for competitive control (netplay PvP is the long-term goal): grafts pass down like IVs, and a held item makes it deterministic ("this is my Huge Power Ditto"). Proposal pending Jacob's OK: a parent holding a new Graft Knot passes all its grafts; without it, nothing is inherited.
+5. Breeding inheritance, designed for competitive control (netplay PvP is the long-term goal): grafts pass down like IVs, and a held item makes it deterministic ("this is my Huge Power Ditto"). Approved: a parent holding a new Graft Knot passes all its grafts (if both parents hold one and conflict, each egg picks one at random). Without a knot, each graft still has a lower chance to pass from a random parent (start at 25%, tune in playtesting).
 6. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
 7. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
 8. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
