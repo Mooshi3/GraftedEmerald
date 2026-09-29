@@ -631,9 +631,9 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Graft Ball"),
     .price = 400,
     .description = COMPOUND_STRING(
-        "A Ball that reveals\n"
-        "three graft categories\n"
-            "from a caught Pokemon."),
+        "Consumes a caught\n"
+        "Pokémon to offer\n"
+        "3 graft categories."),
     .pocket = POCKET_POKE_BALLS,
     .type = ITEM_USE_BAG_MENU,
     .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -645,9 +645,9 @@ const struct ItemInfo gItemsInfo[] =
         .name = ITEM_NAME("Patch Ball"),
         .price = 200,
         .description = COMPOUND_STRING(
-            "A cheap Ball that\n"
-            "extracts one graft\n"
-            "category from a catch."),
+            "A cheap Ball. Its\n"
+            "catch offers one\n"
+            "graft category."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -659,9 +659,9 @@ const struct ItemInfo gItemsInfo[] =
         .name = ITEM_NAME("Splice Ball"),
         .price = 800,
         .description = COMPOUND_STRING(
-            "A premium Ball that\n"
-            "reveals all graft\n"
-            "categories from a catch."),
+            "A premium Ball. Its\n"
+            "catch offers all\n"
+            "5 graft categories."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -676,9 +676,10 @@ const struct ItemInfo gItemsInfo[] =
     .price = 1000,
     .holdEffectParam = 0,
     .description = COMPOUND_STRING(
-        "Sacrifice a Pokemon to\n"
-        "extract a graft for\n"
-        "another team member."),
+        "Sacrifice one\n"
+        "Pokémon to graft\n"
+        "its traits onto\n"
+        "a teammate."),
     .pocket = POCKET_ITEMS,
     .sortType = ITEM_TYPE_FIELD_USE,
     .type = ITEM_USE_PARTY_MENU,
@@ -692,9 +693,10 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Sleeping Bag"),
     .price = 0,
     .description = COMPOUND_STRING(
-        "A cozy sleeping bag.\n"
-        "Use it to change\n"
-        "the time of day."),
+        "A cozy sleeping\n"
+        "bag. Use it to\n"
+        "change the time\n"
+        "of day."),
     .importance = 1,
     .pocket = POCKET_KEY_ITEMS,
     .type = ITEM_USE_FIELD,

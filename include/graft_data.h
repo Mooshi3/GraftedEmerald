@@ -17,7 +17,6 @@ u8 GetGraftedType(u8 partySlot, u8 typeIndex);
 void SetGraftedType(u8 partySlot, u8 typeIndex, u8 type);
 u16 GetGraftedStat(u8 partySlot, u8 statIndex);
 void SetGraftedStat(u8 partySlot, u8 statIndex, u16 stat);
-u8 GetMonEffectiveType(u16 species, u8 partySlot, u8 typeIndex);
 u8 GetMonEffectiveBaseStat(u16 species, u8 partySlot, u8 statIndex);
 u16 GetGraftedAbility(u8 partySlot);
 void SetGraftedAbility(u8 partySlot, u16 ability);

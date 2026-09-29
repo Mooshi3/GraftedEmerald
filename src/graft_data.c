@@ -4,6 +4,7 @@
 #include "move.h"
 #include "constants/species.h"
 #include "constants/abilities.h"
+#include "test_runner.h"
 #include "palette.h"
 #include "constants/rgb.h"
 #include "battle_main.h"
@@ -51,15 +52,6 @@ void SetGraftedStat(u8 partySlot, u8 statIndex, u16 statValue)
     gPlayerParty[partySlot].box.graftStatOverrides[statIndex] = (u8)statValue;
     CalculateMonStats(&gPlayerParty[partySlot]);
     gPlayerParty[partySlot].box.graftFlags |= GRAFT_FLAG_STAT;
-}
-
-// Get the effective type for a mon
-u8 GetMonEffectiveType(u16 species, u8 partySlot, u8 typeIndex)
-{
-    u8 grafted = GetGraftedType(partySlot, typeIndex);
-    if (grafted != GRAFT_TYPE_NONE)
-        return grafted;
-    return gSpeciesInfo[species].types[typeIndex];
 }
 
 // Get effective type from a struct Pokemon pointer (checks grafts first)
@@ -244,7 +236,7 @@ bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
     return GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES) == SPECIES_SHEDINJA;
 }
 
-static const u8 sText_HuskHPGraft[] = _("A hollow husk can't hold\nan HP graft!");
+static const u8 sText_HuskHPGraft[] = _("It won't have any effect.");
 static const u8 sText_StatGraftLimit[] = _("Stat graft limit reached!\nNeed more badges.");
 
 // Returns the message explaining why this stat graft is refused, or NULL if it is allowed.
@@ -663,6 +655,11 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
 {
     u8 badges = GetBadgeCount();
     u8 graftCount = 2 + badges; // 2 base + 1 per badge
+#if TESTING
+    // Battle tests expect trainer parties exactly as written; random grafts break them.
+    if (gTestRunnerEnabled)
+        return;
+#endif
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;

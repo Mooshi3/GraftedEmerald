@@ -265,7 +265,7 @@ s32 CalculateMoveDamageVars(struct BattleContext *ctx);
 s32 DoFixedDamageMoveCalc(struct BattleContext *ctx);
 s32 ApplyModifiersAfterDmgRoll(struct BattleContext *ctx, s32 dmg);
 uq4_12_t CalcTypeEffectivenessMultiplier(struct BattleContext *ctx);
-uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef, s8 partySlotDef);
+uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef, struct Pokemon *monDef);
 uq4_12_t GetTypeModifier(enum Type atkType, enum Type defType);
 uq4_12_t GetOverworldTypeEffectiveness(struct Pokemon *mon, enum Type moveType);
 void UpdateMoveResultFlags(uq4_12_t modifier, u16 *resultFlags);

@@ -8428,7 +8428,8 @@ uq4_12_t CalcTypeEffectivenessMultiplier(struct BattleContext *ctx)
     return modifier;
 }
 
-uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef, s8 partySlotDef)
+// monDef is the defending party mon, so its grafted types count. NULL uses the species' types.
+uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef, enum Ability abilityDef, struct Pokemon *monDef)
 {
     uq4_12_t modifier = UQ_4_12(1.0);
     enum Type moveType = GetBattleMoveType(move);
@@ -8441,10 +8442,11 @@ uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, u16 speciesDef,
         ctx.updateFlags = FALSE;
         ctx.abilityDef = abilityDef;
 
-        enum Type defType0 = (partySlotDef >= 0) ? GetMonEffectiveType(speciesDef, partySlotDef, 0) : GetSpeciesType(speciesDef, 0);
-    MulByTypeEffectiveness(&ctx, &modifier, defType0);
-        if (GetSpeciesType(speciesDef, 1) != GetSpeciesType(speciesDef, 0))
-            MulByTypeEffectiveness(&ctx, &modifier, GetSpeciesType(speciesDef, 1));
+        enum Type defType0 = monDef ? GetEffectiveTypeFromMon(monDef, 0) : GetSpeciesType(speciesDef, 0);
+        enum Type defType1 = monDef ? GetEffectiveTypeFromMon(monDef, 1) : GetSpeciesType(speciesDef, 1);
+        MulByTypeEffectiveness(&ctx, &modifier, defType0);
+        if (defType1 != defType0)
+            MulByTypeEffectiveness(&ctx, &modifier, defType1);
 
         if (ctx.moveType == TYPE_GROUND && abilityDef == ABILITY_LEVITATE && !(gFieldStatuses & STATUS_FIELD_GRAVITY))
             modifier = UQ_4_12(0.0);
@@ -9579,16 +9581,11 @@ void CopyMonAbilityAndTypesToBattleMon(enum BattlerId battler, struct Pokemon *m
     gBattleMons[battler].types[0] = GetSpeciesType(gBattleMons[battler].species, 0);
     gBattleMons[battler].types[1] = GetSpeciesType(gBattleMons[battler].species, 1);
     gBattleMons[battler].types[2] = TYPE_MYSTERY;
-    // GRAFT: Override types from graft data (direct BoxMon accessor)
-    if (GetBattlerSide(battler) == B_SIDE_PLAYER)
-    {
-        u8 gt0 = GetGraftedTypeFromBoxMon(&mon->box, 0);
-        u8 gt1 = GetGraftedTypeFromBoxMon(&mon->box, 1);
-        if (gt0 != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[0] = gt0;
-        if (gt1 != GRAFT_TYPE_NONE)
-            gBattleMons[battler].types[1] = gt1;
-    }
+    // GRAFT: grafted types survive form changes, for both sides
+    if (mon->box.graftTypes[0] != GRAFT_TYPE_NONE)
+        gBattleMons[battler].types[0] = mon->box.graftTypes[0];
+    if (mon->box.graftTypes[1] != GRAFT_TYPE_NONE)
+        gBattleMons[battler].types[1] = mon->box.graftTypes[1];
 }
 
 void RecalcBattlerStats(enum BattlerId battler, struct Pokemon *mon, bool32 isDynamaxing)
