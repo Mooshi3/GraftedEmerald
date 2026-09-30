@@ -298,6 +298,11 @@ static u8 GetPartyIdFromBattleSlot(u8);
 static void Task_ClosePartyMenuAndSetCB2(u8);
 static void UpdatePartyToFieldOrder(void);
 static void MoveCursorToConfirm(void);
+// GRAFT: Splicer / Auto-splice state
+static EWRAM_DATA u8 sSplicerDonorName[POKEMON_NAME_BUFFER_SIZE] = {0};
+static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
+static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
+
 static void HandleChooseMonCancel(u8, s8 *);
 static void HandleChooseMonSelection(u8, s8 *);
 static u16 PartyMenuButtonHandler(s8 *);
@@ -5665,7 +5670,9 @@ static void Task_LearnedMove(u8 taskId)
     if (gPartyMenu.learnMoveState == 0)
     {
         AdjustFriendship(mon, FRIENDSHIP_EVENT_LEARN_TMHM);
-        if (!GetItemImportance(item))
+        // GRAFT: a Splicer graft consumes its item itself (and Auto-splice consumes nothing);
+        // gSpecialVar_ItemId may be the Splicer or a stale item here, so don't treat it as a TM
+        if (!GetItemImportance(item) && !gGraftLearnMovePending)
             RemoveBagItem(item, 1);
     }
     GetMonNickname(mon, gStringVar1);
@@ -5702,7 +5709,8 @@ static void Task_LearnNextMoveOrClosePartyMenu(u8 taskId)
             if (gGraftLearnMovePending)
             {
                 RecordGraftMove(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId].box, gPartyMenu.data1);
-                RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
+                if (!sAutoSpliceActive) // Auto-splice is free
+                    RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
                 gGraftLearnMovePending = FALSE;
             }
             Task_ClosePartyMenu(taskId);
@@ -8724,9 +8732,6 @@ static const u8 sText_AutoSpliceReleased[] = _("{STR_VAR_1} was released.");
 // for a free graft onto a teammate, or is let go. Reuses Task_GraftSplicer.
 // ============================================================
 
-static EWRAM_DATA u8 sSplicerDonorName[POKEMON_NAME_BUFFER_SIZE] = {0};
-static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
-static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
 // The battle's script may read these after the battle; the party menu can overwrite them
 static EWRAM_DATA u16 sAutoSpliceSavedResult = 0;
 static EWRAM_DATA u16 sAutoSpliceSaved8004 = 0;
@@ -8778,6 +8783,35 @@ static void CB2_AutoSpliceContinue(void)
         gSpecialVar_0x8004 = sAutoSpliceSaved8004;
         SetMainCallback2(sAutoSpliceNext);
     }
+}
+
+// Splicer: the donor is released only once the graft is committed (after the type slot or
+// "Teach X?" answer), so backing out keeps it. Returns the target's slot after the party shifts.
+static u8 ReleaseSplicerDonorForGraft(void)
+{
+    u8 targetSlot = gPartyMenu.slotId;
+    u8 sacrificeSlot = gPartyMenu.slotId2;
+    u8 partyCount = CalculatePlayerPartyCount();
+    u8 i;
+
+    // Keep its name for the "was released" message
+    GetMonNickname(&gParties[B_TRAINER_PLAYER][sacrificeSlot], sSplicerDonorName);
+    if (targetSlot > sacrificeSlot)
+        targetSlot--;
+    for (i = sacrificeSlot; i < partyCount - 1; i++)
+        CopyMon(&gParties[B_TRAINER_PLAYER][i], &gParties[B_TRAINER_PLAYER][i + 1], sizeof(struct Pokemon));
+    ZeroMonData(&gParties[B_TRAINER_PLAYER][partyCount - 1]);
+    gPartyMenu.slotId = targetSlot;
+    return targetSlot;
+}
+
+static void ReturnToSplicerTargetPick(u8 taskId)
+{
+    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+    ClearWindowTilemap(WIN_MSG);
+    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+    gTasks[taskId].func = Task_HandleChooseMonInput;
+    sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
 }
 
 static void ReleaseSplicerDonor(void)
@@ -9298,31 +9332,6 @@ void Task_GraftSplicer(u8 taskId)
                 break;
             }
         }
-            // Release the sacrifice mon NOW — we already have the graft data,
-            // and the move-forget flow reinitializes the party menu, destroying
-            // splicer state. Releasing early avoids needing to preserve state.
-            {
-                // Keep its name for the "was released" message; the party is compacted below
-                GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], sSplicerDonorName);
-                u8 sacrificeSlot = gPartyMenu.slotId2;
-                u8 partyCount = CalculatePlayerPartyCount();
-                // Adjust targetSlot if it is after the sacrifice slot
-                if (targetSlot > sacrificeSlot)
-                    targetSlot--;
-                if (sacrificeSlot < partyCount - 1)
-                {
-                    u8 i;
-                    for (i = sacrificeSlot; i < partyCount - 1; i++)
-                        CopyMon(&gParties[B_TRAINER_PLAYER][i], &gParties[B_TRAINER_PLAYER][i + 1], sizeof(struct Pokemon));
-                    ZeroMonData(&gParties[B_TRAINER_PLAYER][partyCount - 1]);
-                }
-                else
-                {
-                    ZeroMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot]);
-                }
-                gPartyMenu.slotId = targetSlot;
-            }
- 
         if (graftType == GRAFT_MENU_MOVE)
         {
             // Move graft — show the "Teach X to Y?" confirmation.
@@ -9361,7 +9370,9 @@ void Task_GraftSplicer(u8 taskId)
         else
         {
             // Ability / Stat / Nature — no extra prompt, apply immediately.
-bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
+            bool8 graftResult;
+            targetSlot = ReleaseSplicerDonorForGraft();
+            graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                 if (!graftResult && GetSelectedGraftType() == GRAFT_MENU_STAT)
                 {
                     StringExpandPlaceholders(gStringVar4, GetStatGraftRejectReason(&gParties[B_TRAINER_PLAYER][targetSlot].box, GetSelectedGraftStatIndex()));
@@ -9421,6 +9432,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
             if (JOY_NEW(A_BUTTON))
             {
                 PlaySE(SE_SELECT);
+                targetSlot = ReleaseSplicerDonorForGraft();
                 SetGraftedType(targetSlot, sPartyMenuInternal->data[1], newType);
                 StringCopy(gStringVar1, sSplicerDonorName);
                 StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
@@ -9431,9 +9443,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
             if (JOY_NEW(B_BUTTON))
             {
                 PlaySE(SE_SELECT);
-                DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-                gTasks[taskId].func = Task_HandleChooseMonInput;
-                sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
+                ReturnToSplicerTargetPick(taskId); // nothing spent yet
             }
         }
         break;
@@ -9447,13 +9457,15 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
 
     case SPLICER_MOVE_REPLACE_YESNO:
     {
-        u8 targetSlot = gPartyMenu.slotId;
+        u8 targetSlot;
         u16 moveId = GetSelectedGraftValue();
-        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][targetSlot];
+        struct Pokemon *mon;
         switch (Menu_ProcessInputNoWrapClearOnChoose())
         {
-        case 0: // YES - try to learn the move
+        case 0: // YES - the graft is committed: release the donor, then try to learn the move
             PlaySE(SE_SELECT);
+            targetSlot = ReleaseSplicerDonorForGraft();
+            mon = &gParties[B_TRAINER_PLAYER][targetSlot];
             {
                 u16 result = GiveMoveToMon(mon, moveId);
                 if (result != MON_HAS_MAX_MOVES)
@@ -9479,10 +9491,10 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                 }
             }
             break;
-        case 1: // NO
+        case 1: // NO - back to picking a target; nothing spent yet
         case MENU_B_PRESSED:
             PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
+            ReturnToSplicerTargetPick(taskId);
             break;
         }
     }
