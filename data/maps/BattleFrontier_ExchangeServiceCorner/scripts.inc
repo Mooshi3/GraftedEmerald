@@ -216,7 +216,9 @@ BattleFrontier_ExchangeServiceCorner_EventScript_ChooseVitamin::
 	case 3, BattleFrontier_ExchangeServiceCorner_EventScript_Zinc
 	case 4, BattleFrontier_ExchangeServiceCorner_EventScript_Carbos
 	case 5, BattleFrontier_ExchangeServiceCorner_EventScript_HPUp
-	case 6, BattleFrontier_ExchangeServiceCorner_EventScript_ClerkGoodbye
+	case 6, BattleFrontier_ExchangeServiceCorner_EventScript_BottleCap
+	case 7, BattleFrontier_ExchangeServiceCorner_EventScript_GoldBottleCap
+	case 8, BattleFrontier_ExchangeServiceCorner_EventScript_ClerkGoodbye
 	case MULTI_B_PRESSED, BattleFrontier_ExchangeServiceCorner_EventScript_ClerkGoodbye
 	end
 
@@ -249,6 +251,15 @@ BattleFrontier_ExchangeServiceCorner_EventScript_Carbos::
 
 BattleFrontier_ExchangeServiceCorner_EventScript_HPUp::
 	setitemandprice ITEM_HP_UP, 1
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_PurchaseVitamin
+
+@ GRAFT: Bottle Caps for the hyper trainer
+BattleFrontier_ExchangeServiceCorner_EventScript_BottleCap::
+	setitemandprice ITEM_BOTTLE_CAP, 16
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_PurchaseVitamin
+
+BattleFrontier_ExchangeServiceCorner_EventScript_GoldBottleCap::
+	setitemandprice ITEM_GOLD_BOTTLE_CAP, 48
 	goto BattleFrontier_ExchangeServiceCorner_EventScript_PurchaseVitamin
 
 
@@ -482,6 +493,14 @@ BattleFrontier_ExchangeServiceCorner_Text_CarbosDesc::
 BattleFrontier_ExchangeServiceCorner_Text_HPUpDesc::
 	.string "Raises the HP of one POKéMON.$"
 
+BattleFrontier_ExchangeServiceCorner_Text_BottleCapDesc::
+	.string "The hyper trainer here takes one\n"
+	.string "to max out one of a POKéMON's IVs.$"
+
+BattleFrontier_ExchangeServiceCorner_Text_GoldBottleCapDesc::
+	.string "The hyper trainer here takes one\n"
+	.string "to max out all of a POKéMON's IVs.$"
+
 BattleFrontier_ExchangeServiceCorner_Text_LeftoversDesc::
 	.string "A hold item that gradually restores\n"
 	.string "HP in battle.$"
@@ -517,3 +536,192 @@ BattleFrontier_ExchangeServiceCorner_Text_FocusBandDesc::
 BattleFrontier_ExchangeServiceCorner_Text_ScopeLensDesc::
 	.string "A hold item that raises the\n"
 	.string "critical-hit rate.$"
+
+@ GRAFT: hyper training. A Bottle Cap maxes one IV, a Gold Bottle Cap all six.
+@ VAR_0x8004 = party slot, VAR_0x8005/6 = has Bottle Cap / Gold Bottle Cap, VAR_0x8007 = trainable stats
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainer::
+	lock
+	faceplayer
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerIntro, MSGBOX_DEFAULT
+	checkitem ITEM_BOTTLE_CAP
+	copyvar VAR_0x8005, VAR_RESULT
+	checkitem ITEM_GOLD_BOTTLE_CAP
+	copyvar VAR_0x8006, VAR_RESULT
+	goto_if_eq VAR_0x8005, TRUE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainChooseMon
+	goto_if_eq VAR_0x8006, TRUE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainChooseMon
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerNoCaps, MSGBOX_DEFAULT
+	release
+	end
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainChooseMon::
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerWhichMon, MSGBOX_DEFAULT
+	special ChoosePartyMon
+	waitstate
+	goto_if_ge VAR_0x8004, PARTY_SIZE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCancel
+	specialvar VAR_RESULT, ScriptGetPartyMonSpecies
+	goto_if_eq VAR_RESULT, SPECIES_EGG, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainEgg
+	setvar VAR_0x8007, FALSE
+	canhypertrain STAT_HP, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckHPDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckHPDone:
+	canhypertrain STAT_ATK, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckAtkDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckAtkDone:
+	canhypertrain STAT_DEF, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckDefDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckDefDone:
+	canhypertrain STAT_SPATK, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpAtkDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpAtkDone:
+	canhypertrain STAT_SPDEF, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpDefDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpDefDone:
+	canhypertrain STAT_SPEED, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpeedDone
+	setvar VAR_0x8007, TRUE
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCheckSpeedDone:
+	goto_if_eq VAR_0x8007, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainMaxed
+	goto_if_eq VAR_0x8006, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainChooseStat
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerUseGold, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, YES, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainAll
+	goto_if_eq VAR_0x8005, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCancel
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainChooseStat::
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerWhichStat, MSGBOX_DEFAULT
+	canhypertrain STAT_HP, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushHPDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatHP, STAT_HP
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushHPDone:
+	canhypertrain STAT_ATK, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushAtkDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatAtk, STAT_ATK
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushAtkDone:
+	canhypertrain STAT_DEF, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushDefDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatDef, STAT_DEF
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushDefDone:
+	canhypertrain STAT_SPATK, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpAtkDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatSpAtk, STAT_SPATK
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpAtkDone:
+	canhypertrain STAT_SPDEF, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpDefDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatSpDef, STAT_SPDEF
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpDefDone:
+	canhypertrain STAT_SPEED, VAR_0x8004
+	goto_if_eq VAR_RESULT, FALSE, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpeedDone
+	dynmultipush BattleFrontier_ExchangeServiceCorner_Text_StatSpeed, STAT_SPEED
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainPushSpeedDone:
+	dynmultistack 0, 0, FALSE, 6, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	switch VAR_RESULT
+	case STAT_HP, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainHP
+	case STAT_ATK, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainAtk
+	case STAT_DEF, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainDef
+	case STAT_SPATK, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpAtk
+	case STAT_SPDEF, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpDef
+	case STAT_SPEED, BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpeed
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCancel
+	end
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainHP::
+	hypertrain STAT_HP, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainAtk::
+	hypertrain STAT_ATK, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainDef::
+	hypertrain STAT_DEF, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpAtk::
+	hypertrain STAT_SPATK, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpDef::
+	hypertrain STAT_SPDEF, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainSpeed::
+	hypertrain STAT_SPEED, VAR_0x8004
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainOneDone::
+	removeitem ITEM_BOTTLE_CAP
+	goto BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainDone
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainAll::
+	hypertrain STAT_HP, VAR_0x8004
+	hypertrain STAT_ATK, VAR_0x8004
+	hypertrain STAT_DEF, VAR_0x8004
+	hypertrain STAT_SPATK, VAR_0x8004
+	hypertrain STAT_SPDEF, VAR_0x8004
+	hypertrain STAT_SPEED, VAR_0x8004
+	removeitem ITEM_GOLD_BOTTLE_CAP
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainDone::
+	bufferpartymonnick STR_VAR_1, VAR_0x8004
+	playfanfare MUS_LEVEL_UP
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerDone, MSGBOX_DEFAULT
+	waitfanfare
+	release
+	end
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainMaxed::
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerMaxed, MSGBOX_DEFAULT
+	release
+	end
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainEgg::
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerEgg, MSGBOX_DEFAULT
+	release
+	end
+
+BattleFrontier_ExchangeServiceCorner_EventScript_HyperTrainCancel::
+	msgbox BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerCancel, MSGBOX_DEFAULT
+	release
+	end
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerIntro::
+	.string "I'm a hyper trainer! A BOTTLE CAP\n"
+	.string "maxes one IV, a GOLD one maxes all!$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerNoCaps::
+	.string "You don't have any BOTTLE CAPS.\n"
+	.string "The clerks here trade them for BP.$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerWhichMon::
+	.string "Which POKéMON should I train?$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerUseGold::
+	.string "Use a GOLD BOTTLE CAP to max out\n"
+	.string "all of its IVs?$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerWhichStat::
+	.string "Which stat should I train?$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerDone::
+	.string "Hyper training complete!\n"
+	.string "{STR_VAR_1} got stronger!$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerMaxed::
+	.string "That POKéMON's IVs are already\n"
+	.string "as high as they go.$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerEgg::
+	.string "I can't train an EGG!$"
+
+BattleFrontier_ExchangeServiceCorner_Text_HyperTrainerCancel::
+	.string "Come back anytime.$"
+
+BattleFrontier_ExchangeServiceCorner_Text_StatHP::
+	.string "HP$"
+BattleFrontier_ExchangeServiceCorner_Text_StatAtk::
+	.string "ATTACK$"
+BattleFrontier_ExchangeServiceCorner_Text_StatDef::
+	.string "DEFENSE$"
+BattleFrontier_ExchangeServiceCorner_Text_StatSpAtk::
+	.string "SP. ATK$"
+BattleFrontier_ExchangeServiceCorner_Text_StatSpDef::
+	.string "SP. DEF$"
+BattleFrontier_ExchangeServiceCorner_Text_StatSpeed::
+	.string "SPEED$"

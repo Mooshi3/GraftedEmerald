@@ -8724,6 +8724,7 @@ static const u8 sText_AutoSpliceReleased[] = _("{STR_VAR_1} was released.");
 // for a free graft onto a teammate, or is let go. Reuses Task_GraftSplicer.
 // ============================================================
 
+static EWRAM_DATA u8 sSplicerDonorName[POKEMON_NAME_BUFFER_SIZE] = {0};
 static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
 static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
 // The battle's script may read these after the battle; the party menu can overwrite them
@@ -9271,6 +9272,9 @@ void Task_GraftSplicer(u8 taskId)
     case SPLICER_CANCEL_TARGET:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
+        // Clear the refusal message first, or it stays behind the prompt
+        ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+        ClearWindowTilemap(WIN_MSG);
         DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
         gTasks[taskId].func = Task_HandleChooseMonInput;
         sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
@@ -9298,6 +9302,8 @@ void Task_GraftSplicer(u8 taskId)
             // and the move-forget flow reinitializes the party menu, destroying
             // splicer state. Releasing early avoids needing to preserve state.
             {
+                // Keep its name for the "was released" message; the party is compacted below
+                GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], sSplicerDonorName);
                 u8 sacrificeSlot = gPartyMenu.slotId2;
                 u8 partyCount = CalculatePlayerPartyCount();
                 // Adjust targetSlot if it is after the sacrifice slot
@@ -9364,7 +9370,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                     sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
                     break;
                 }
-            GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
+            StringCopy(gStringVar1, sSplicerDonorName);
             StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
             DisplayPartyMenuMessage(gStringVar4, TRUE);
             ScheduleBgCopyTilemapToVram(2);
@@ -9416,7 +9422,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
             {
                 PlaySE(SE_SELECT);
                 SetGraftedType(targetSlot, sPartyMenuInternal->data[1], newType);
-                GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
+                StringCopy(gStringVar1, sSplicerDonorName);
                 StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
                 DisplayPartyMenuMessage(gStringVar4, TRUE);
                 ScheduleBgCopyTilemapToVram(2);
@@ -9523,7 +9529,7 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
                 RecordGraftMove(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId].box, sPartyMenuInternal->data[2]);
                 gGraftLearnMovePending = FALSE;
             }
-            GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
+            StringCopy(gStringVar1, sSplicerDonorName);
             StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
             DisplayPartyMenuMessage(gStringVar4, TRUE);
             ScheduleBgCopyTilemapToVram(2);

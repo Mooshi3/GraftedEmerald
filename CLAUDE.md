@@ -57,6 +57,11 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 - The sheet lives at `tools/encounters/Grafted_Encounter_Tables.xlsx`. `tools/encounters/sheet_to_json.py` generates `src/data/wild_encounters.json` and `src/data/graft_postgame_legendaries.h` from it (see the README there). Never hand-edit Emerald maps in the JSON.
 - Every Emerald encounter table now comes from the sheet, except Altering Cave's 8 mystery-event variants (vanilla). Aqua Hideout has no land-encounter tiles, so it has a surfing table instead; Mewtwo's postgame slot is in Artisan Cave.
 
+## Postgame
+
+- **Hyper training:** a Black Belt in the Battle Frontier Exchange Service Corner (right of the counter) maxes one IV for a Bottle Cap or all six for a Gold Bottle Cap. The vitamin clerk sells Bottle Caps (16 BP) and Gold Bottle Caps (48 BP). Uses the expansion's `canhypertrain`/`hypertrain` script macros.
+- Script gotchas found while building it: `addvar` adds a literal, not a variable's value; and `dynmultipush` inside a `call`ed subroutine crashed the game (use skip labels instead).
+
 ## New-game settings
 
 After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`src/graft_settings.c`) picks per-save options; they can't be changed later. They're packed into a 32-bit word across `VAR_GRAFTED_SETTINGS` (low) and `VAR_GRAFTED_SETTINGS_2` (high), stored XOR each setting's default so an unwritten var reads as defaults. `NewGameInitData` applies the choices after vars are cleared (`ApplyPendingGraftSettings`). To add a setting: add an enum entry and a row in `sGraftSettings[]` with its own bit range (and per-choice descriptions if the modes differ); the screen picks it up and `test/graft.c` checks the text fits.
@@ -77,11 +82,10 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5428 passed as of 2026-09-30; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
 
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories; Ungrafter.
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories; Ungrafter; hyper training at the Frontier; Splicer naming the wrong mon in "was released" and leaving the refusal message behind the target prompt.
 
 Next:
-1. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
-2. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
-3. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
+1. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
+2. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).

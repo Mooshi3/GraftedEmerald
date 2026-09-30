@@ -31,6 +31,8 @@ static const enum Item sFrontierExchangeCorner_Vitamins[] =
     ITEM_ZINC,
     ITEM_CARBOS,
     ITEM_HP_UP,
+    ITEM_BOTTLE_CAP,
+    ITEM_GOLD_BOTTLE_CAP,
     ITEM_LIST_END
 };
 
@@ -81,6 +83,8 @@ static const u8 *const sFrontierExchangeCorner_VitaminsDescriptions[] =
     BattleFrontier_ExchangeServiceCorner_Text_ZincDesc,
     BattleFrontier_ExchangeServiceCorner_Text_CarbosDesc,
     BattleFrontier_ExchangeServiceCorner_Text_HPUpDesc,
+    BattleFrontier_ExchangeServiceCorner_Text_BottleCapDesc,
+    BattleFrontier_ExchangeServiceCorner_Text_GoldBottleCapDesc,
     gText_Exit
 };
 

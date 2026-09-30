@@ -511,6 +511,8 @@ extern const u8 BattleFrontier_ExchangeServiceCorner_Text_ChikoritaDollDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_TotodileDollDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_LargeDollDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_ProteinDesc[];
+extern const u8 BattleFrontier_ExchangeServiceCorner_Text_BottleCapDesc[];
+extern const u8 BattleFrontier_ExchangeServiceCorner_Text_GoldBottleCapDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_CalciumDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_IronDesc[];
 extern const u8 BattleFrontier_ExchangeServiceCorner_Text_ZincDesc[];
