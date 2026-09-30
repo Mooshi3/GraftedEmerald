@@ -101,6 +101,7 @@ Next:
 3. **Graft Bag (planned redesign, needs a new save):** graft balls and the Splicer turn Pokémon into stored *pieces* instead of grafting on the spot, so a good roll can be kept for a later Pokémon. Decided with Jacob (2026-10-01):
    - **Pieces:** one trait each: a move, an ability, one type, a nature, or one stat's base value. They stack and don't remember their source.
    - **Sources:** Patch Ball gives 1 random piece of the caught wild mon; Graft Ball 3 different random pieces; Splice Ball minces the wild mon into every piece it has (4 moves, ability, each type, nature, 6 stats; never a hidden ability). The Splicer sacrifices a party mon and minces it the same way, grafts included.
+   - **The Graft Bag is its own key item** with its own screen, separate from the regular Bag: pieces never take Bag space. It has a tab per category (Moves, Abilities, Types, Natures, Stats), each listing the pieces you have with their counts.
    - **Using pieces:** from the Graft Bag, outside battle, onto a party mon; a type piece asks which slot it replaces; moves use the forget-a-move prompt and `RecordGraftMove`. Every rule still applies at that point through `GetGraftRejectReason` (limits, gates, husk, fallen).
    - **Ungrafter** destroys grafts; nothing returns to the bag. Pieces can be discarded, not sold.
    - **Bag full after a catch:** just say "The Graft Bag is full." and the overflow is lost.
