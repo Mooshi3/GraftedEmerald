@@ -8726,6 +8726,9 @@ static const u8 sText_AutoSpliceReleased[] = _("{STR_VAR_1} was released.");
 
 static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
 static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
+// The battle's script may read these after the battle; the party menu can overwrite them
+static EWRAM_DATA u16 sAutoSpliceSavedResult = 0;
+static EWRAM_DATA u16 sAutoSpliceSaved8004 = 0;
 
 static void CB2_AutoSpliceContinue(void);
 
@@ -8754,6 +8757,11 @@ bool32 StartAutoSplice(MainCallback next)
         sAutoSpliceActive = FALSE;
         return FALSE;
     }
+    if (!sAutoSpliceActive)
+    {
+        sAutoSpliceSavedResult = gSpecialVar_Result;
+        sAutoSpliceSaved8004 = gSpecialVar_0x8004;
+    }
     sAutoSpliceNext = next;
     sAutoSpliceActive = TRUE;
     InitPartyMenu(PARTY_MENU_TYPE_FIELD, PARTY_LAYOUT_SINGLE, PARTY_ACTION_CHOOSE_MON, FALSE, PARTY_MSG_NONE, Task_AutoSpliceBegin, CB2_AutoSpliceContinue);
@@ -8764,7 +8772,11 @@ bool32 StartAutoSplice(MainCallback next)
 static void CB2_AutoSpliceContinue(void)
 {
     if (!StartAutoSplice(sAutoSpliceNext))
+    {
+        gSpecialVar_Result = sAutoSpliceSavedResult;
+        gSpecialVar_0x8004 = sAutoSpliceSaved8004;
         SetMainCallback2(sAutoSpliceNext);
+    }
 }
 
 static void ReleaseSplicerDonor(void)
