@@ -1207,6 +1207,7 @@ struct SaveBlock1
     // GRAFT: challenge settings, one bit per map section (graft_challenge.c)
     u8 graftCaughtAreas[32];  // Nuzlocke: this area's encounter is spent
     u8 graftHarvestAreas[32]; // Harvests 1 per area: this area's harvest is spent
+    u8 graftVisitedAreas[32]; // Pokédex encounter screen: areas the player has been to
 #if FREE_TRAINER_TOWER == FALSE && IS_FRLG
     u32 towerChallengeId;
     struct TrainerTower trainerTower[NUM_TOWER_CHALLENGE_TYPES];

@@ -3,6 +3,7 @@
 #include "graft_settings.h"
 #include "graft_menu.h"
 #include "graft_challenge.h"
+#include "graft_encounter_dex.h"
 #include "battle.h"
 #include "battle_controllers.h"
 #include "item.h"
@@ -571,4 +572,81 @@ TEST("The Ungrafter removes every graft and the relearner history, keeping known
     EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), maxHP);
     EXPECT_EQ(GetMonAbility(&mon), GetAbilityBySpecies(SPECIES_WOBBUFFET, GetMonData(&mon, MON_DATA_ABILITY_NUM)));
     EXPECT_EQ(GetMonData(&mon, MON_DATA_HIDDEN_NATURE), GetNatureFromPersonality(GetMonData(&mon, MON_DATA_PERSONALITY)));
+}
+
+static const struct EncounterDexEntry *FindEncDexEntry(const struct EncounterDexEntry *entries, u32 count, u16 species, u8 method)
+{
+    for (u32 i = 0; i < count; i++)
+    {
+        if (entries[i].species == species && entries[i].method == method)
+            return &entries[i];
+    }
+    return NULL;
+}
+
+TEST("Encounter screen: area lists come from the wild tables, sorted by method then rate")
+{
+    struct EncounterDexEntry entries[ENCDEX_MAX_ENTRIES];
+    u32 count, i;
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+    EXPECT(AreaHasWildEncounters(MAPSEC_PETALBURG_WOODS));
+    EXPECT(!AreaHasWildEncounters(MAPSEC_LITTLEROOT_TOWN));
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    EXPECT_GT(count, 0);
+    EXPECT(FindEncDexEntry(entries, count, SPECIES_SHROOMISH, ENCDEX_GRASS) != NULL);
+    for (i = 0; i < count; i++)
+    {
+        EXPECT_GT(entries[i].rate, 0);
+        EXPECT_LE(entries[i].rate, 100);
+        EXPECT_NE(entries[i].timeMask, 0);
+        EXPECT_LE(entries[i].minLevel, entries[i].maxLevel);
+        if (i > 0)
+            EXPECT(entries[i - 1].method < entries[i].method
+                || (entries[i - 1].method == entries[i].method && entries[i - 1].rate >= entries[i].rate));
+    }
+}
+
+TEST("Encounter screen: postgame legendaries only show after the Champion win, until caught")
+{
+    struct EncounterDexEntry entries[ENCDEX_MAX_ENTRIES];
+    u32 count;
+    const struct EncounterDexEntry *legend;
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+    GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_VIRIZION), FLAG_SET_SEEN);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    EXPECT(FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS) == NULL);
+
+    FlagSet(FLAG_SYS_GAME_CLEAR);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    legend = FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS);
+    EXPECT(legend != NULL);
+    EXPECT_EQ(legend->rate, 1);
+    EXPECT_EQ(legend->minLevel, 50);
+
+    GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_VIRIZION), FLAG_SET_CAUGHT);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    EXPECT(FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS) == NULL);
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+}
+
+TEST("Encounter screen: visited areas are remembered per map section")
+{
+    memset(gSaveBlock1Ptr->graftVisitedAreas, 0, sizeof(gSaveBlock1Ptr->graftVisitedAreas));
+    EXPECT(!IsEncounterAreaVisited(MAPSEC_ROUTE_104));
+    MarkEncounterAreaVisited(MAPSEC_ROUTE_104);
+    EXPECT(IsEncounterAreaVisited(MAPSEC_ROUTE_104));
+    EXPECT(!IsEncounterAreaVisited(MAPSEC_ROUTE_105));
+}
+
+TEST("Encounter slot rates add up to 100 for every method")
+{
+    u32 i, sum;
+    for (i = 0, sum = 0; i < NUM_LAND_MONS_ENCOUNTER_SLOTS; i++) sum += gEncounterSlotRatesLand[i];
+    EXPECT_EQ(sum, 100);
+    for (i = 0, sum = 0; i < NUM_WATER_MONS_ENCOUNTER_SLOTS; i++) sum += gEncounterSlotRatesWater[i];
+    EXPECT_EQ(sum, 100);
+    for (i = 0, sum = 0; i < NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS; i++) sum += gEncounterSlotRatesRockSmash[i];
+    EXPECT_EQ(sum, 100);
+    for (i = 0, sum = 0; i < NUM_FISHING_MONS_ENCOUNTER_SLOTS; i++) sum += gEncounterSlotRatesFishing[i];
+    EXPECT_EQ(sum, 300); // three rods
 }

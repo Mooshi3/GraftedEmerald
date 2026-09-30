@@ -15,6 +15,7 @@
 #include "overworld.h"
 #include "palette.h"
 #include "pokedex.h"
+#include "graft_encounter_dex.h"
 #include "pokedex_area_screen.h"
 #include "pokedex_common.h"
 #include "pokedex_cry_screen.h"
@@ -37,6 +38,7 @@
 EWRAM_DATA struct PokedexView *sPokedexView = NULL;
 static EWRAM_DATA u16 sLastSelectedPokemon = 0;
 static EWRAM_DATA u8 sPokeBallRotation = 0;
+static EWRAM_DATA bool8 sExitToEncounterDex = FALSE; // GRAFT: R in the list opens the encounter screen
 EWRAM_DATA struct PokedexListItem *sPokedexListItem = NULL;
 
 COMMON_DATA void (*gPokedexVBlankCB)(void) = NULL;
@@ -1551,6 +1553,17 @@ void Task_HandlePokedexInput(u8 taskId)
             gTasks[taskId].func = Task_HandlePokedexStartMenuInput;
             PlaySE(SE_SELECT);
         }
+        else if (JOY_NEW(R_BUTTON))
+        {
+            // GRAFT: encounter screen; it comes back to the Pokédex at the same entry
+            HandleDestroyStatBars_HGSS();
+            sLastSelectedPokemon = sPokedexView->selectedPokemon;
+            sPokeBallRotation = sPokedexView->pokeBallRotation;
+            sExitToEncounterDex = TRUE;
+            BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 0x10, RGB_BLACK);
+            gTasks[taskId].func = Task_ClosePokedex;
+            PlaySE(SE_PC_LOGIN);
+        }
         else if (JOY_NEW(SELECT_BUTTON))
         {
             PlaySE(SE_SELECT);
@@ -1719,7 +1732,15 @@ static void Task_ClosePokedex(u8 taskId)
         ClearMonSprites();
         FreeWindowAndBgBuffers();
         DestroyTask(taskId);
-        SetMainCallback2(CB2_ReturnToFieldWithOpenMenu);
+        if (sExitToEncounterDex)
+        {
+            sExitToEncounterDex = FALSE;
+            SetMainCallback2(CB2_OpenEncounterDex);
+        }
+        else
+        {
+            SetMainCallback2(CB2_ReturnToFieldWithOpenMenu);
+        }
         m4aMPlayVolumeControl(&gMPlayInfo_BGM, TRACKS_ALL, 0x100);
         Free(sPokedexView);
     }

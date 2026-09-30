@@ -1,5 +1,6 @@
 #include "global.h"
 #include "overworld.h"
+#include "graft_encounter_dex.h"
 #include "battle_pyramid.h"
 #include "battle_setup.h"
 #include "battle_util.h"
@@ -671,6 +672,7 @@ static void LoadCurrentMapData(void)
     gMapHeader = *Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     gSaveBlock1Ptr->mapLayoutId = gMapHeader.mapLayoutId;
     gMapHeader.mapLayout = GetMapLayout(gMapHeader.mapLayoutId);
+    MarkEncounterAreaVisited(gMapHeader.regionMapSectionId); // GRAFT: Pokédex encounter screen
 }
 
 static void LoadSaveblockMapHeader(void)

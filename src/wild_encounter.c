@@ -563,6 +563,91 @@ bool32 TryGetPostgameLegendary(enum WildPokemonArea area, u16 *species, u8 *leve
     return FALSE;
 }
 
+// GRAFT: per-slot chances in percent, from the same macros the encounter code rolls against
+#define SLOT_DIFF(prefix, i) (prefix##_SLOT_##i - prefix##_SLOT_##i##_PREV)
+const u8 gEncounterSlotRatesLand[NUM_LAND_MONS_ENCOUNTER_SLOTS] =
+{
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_1 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_2 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_1,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_3 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_2,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_4 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_3,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_5 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_4,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_6 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_5,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_7 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_6,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_8 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_7,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_9 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_8,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_10 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_9,
+    ENCOUNTER_CHANCE_LAND_MONS_SLOT_11 - ENCOUNTER_CHANCE_LAND_MONS_SLOT_10,
+};
+const u8 gEncounterSlotRatesWater[NUM_WATER_MONS_ENCOUNTER_SLOTS] =
+{
+    ENCOUNTER_CHANCE_WATER_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_WATER_MONS_SLOT_1 - ENCOUNTER_CHANCE_WATER_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_WATER_MONS_SLOT_2 - ENCOUNTER_CHANCE_WATER_MONS_SLOT_1,
+    ENCOUNTER_CHANCE_WATER_MONS_SLOT_3 - ENCOUNTER_CHANCE_WATER_MONS_SLOT_2,
+    ENCOUNTER_CHANCE_WATER_MONS_SLOT_4 - ENCOUNTER_CHANCE_WATER_MONS_SLOT_3,
+};
+const u8 gEncounterSlotRatesRockSmash[NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS] =
+{
+    ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_1 - ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_0,
+    ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_2 - ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_1,
+    ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_3 - ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_2,
+    ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_4 - ENCOUNTER_CHANCE_ROCK_SMASH_MONS_SLOT_3,
+};
+// Fishing slots 0-1 are the Old Rod, 2-4 the Good Rod, 5-9 the Super Rod; each rod's chances add to 100
+const u8 gEncounterSlotRatesFishing[NUM_FISHING_MONS_ENCOUNTER_SLOTS] =
+{
+    ENCOUNTER_CHANCE_FISHING_MONS_OLD_ROD_SLOT_0,
+    ENCOUNTER_CHANCE_FISHING_MONS_OLD_ROD_SLOT_1 - ENCOUNTER_CHANCE_FISHING_MONS_OLD_ROD_SLOT_0,
+    ENCOUNTER_CHANCE_FISHING_MONS_GOOD_ROD_SLOT_2,
+    ENCOUNTER_CHANCE_FISHING_MONS_GOOD_ROD_SLOT_3 - ENCOUNTER_CHANCE_FISHING_MONS_GOOD_ROD_SLOT_2,
+    ENCOUNTER_CHANCE_FISHING_MONS_GOOD_ROD_SLOT_4 - ENCOUNTER_CHANCE_FISHING_MONS_GOOD_ROD_SLOT_3,
+    ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_5,
+    ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_6 - ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_5,
+    ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_7 - ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_6,
+    ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_8 - ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_7,
+    ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_9 - ENCOUNTER_CHANCE_FISHING_MONS_SUPER_ROD_SLOT_8,
+};
+#undef SLOT_DIFF
+
+// GRAFT: for the Pokédex encounter screen. The table a header uses for an area at a given time,
+// with the same fallback as GetTimeOfDayForEncounters.
+const struct WildPokemonInfo *GetWildMonInfoForTime(u32 headerId, enum WildPokemonArea area, enum TimeOfDay timeOfDay)
+{
+    const struct WildEncounterTypes *types = gWildMonHeaders[headerId].encounterTypes;
+    const struct WildPokemonInfo *info;
+    #define AREA_INFO(t) (area == WILD_AREA_LAND ? types[t].landMonsInfo : area == WILD_AREA_WATER ? types[t].waterMonsInfo \
+                        : area == WILD_AREA_ROCKS ? types[t].rockSmashMonsInfo : types[t].fishingMonsInfo)
+
+    if (!OW_TIME_OF_DAY_ENCOUNTERS)
+        return AREA_INFO(TIME_OF_DAY_DEFAULT);
+    info = AREA_INFO(timeOfDay);
+    if (info == NULL && !OW_TIME_OF_DAY_DISABLE_FALLBACK)
+        return AREA_INFO(OW_TIME_OF_DAY_FALLBACK);
+    return AREA_INFO(GenConfigTimeOfDay(timeOfDay));
+    #undef AREA_INFO
+}
+
+// GRAFT: the postgame legendary that takes this map's last slot for an area and time, or SPECIES_NONE.
+// Doesn't check FLAG_SYS_GAME_CLEAR or whether it's caught.
+enum Species GetPostgameLegendaryForMap(u16 map, enum WildPokemonArea area, enum TimeOfDay timeOfDay, u8 *minLevel, u8 *maxLevel)
+{
+    for (u32 i = 0; i < ARRAY_COUNT(sPostgameLegendaries); i++)
+    {
+        const struct PostgameLegendary *legend = &sPostgameLegendaries[i];
+        if (legend->map != map || legend->area != area)
+            continue;
+        if (legend->timeOfDay != TIMES_OF_DAY_COUNT && legend->timeOfDay != timeOfDay)
+            continue;
+        *minLevel = legend->minLevel;
+        *maxLevel = legend->maxLevel;
+        return legend->species;
+    }
+    return SPECIES_NONE;
+}
+
 bool8 TryGenerateWildMon(const struct WildPokemonInfo *wildMonInfo, enum WildPokemonArea area, u8 flags)
 {
     u8 wildMonIndex = 0;

@@ -76,6 +76,12 @@ u32 ChooseWildMonIndex_Rocks(void);
 u32 ChooseHiddenMonIndex(void);
 bool32 MapHasNoEncounterData(void);
 enum TimeOfDay GetTimeOfDayForEncounters(u32 headerId, enum WildPokemonArea area);
+extern const u8 gEncounterSlotRatesLand[];
+extern const u8 gEncounterSlotRatesWater[];
+extern const u8 gEncounterSlotRatesRockSmash[];
+extern const u8 gEncounterSlotRatesFishing[];
+const struct WildPokemonInfo *GetWildMonInfoForTime(u32 headerId, enum WildPokemonArea area, enum TimeOfDay timeOfDay);
+enum Species GetPostgameLegendaryForMap(u16 map, enum WildPokemonArea area, enum TimeOfDay timeOfDay, u8 *minLevel, u8 *maxLevel);
 
 bool32 TryGetPostgameLegendary(enum WildPokemonArea area, u16 *species, u8 *level);
 u8 GetLandEncounterSlotForMatchCall(void);
