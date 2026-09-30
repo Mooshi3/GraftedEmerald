@@ -69,15 +69,17 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 
 - **Shiny Odds:** 1/4096, 1/512 (default, the old hard-coded rate) or 1/128, read by `ComputePlayerShinyOdds` via `GetPlayerShinyOddsThreshold`. `SHINY_ODDS` itself must never change: stored shininess is measured against it.
 - **Level Cap:** Off / Hard / Soft (`src/caps.c`, replacing the compile-time `B_EXP_CAP_TYPE`). The cap is the next Gym Leader's (then the Champion's) strongest level. Hard stops EXP, candies and Day Care growth; Soft divides EXP past it (1/4 down to 1/64) and makes the player's own mons above the cap disobey sometimes (same odds as vanilla obedience, with the cap in place of the badge level).
+- **EXP Share:** Item (vanilla held item) / Party (the whole party always gets EXP, via the expansion's Gen 6 path: `IsGen6ExpShareEnabled` reads the setting).
 - **Obedience** is vanilla otherwise (`B_OBEDIENCE_MECHANICS GEN_7`): only traded mons can disobey. The expansion default (Gen 8+) also made your own catches disobey by met level.
 - **Graft Limit:** Free / Standard (stat grafts capped at 1 + badges until 5 badges) / Budget (2 + badges/2 grafts per mon) / Strict (3). Budget counts types (both slots as one), ability, nature and each stat; moves never count. **Graft Gates:** types need 1 badge, stats 2, abilities 3. All of it, plus the husk rule and fallen mons, goes through `GetGraftRejectReason` (`src/graft_data.c`), checked when a graft target is picked in battle or with the Splicer.
 - **Graft Items:** Shops / Rations. Rations: marts don't sell graft balls or Splicers; a new game starts with 3 Splice Balls and every gym badge gives 3 more (plus a Splicer from 3 badges), from `Common_EventScript_GiveGraftRations`, called by the shared `Common_EventScript_SetGymTrainers`.
 - **Harvests** (grafting from wild mons with a ball): None / 1 per area / 1 per mon (each party mon, per map section, stored in `graftHarvestArea` on BoxPokemon) / Any. With None, marts and Rations leave out the grafting balls (`AreGraftBallsUseless`); Rations then give only the Splicer, from 3 badges.
 - **Enemy Grafts:** Fewer (1 + badges/2) / Normal (2 + badges) / More (3 + badges; Leaders', Elite Four and Champion aces always roll an ability graft).
+- **Wild Grafts:** Off (default) / Rare (5%) / Common (20%) of wild Pokémon come pre-grafted with 1 + badges/2 grafts, rolled like a trainer's from the nearby donor pool (`TryApplyWildGrafts`, hooked in `CreateWildMon`). Not before the Pokédex.
 - **Nuzlocke** (`src/graft_challenge.c`): only the first random wild encounter per map section is catchable (`graftCaughtAreas` in SaveBlock1); scripted/static battles are free, and nothing counts until the Pokédex (`FLAG_SYS_POKEDEX_GET`, when balls unlock; a flag so emptying the Bag can't dodge it). Dupes clause (default on) and shiny clause (default on). Harvesting uses a grafting ball, so it follows the Harvests setting rather than the catch rule; harvesting the area's first encounter uses up its catch too.
 - **Fainting:** Normal / Release (fainted mons are released after battle, held items return to the Bag) / Graveyard (`GRAFT_FLAG_FALLEN`: HP is clamped to 0 in `SetMonData`, items fail, they can't take grafts, but they can be the Splicer's donor) / Auto-splice (after battle, each fallen mon opens the Splicer as a free donor, or can be let go). Applied in `ReturnFromBattleToOverworld`; not after a whiteout (a wipe ends a Nuzlocke run, on the player's honor), and not in link, Frontier, Pyramid, Pike, Trainer Hill or partner battles (Steven, NPC followers: the partner's mons sit in the player's party then).
   Overworld poison can't make a mon faint: `OW_POISON_DAMAGE` is Gen 5+ (no overworld poison damage at all), so battles are the only place fainting happens.
-- **Battle Items:** Banned leaves only balls usable from the Bag in battle (`CannotUseItemsInBattle`). **Force Set:** battles always use Set style and the option is locked.
+- **Battle Items:** Banned leaves only balls usable from the Bag in battle (`CannotUseItemsInBattle`). **Poké Centers:** Closed makes the nurse refuse (`ArePokeCentersClosed` in `Common_EventScript_PkmnCenterNurse`); other healing (beds, story heals, whiteouts) still works. **Force Set:** battles always use Set style and the option is locked.
 - **Monotype:** any type or Off. Only party mons with that type (natural or grafted) pass `IsValidForBattle` and can switch in; if no party mon has it, everyone may battle, so there's always someone to send out. In partner battles only the player's half of the party is restricted. The starter gets the type grafted as its second type.
 
 ## Smoke tests
@@ -93,5 +95,9 @@ Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-
 
 Next:
 1. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish.
+2. **Vanilla encounters** setting: build Emerald's original tables alongside the sheet's and pick by setting (the encounter screen follows via `GetWildMonInfoForTime`). Open question: postgame legendaries in vanilla mode?
+3. **Ironmon:** mostly self-imposed (one usable mon, a committed pivot catch is allowed, HM users are fine), so the party can't just be capped at 1. The game-side parts already exist as settings: Battle Items banned, Poké Centers closed. Revisit if a rule turns out to need enforcing.
+
+Speed-ups stay player-side: the Options menu and Battle Scene OFF.
 
 

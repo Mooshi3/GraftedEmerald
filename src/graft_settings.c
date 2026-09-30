@@ -125,6 +125,30 @@ static const u8 *const sFaintingDescriptions[GRAFT_FAINTING_COUNT] =
     [GRAFT_FAINTING_AUTO_SPLICE] = COMPOUND_STRING("After battle, each fainted Pokémon\nis spliced into a party member."),
 };
 
+static const u8 *const sExpShareChoices[] = { COMPOUND_STRING("Item"), COMPOUND_STRING("Party") };
+
+static const u8 *const sExpShareDescriptions[] =
+{
+    COMPOUND_STRING("Only Pokémon that battled or hold\nan Exp. Share get EXP."),
+    COMPOUND_STRING("The whole party always gets EXP,\nlike in later games."),
+};
+
+static const u8 *const sWildGraftChoices[GRAFT_WILD_GRAFTS_COUNT] =
+{
+    [GRAFT_WILD_GRAFTS_OFF]    = COMPOUND_STRING("Off"),
+    [GRAFT_WILD_GRAFTS_RARE]   = COMPOUND_STRING("Rare"),
+    [GRAFT_WILD_GRAFTS_COMMON] = COMPOUND_STRING("Common"),
+};
+
+static const u8 *const sWildGraftDescriptions[GRAFT_WILD_GRAFTS_COUNT] =
+{
+    [GRAFT_WILD_GRAFTS_OFF] = COMPOUND_STRING("Wild Pokémon never have grafts."),
+    [GRAFT_WILD_GRAFTS_RARE] = COMPOUND_STRING("1 in 20 wild Pokémon comes with\ngrafts from its neighbors."),
+    [GRAFT_WILD_GRAFTS_COMMON] = COMPOUND_STRING("1 in 5 wild Pokémon comes with\ngrafts from its neighbors."),
+};
+
+static const u8 *const sPokeCenterChoices[] = { COMPOUND_STRING("Open"), COMPOUND_STRING("Closed") };
+
 static const u8 *const sBattleItemChoices[] = { COMPOUND_STRING("Allowed"), COMPOUND_STRING("Banned") };
 
 static const u8 *MonotypeName(u32 value)
@@ -152,6 +176,12 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .description = COMPOUND_STRING("Cap at the next Leader's ace.\nHard: no EXP. Soft: much less."),
         .choices = sLevelCapChoices, .choiceDescriptions = sLevelCapDescriptions, .choiceCount = GRAFT_LEVEL_CAP_COUNT,
         .defaultChoice = GRAFT_LEVEL_CAP_OFF, .shift = 2, .bits = 2, .requires = -1,
+    },
+    [GRAFT_SETTING_EXP_SHARE] = {
+        .name = COMPOUND_STRING("EXP Share"),
+        .description = COMPOUND_STRING("Who gets EXP from a battle."),
+        .choices = sExpShareChoices, .choiceDescriptions = sExpShareDescriptions, .choiceCount = 2,
+        .defaultChoice = FALSE, .shift = 24, .bits = 1, .requires = -1,
     },
     [GRAFT_SETTING_GRAFT_LIMIT] = {
         .name = COMPOUND_STRING("Graft Limit"),
@@ -183,6 +213,12 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .choices = sEnemyGraftChoices, .choiceCount = GRAFT_ENEMY_GRAFTS_COUNT,
         .defaultChoice = GRAFT_ENEMY_GRAFTS_NORMAL, .shift = 10, .bits = 2, .requires = -1,
     },
+    [GRAFT_SETTING_WILD_GRAFTS] = {
+        .name = COMPOUND_STRING("Wild Grafts"),
+        .description = COMPOUND_STRING("How often wild Pokémon already\nhave grafts."),
+        .choices = sWildGraftChoices, .choiceDescriptions = sWildGraftDescriptions, .choiceCount = GRAFT_WILD_GRAFTS_COUNT,
+        .defaultChoice = GRAFT_WILD_GRAFTS_OFF, .shift = 25, .bits = 2, .requires = -1,
+    },
     [GRAFT_SETTING_ENCOUNTERS] = {
         .name = COMPOUND_STRING("Nuzlocke"),
         .description = COMPOUND_STRING("You can only catch the first\nPokémon you meet in each area."),
@@ -212,6 +248,12 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .description = COMPOUND_STRING("Banned: only Poké Balls can be\nused from the Bag in battle."),
         .choices = sBattleItemChoices, .choiceCount = 2,
         .defaultChoice = FALSE, .shift = 17, .bits = 1, .requires = -1,
+    },
+    [GRAFT_SETTING_POKECENTERS] = {
+        .name = COMPOUND_STRING("Poké Centers"),
+        .description = COMPOUND_STRING("Closed: nurses won't heal your\nPokémon. Other healing still works."),
+        .choices = sPokeCenterChoices, .choiceCount = 2,
+        .defaultChoice = FALSE, .shift = 27, .bits = 1, .requires = -1,
     },
     [GRAFT_SETTING_SET_MODE] = {
         .name = COMPOUND_STRING("Force Set"),
@@ -339,6 +381,17 @@ void ApplyPendingGraftSettings(void)
 bool32 AreGraftBallsUseless(void)
 {
     return GetGraftSetting(GRAFT_SETTING_HARVESTS) == GRAFT_HARVESTS_NONE;
+}
+
+bool32 IsPartyExpShareOn(void)
+{
+    return GetGraftSetting(GRAFT_SETTING_EXP_SHARE) == TRUE;
+}
+
+// Special for Common_EventScript_PkmnCenterNurse
+bool16 ArePokeCentersClosed(void)
+{
+    return GetGraftSetting(GRAFT_SETTING_POKECENTERS) == TRUE;
 }
 
 // Special for Common_EventScript_GiveGraftRations: what this badge's ration holds.

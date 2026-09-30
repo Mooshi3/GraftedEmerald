@@ -9,8 +9,9 @@ R() { for i in $(seq "$1"); do echo -n "press $2;wait 4;"; done; } # press key $
 intro() { echo -n "wait 900;press START;wait 120;press A;wait 200;$(for i in $(seq 35); do echo -n 'mash A 15 8;'; done)wait 60;"; }
 
 # On the settings screen: settings "ROW:RIGHTS ..." e.g. settings 5:2 7:1 (rows ascending), then start the game.
-# Rows: 0 shiny, 1 level cap, 2 graft limit, 3 gates, 4 graft items, 5 harvests, 6 enemy grafts,
-# 7 nuzlocke, 8 dupes, 9 shiny clause, 10 fainting, 11 battle items, 12 force set, 13 monotype
+# Rows: 0 shiny, 1 level cap, 2 exp share, 3 graft limit, 4 gates, 5 graft items, 6 harvests, 7 enemy grafts,
+# 8 wild grafts, 9 nuzlocke, 10 dupes, 11 shiny clause, 12 fainting, 13 battle items, 14 poke centers,
+# 15 force set, 16 monotype
 settings() {
     local row=0 r n
     for pair in "$@"; do

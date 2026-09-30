@@ -60,4 +60,5 @@ void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId);
 // Enemy trainer graft system
 void BuildNearbyGraftPool(void);
 void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum);
+void TryApplyWildGrafts(struct Pokemon *mon);
 u32 GetEnemyGraftCount(void);

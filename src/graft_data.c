@@ -788,6 +788,32 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
     }
 }
 
+// Wild Grafts setting: some wild Pokémon come with grafts rolled like a trainer's, from the same nearby pool.
+void TryApplyWildGrafts(struct Pokemon *mon)
+{
+    u32 chance;
+#if TESTING
+    if (gTestRunnerEnabled)
+        return;
+#endif
+    switch (GetGraftSetting(GRAFT_SETTING_WILD_GRAFTS))
+    {
+    case GRAFT_WILD_GRAFTS_RARE:
+        chance = 5;
+        break;
+    case GRAFT_WILD_GRAFTS_COMMON:
+        chance = 20;
+        break;
+    default:
+        return;
+    }
+    // Not before the Pokédex: keeps Birch's rescue battle plain
+    if (!FlagGet(FLAG_SYS_POKEDEX_GET) || Random() % 100 >= chance)
+        return;
+    BuildNearbyGraftPool();
+    ApplyEnemyGrafts(mon, 1 + GetBadgeCount() / 2, FALSE);
+}
+
 // The first rival battle on Route 103 is a tutorial fight; it stays ungrafted.
 static bool32 IsUngraftedTrainer(u16 trainerNum)
 {

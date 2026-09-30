@@ -692,3 +692,19 @@ TEST("Rations leave out grafting balls when harvests are off")
     FlagClear(FLAG_BADGE01_GET);
     FlagClear(FLAG_BADGE02_GET);
 }
+
+TEST("EXP Share and Poké Center settings")
+{
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    EXPECT(!IsGen6ExpShareEnabled());
+    EXPECT(!ArePokeCentersClosed());
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_WILD_GRAFTS), GRAFT_WILD_GRAFTS_OFF);
+
+    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, TRUE);
+    SetGraftSetting(GRAFT_SETTING_POKECENTERS, TRUE);
+    EXPECT(IsGen6ExpShareEnabled());
+    EXPECT(ArePokeCentersClosed());
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}

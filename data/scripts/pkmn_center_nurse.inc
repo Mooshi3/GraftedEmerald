@@ -2,6 +2,8 @@ Common_EventScript_PkmnCenterNurse::
 	lock
 	faceplayer
 	setvar VAR_0x8004, 0
+	specialvar VAR_RESULT, ArePokeCentersClosed
+	goto_if_eq VAR_RESULT, TRUE, EventScript_PkmnCenterNurse_Closed
 .if !IS_FRLG
 	specialvar VAR_RESULT, CountPlayerTrainerStars
 	goto_if_eq VAR_RESULT, 4, EventScript_PkmnCenterNurse_GoldCard
@@ -10,6 +12,11 @@ Common_EventScript_PkmnCenterNurse::
 	goto_if_eq VAR_RESULT, YES, EventScript_PkmnCenterNurse_HealPkmn
 	goto_if_eq VAR_RESULT, NO, EventScript_PkmnCenterNurse_Goodbye
 	end
+
+@ GRAFT: the Poké Centers new-game setting
+EventScript_PkmnCenterNurse_Closed::
+	message gText_PkmnCenterClosed
+	return
 
 EventScript_PkmnCenterNurse_Goodbye::
 	message gText_WeHopeToSeeYouAgain

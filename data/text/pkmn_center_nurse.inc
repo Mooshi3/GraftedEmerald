@@ -14,6 +14,10 @@ gText_RestoredPkmnToFullHealth::
 	.string "We've restored your POKéMON\n"
 	.string "to full health.$"
 
+gText_PkmnCenterClosed::
+	.string "I'm sorry, but I can't heal your\n"
+	.string "POKéMON on this journey.$"
+
 gText_WeHopeToSeeYouAgain::
 	.string "We hope to see you again!$"
 
