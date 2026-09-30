@@ -26,6 +26,7 @@ Sources:
 - **Balls** consume the caught wild mon and offer graft categories: Patch Ball (1 random category), Graft Ball (3), Splice Ball (all 5). A wild mon offers its actual ability (never its hidden one), the 4 moves it currently knows, its species' base stats, its types and its nature (`GatherGraftSourceDataBattle`, `src/graft_menu.c`).
 - **Graft Splicer** (3 badges) sacrifices a party mon to graft its traits, including evolved forms and grafts it already has (`GatherGraftSourceDataPartyMon`).
 - Marts: Graft Ball needs 1 badge; Splice Ball and Splicer need 3. Filtered in the shop menu (`GetItemBadgeRequirement`, `src/shop.c`).
+- **Ungrafter** (200, no badge gate, single use): clears every graft and the grafted-move relearner history; moves the mon knows stay, a grafted nature reverts to its personality nature (`UngraftMon`, `src/graft_data.c`). It isn't a grafting item, so Rations don't hide it.
 
 ### Data model
 
@@ -76,12 +77,11 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5428 passed as of 2026-09-30; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
 
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories.
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories; Ungrafter.
 
 Next:
-1. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
-2. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
-3. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
-4. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
+1. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
+2. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
+3. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).

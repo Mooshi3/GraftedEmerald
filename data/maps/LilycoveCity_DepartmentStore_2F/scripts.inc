@@ -41,6 +41,7 @@ LilycoveCity_DepartmentStore_2F_Pokemart1:
 .2byte ITEM_SPLICE_BALL
 .2byte ITEM_GRAFT_SPLICER
 .2byte ITEM_GRAFT_KNOT
+.2byte ITEM_UNGRAFTER
 	pokemartlistend
 
 LilycoveCity_DepartmentStore_2F_EventScript_ClerkRight::

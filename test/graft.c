@@ -525,3 +525,31 @@ TEST("Battle Items: Banned leaves only balls")
     EXPECT(CannotUseItemsInBattle(ITEM_X_ATTACK, &gParties[B_TRAINER_PLAYER][0]));
     ResetGraftSettingsForTest();
 }
+
+TEST("The Ungrafter removes every graft and the relearner history, keeping known moves")
+{
+    struct Pokemon mon;
+    u32 atk, maxHP;
+    u8 nature = NATURE_ADAMANT;
+    CreateMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0, OTID_STRUCT_PRESET(0), 0);
+    atk = GetMonData(&mon, MON_DATA_ATK);
+    maxHP = GetMonData(&mon, MON_DATA_MAX_HP);
+    GiveTestGrafts(&mon);
+    SetGraftedAbilityOnMon(&mon, ABILITY_WONDER_GUARD);
+    SetMonData(&mon, MON_DATA_HIDDEN_NATURE, &nature);
+    mon.box.graftFlags |= GRAFT_FLAG_NATURE | GRAFT_FLAG_FALLEN;
+    SetMonMoveSlot(&mon, MOVE_FLAMETHROWER, 0);
+    EXPECT(BoxMonHasGrafts(&mon.box));
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), 1);
+
+    UngraftMon(&mon);
+    EXPECT(!BoxMonHasGrafts(&mon.box));
+    EXPECT_EQ(mon.box.graftFlags, GRAFT_FLAG_FALLEN); // challenge state stays
+    EXPECT_EQ(mon.box.graftTypes[0], GRAFT_TYPE_NONE);
+    EXPECT_EQ(mon.box.graftMoves[0], MOVE_NONE);
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MOVE1), MOVE_FLAMETHROWER); // known moves stay
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_ATK), atk);
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), maxHP);
+    EXPECT_EQ(GetMonAbility(&mon), GetAbilityBySpecies(SPECIES_WOBBUFFET, GetMonData(&mon, MON_DATA_ABILITY_NUM)));
+    EXPECT_EQ(GetMonData(&mon, MON_DATA_HIDDEN_NATURE), GetNatureFromPersonality(GetMonData(&mon, MON_DATA_PERSONALITY)));
+}

@@ -53,6 +53,7 @@ PetalburgCity_Mart_Pokemart_Expanded:
 	.2byte ITEM_SPLICE_BALL
 	.2byte ITEM_GRAFT_SPLICER
 	.2byte ITEM_GRAFT_KNOT
+	.2byte ITEM_UNGRAFTER
 pokemartlistend
 
 PetalburgCity_Mart_EventScript_Woman::

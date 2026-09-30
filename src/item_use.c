@@ -872,6 +872,12 @@ void ItemUseOutOfBattle_GraftSplicer(u8 taskId)
     SetUpItemUseCallback(taskId);
 }
 
+void ItemUseOutOfBattle_Ungrafter(u8 taskId)
+{
+    gItemUseCB = ItemUseCB_Ungrafter;
+    SetUpItemUseCallback(taskId);
+}
+
 static void ItemUseOnFieldCB_SleepingBag(u8 taskId)
 {
     gSpecialVar_Result = 0xFF;

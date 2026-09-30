@@ -253,6 +253,50 @@ static const u8 sText_GateType[] = _("Type grafts need a badge.");
 static const u8 sText_GateStat[] = _("Stat grafts need 2 badges.");
 static const u8 sText_GateAbility[] = _("Ability grafts need 3 badges.");
 
+// Does this mon have anything the Ungrafter would remove?
+bool32 BoxMonHasGrafts(const struct BoxPokemon *boxMon)
+{
+    u32 i;
+    if (boxMon->graftFlags & ~GRAFT_FLAG_FALLEN)
+        return TRUE;
+    if (boxMon->graftTypes[0] != GRAFT_TYPE_NONE || boxMon->graftTypes[1] != GRAFT_TYPE_NONE
+     || boxMon->graftAbility != GRAFT_ABILITY_NONE)
+        return TRUE;
+    for (i = 0; i < NUM_STATS; i++)
+    {
+        if (boxMon->graftStatOverrides[i] != 0)
+            return TRUE;
+    }
+    for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        if (boxMon->graftMoves[i] != MOVE_NONE)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Ungrafter: removes every graft and the grafted-move relearner history. Moves the mon
+// currently knows stay. A grafted nature goes back to the one from its personality.
+// Keeps the fallen mark and the harvest area, which are challenge state, not grafts.
+void UngraftMon(struct Pokemon *mon)
+{
+    u32 i;
+    if (mon->box.graftFlags & GRAFT_FLAG_NATURE)
+    {
+        u8 nature = GetNatureFromPersonality(GetMonData(mon, MON_DATA_PERSONALITY));
+        SetMonData(mon, MON_DATA_HIDDEN_NATURE, &nature);
+    }
+    mon->box.graftTypes[0] = GRAFT_TYPE_NONE;
+    mon->box.graftTypes[1] = GRAFT_TYPE_NONE;
+    mon->box.graftAbility = GRAFT_ABILITY_NONE;
+    for (i = 0; i < NUM_STATS; i++)
+        mon->box.graftStatOverrides[i] = 0;
+    for (i = 0; i < MAX_MON_MOVES; i++)
+        mon->box.graftMoves[i] = MOVE_NONE;
+    mon->box.graftFlags &= GRAFT_FLAG_FALLEN;
+    CalculateMonStats(mon); // stat grafts and the Wonder Guard husk
+}
+
 // Graft Budget/Strict: how many grafts a mon holds. Moves don't count; both type slots count as one.
 u32 CountBudgetGraftsOnBoxMon(const struct BoxPokemon *boxMon)
 {

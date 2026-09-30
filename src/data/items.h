@@ -554,6 +554,22 @@ const struct ItemInfo gItemsInfo[] =
     .iconPalette = gItemIconPalette_DestinyKnot,
 },
 
+[ITEM_UNGRAFTER] =
+{
+    .name = ITEM_NAME("Ungrafter"),
+    .price = 200,
+    .description = COMPOUND_STRING(
+        "Removes all of a\n"
+        "Pokémon's grafts.\n"
+        "Known moves stay."),
+    .pocket = POCKET_ITEMS,
+    .sortType = ITEM_TYPE_FIELD_USE,
+    .type = ITEM_USE_PARTY_MENU,
+    .fieldUseFunc = ItemUseOutOfBattle_Ungrafter,
+    .iconPic = gItemIcon_CleanseTag,
+    .iconPalette = gItemIconPalette_CleanseTag,
+},
+
 // Graft Splicer
 [ITEM_GRAFT_SPLICER] = {
     .name = ITEM_NAME("Graft Splicer"),

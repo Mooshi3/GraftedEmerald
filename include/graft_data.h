@@ -48,6 +48,8 @@ const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex
 const u8 *GetGraftRejectReason(const struct BoxPokemon *boxMon, u8 graftMenuType, u8 statIndex);
 bool32 IsGraftKindGated(u8 graftMenuType);
 u32 CountBudgetGraftsOnBoxMon(const struct BoxPokemon *boxMon);
+bool32 BoxMonHasGrafts(const struct BoxPokemon *boxMon);
+void UngraftMon(struct Pokemon *mon);
 u32 GetGraftBudget(void);
 bool8 IsGraftHusk(const struct BoxPokemon *boxMon);
 // Pointer-based setters (work on any Pokemon, not just gPlayerParty)

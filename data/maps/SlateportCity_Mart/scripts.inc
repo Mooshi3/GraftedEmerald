@@ -27,6 +27,7 @@ SlateportCity_Mart_Pokemart:
 .2byte ITEM_SPLICE_BALL
 .2byte ITEM_GRAFT_SPLICER
 .2byte ITEM_GRAFT_KNOT
+.2byte ITEM_UNGRAFTER
 	pokemartlistend
 
 SlateportCity_Mart_EventScript_BlackBelt::

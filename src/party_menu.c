@@ -8790,6 +8790,95 @@ static void ReleaseSplicerDonor(void)
     CalculatePlayerPartyCount();
 }
 
+// ============================================================
+// Ungrafter: confirm, then clear the mon's grafts
+// ============================================================
+
+#define tState   data[0]
+#define tMonId   data[1]
+#define tOldFunc 4
+
+static const u8 sText_UngraftAsk[] = _("Remove all of {STR_VAR_1}'s\ngrafts?");
+static const u8 sText_UngraftDone[] = _("{STR_VAR_1}'s grafts were\nremoved.{PAUSE_UNTIL_PRESS}");
+
+static void Task_Ungrafter(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][tMonId];
+
+    switch (tState)
+    {
+    case 0:
+        if (!BoxMonHasGrafts(&mon->box) || GetMonData(mon, MON_DATA_IS_EGG))
+        {
+            gPartyMenuUseExitCallback = FALSE;
+            PlaySE(SE_SELECT);
+            DisplayPartyMenuMessage(gText_WontHaveEffect, TRUE);
+            ScheduleBgCopyTilemapToVram(2);
+            gTasks[taskId].func = Task_ClosePartyMenuAfterText;
+            return;
+        }
+        GetMonNickname(mon, gStringVar1);
+        StringExpandPlaceholders(gStringVar4, sText_UngraftAsk);
+        PlaySE(SE_SELECT);
+        DisplayPartyMenuMessage(gStringVar4, TRUE);
+        ScheduleBgCopyTilemapToVram(2);
+        tState++;
+        break;
+    case 1:
+        if (!IsPartyMenuTextPrinterActive())
+        {
+            PartyMenuDisplayYesNoMenu();
+            tState++;
+        }
+        break;
+    case 2:
+        switch (Menu_ProcessInputNoWrapClearOnChoose())
+        {
+        case 0:
+            tState++;
+            break;
+        case 1:
+        case MENU_B_PRESSED:
+            gPartyMenuUseExitCallback = FALSE;
+            PlaySE(SE_SELECT);
+            ScheduleBgCopyTilemapToVram(2);
+            // Back to choosing a mon
+            ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+            ClearWindowTilemap(WIN_MSG);
+            DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+            gTasks[taskId].func = (void *)GetWordTaskArg(taskId, tOldFunc);
+            return;
+        }
+        break;
+    case 3:
+        gPartyMenuUseExitCallback = TRUE;
+        UngraftMon(mon);
+        RemoveBagItem(gSpecialVar_ItemId, 1);
+        PlaySE(SE_USE_ITEM);
+        GetMonNickname(mon, gStringVar1);
+        StringExpandPlaceholders(gStringVar4, sText_UngraftDone);
+        DisplayPartyMenuMessage(gStringVar4, TRUE);
+        ScheduleBgCopyTilemapToVram(2);
+        gTasks[taskId].func = Task_ClosePartyMenuAfterText;
+        break;
+    }
+}
+
+void ItemUseCB_Ungrafter(u8 taskId, TaskFunc task)
+{
+    s16 *data = gTasks[taskId].data;
+
+    tState = 0;
+    tMonId = gPartyMenu.slotId;
+    SetWordTaskArg(taskId, tOldFunc, (uintptr_t)(gTasks[taskId].func));
+    gTasks[taskId].func = Task_Ungrafter;
+}
+
+#undef tState
+#undef tMonId
+#undef tOldFunc
+
 void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
 {
     u8 partyCount = CalculatePlayerPartyCount();
