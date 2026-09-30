@@ -9,6 +9,7 @@
 #include "event_data.h"
 #include "field_effect.h"
 #include "gpu_regs.h"
+#include "graft_settings.h"
 #include "graphics.h"
 #include "international_string_util.h"
 #include "link.h"
@@ -1814,7 +1815,9 @@ static void Task_NewGameBirchSpeech_Cleanup(u8 taskId)
         FreeAllWindowBuffers();
         FreeAndDestroyMonPicSprite(gTasks[taskId].tLotadSpriteId);
         ResetAllPicSprites();
-        SetMainCallback2(CB2_NewGame);
+        // GRAFT: pick new-game settings before the save is initialized
+        gMain.savedCallback = CB2_NewGame;
+        SetMainCallback2(CB2_InitGraftSettingsMenu);
         DestroyTask(taskId);
     }
 }

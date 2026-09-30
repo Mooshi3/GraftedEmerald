@@ -105,6 +105,9 @@ enum __attribute__((packed)) Stat
 
 // Shiny odds
 #define SHINY_ODDS 128 // Actual probability is SHINY_ODDS/65536
+// GRAFT: SHINY_ODDS is also the threshold the IS_SHINY bit is stored against
+// (shinyModifier), so never change it. Generation odds are a new-game setting:
+// GetPlayerShinyOddsThreshold() in graft_settings.c.
 
 // Ribbon IDs used by TV and Pokénav
 #define CHAMPION_RIBBON       0

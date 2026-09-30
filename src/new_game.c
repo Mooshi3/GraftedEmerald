@@ -55,6 +55,7 @@
 #include "constants/items.h"
 #include "difficulty.h"
 #include "follower_npc.h"
+#include "graft_settings.h"
 
 extern const u8 EventScript_ResetAllMapFlags[];
 extern const u8 EventScript_ResetAllMapFlagsFrlg[];
@@ -239,6 +240,7 @@ void NewGameInitData(void)
     ResetItemFlags();
     ResetDexNav();
     ClearFollowerNPCData();
+    ApplyPendingGraftSettings(); // GRAFT: after ClearSav1 wiped the vars
 }
 
 static void ResetMiniGamesRecords(void)

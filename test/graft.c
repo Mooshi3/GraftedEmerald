@@ -1,5 +1,6 @@
 #include "global.h"
 #include "graft_data.h"
+#include "graft_settings.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
 #include "test/test.h"
@@ -206,4 +207,25 @@ TEST("Grafted move history skips duplicates and keeps the newest moves when full
     EXPECT_EQ(mon.box.graftMoves[0], MOVE_SURF);
     EXPECT_EQ(mon.box.graftMoves[3], MOVE_EARTHQUAKE);
     EXPECT(mon.box.graftFlags & GRAFT_FLAG_MOVE);
+}
+
+TEST("New-game settings read as their defaults when the settings var is unset")
+{
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GRAFT_SHINY_ODDS_BOOSTED);
+    EXPECT_EQ(GetPlayerShinyOddsThreshold(), 128);
+}
+
+TEST("New-game settings round-trip and set the shiny odds")
+{
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    SetGraftSetting(GRAFT_SETTING_SHINY_ODDS, GRAFT_SHINY_ODDS_NORMAL);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GRAFT_SHINY_ODDS_NORMAL);
+    EXPECT_EQ(GetPlayerShinyOddsThreshold(), 16);
+    SetGraftSetting(GRAFT_SETTING_SHINY_ODDS, GRAFT_SHINY_ODDS_HIGH);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GRAFT_SHINY_ODDS_HIGH);
+    EXPECT_EQ(GetPlayerShinyOddsThreshold(), 512);
+    ApplyPendingGraftSettings(); // nothing chosen: back to defaults
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GRAFT_SHINY_ODDS_BOOSTED);
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
 }

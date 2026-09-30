@@ -3,6 +3,7 @@
 #include "apprentice.h"
 #include "battle.h"
 #include "graft_data.h"
+#include "graft_settings.h"
 #include "pokeball.h"
 #include "battle_ai_util.h"
 #include "battle_anim.h"
@@ -913,13 +914,13 @@ bool32 ComputePlayerShinyOdds(u32 personality, u32 value)
     if (gDexNavSpecies)
         totalRerolls += CalculateDexNavShinyRolls();
 
-    while (GET_SHINY_VALUE(value, personality) >= SHINY_ODDS && totalRerolls > 0)
+    while (GET_SHINY_VALUE(value, personality) >= GetPlayerShinyOddsThreshold() && totalRerolls > 0)
     {
         personality = Random32();
         totalRerolls--;
     }
 
-    return GET_SHINY_VALUE(value, personality) < SHINY_ODDS;
+    return GET_SHINY_VALUE(value, personality) < GetPlayerShinyOddsThreshold(); // GRAFT: per-save odds
 }
 
 void SetBoxMonIVs(struct BoxPokemon *mon, u8 fixedIV)
