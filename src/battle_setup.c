@@ -2263,7 +2263,7 @@ static void CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)
     if (!GetTrainerStructFromId(trainerNum)->overrideTrainer)
     {
         CreateNPCTrainerPartyFromTrainer(party, GetTrainerStructFromId(trainerNum));
-        ApplyTrainerGrafts(party, GetTrainerStructFromId(trainerNum)->partySize); // GRAFT
+        ApplyTrainerGrafts(party, GetTrainerStructFromId(trainerNum)->partySize, trainerNum); // GRAFT
         return;
     }
 
@@ -2277,7 +2277,7 @@ static void CreateNPCTrainerParty(struct Pokemon *party, u16 trainerNum)
     if (tempTrainer.partySize == 0)
         tempTrainer.partySize = origTrainer->partySize;
     CreateNPCTrainerPartyFromTrainer(party, (const struct Trainer *)(&tempTrainer));
-    ApplyTrainerGrafts(party, tempTrainer.partySize); // GRAFT
+    ApplyTrainerGrafts(party, tempTrainer.partySize, trainerNum); // GRAFT
 }
 
 void CreateTrainerPartyForPlayer(void)

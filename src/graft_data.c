@@ -1,11 +1,14 @@
 #include "global.h"
 #include "pokemon.h"
 #include "graft_data.h"
+#include "graft_menu.h"
+#include "graft_settings.h"
 #include "move.h"
 #include "constants/species.h"
 #include "constants/abilities.h"
 #include "test_runner.h"
 #include "palette.h"
+#include "data.h"
 #include "constants/rgb.h"
 #include "battle_main.h"
 #include "event_data.h"
@@ -244,19 +247,106 @@ bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
 
 static const u8 sText_HuskHPGraft[] = _("It won't have any effect.");
 static const u8 sText_StatGraftLimit[] = _("Stat graft limit reached!\nNeed more badges.");
+static const u8 sText_GraftBudgetFull[] = _("It can't take any more grafts.");
+static const u8 sText_GateType[] = _("Type grafts need a badge.");
+static const u8 sText_GateStat[] = _("Stat grafts need 2 badges.");
+static const u8 sText_GateAbility[] = _("Ability grafts need 3 badges.");
 
-// Returns the message explaining why this stat graft is refused, or NULL if it is allowed.
+// Graft Budget/Strict: how many grafts a mon holds. Moves don't count; both type slots count as one.
+u32 CountBudgetGraftsOnBoxMon(const struct BoxPokemon *boxMon)
+{
+    u32 count = CountStatGraftsOnBoxMon(boxMon);
+    if (boxMon->graftTypes[0] != GRAFT_TYPE_NONE || boxMon->graftTypes[1] != GRAFT_TYPE_NONE)
+        count++;
+    if (boxMon->graftAbility != GRAFT_ABILITY_NONE)
+        count++;
+    if (boxMon->graftFlags & GRAFT_FLAG_NATURE)
+        count++;
+    return count;
+}
+
+u32 GetGraftBudget(void)
+{
+    switch (GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT))
+    {
+    case GRAFT_LIMIT_BUDGET:
+        return 2 + GetBadgeCount() / 2;
+    case GRAFT_LIMIT_STRICT:
+        return 3;
+    default:
+        return 0xFF;
+    }
+}
+
+// Would this graft take a new budget slot, or replace one the mon already has?
+static bool32 GraftTakesNewSlot(const struct BoxPokemon *boxMon, u8 graftMenuType, u8 statIndex)
+{
+    switch (graftMenuType)
+    {
+    case GRAFT_MENU_TYPE:
+        return boxMon->graftTypes[0] == GRAFT_TYPE_NONE && boxMon->graftTypes[1] == GRAFT_TYPE_NONE;
+    case GRAFT_MENU_ABILITY:
+        return boxMon->graftAbility == GRAFT_ABILITY_NONE;
+    case GRAFT_MENU_NATURE:
+        return !(boxMon->graftFlags & GRAFT_FLAG_NATURE);
+    case GRAFT_MENU_STAT:
+        return statIndex >= NUM_STATS || boxMon->graftStatOverrides[statIndex] == 0;
+    default: // moves never count
+        return FALSE;
+    }
+}
+
+// Returns the message explaining why this graft can't go on this mon, or NULL if it can.
+// Every graft target check (Graft Ball, Splicer) goes through here.
+const u8 *GetGraftRejectReason(const struct BoxPokemon *boxMon, u8 graftMenuType, u8 statIndex)
+{
+    u32 badges = GetBadgeCount();
+
+    if (graftMenuType == GRAFT_MENU_STAT && statIndex == STAT_HP && IsGraftHusk(boxMon))
+        return sText_HuskHPGraft;
+
+    if (GetGraftSetting(GRAFT_SETTING_GRAFT_GATES))
+    {
+        if (graftMenuType == GRAFT_MENU_TYPE && badges < 1)
+            return sText_GateType;
+        if (graftMenuType == GRAFT_MENU_STAT && badges < 2)
+            return sText_GateStat;
+        if (graftMenuType == GRAFT_MENU_ABILITY && badges < 3)
+            return sText_GateAbility;
+    }
+
+    if (!GraftTakesNewSlot(boxMon, graftMenuType, statIndex))
+        return NULL; // replacing an existing graft is always allowed
+
+    switch (GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT))
+    {
+    case GRAFT_LIMIT_STANDARD:
+        if (graftMenuType == GRAFT_MENU_STAT && CountStatGraftsOnBoxMon(boxMon) >= GetStatGraftCap())
+            return sText_StatGraftLimit;
+        break;
+    case GRAFT_LIMIT_BUDGET:
+    case GRAFT_LIMIT_STRICT:
+        if (CountBudgetGraftsOnBoxMon(boxMon) >= GetGraftBudget())
+            return sText_GraftBudgetFull;
+        break;
+    }
+    return NULL;
+}
+
+// Is this graft kind usable at all right now (gates only)? Used to order Patch/Graft Ball offers.
+bool32 IsGraftKindGated(u8 graftMenuType)
+{
+    u32 badges = GetBadgeCount();
+    if (!GetGraftSetting(GRAFT_SETTING_GRAFT_GATES))
+        return FALSE;
+    return (graftMenuType == GRAFT_MENU_TYPE && badges < 1)
+        || (graftMenuType == GRAFT_MENU_STAT && badges < 2)
+        || (graftMenuType == GRAFT_MENU_ABILITY && badges < 3);
+}
+
 const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex)
 {
-    if (statIndex == STAT_HP && IsGraftHusk(boxMon))
-        return sText_HuskHPGraft;
-    // Overwriting an existing graft slot is always free
-    if (statIndex < 6 && boxMon->graftStatOverrides[statIndex] != 0)
-        return NULL;
-    // New slot: check against cap
-    if (CountStatGraftsOnBoxMon(boxMon) >= GetStatGraftCap())
-        return sText_StatGraftLimit;
-    return NULL;
+    return GetGraftRejectReason(boxMon, GRAFT_MENU_STAT, statIndex);
 }
 
 bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex)
@@ -528,7 +618,7 @@ static u16 PickDonorMove(u16 donor, u8 recipientLevel)
     return n ? moves[Random() % n] : MOVE_NONE;
 }
 
-static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
+static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbility)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     bool8 statUsed[6] = { FALSE };
@@ -544,6 +634,8 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
 
         u16 donor = sGraftDonorPool[Random() % sGraftDonorCount];
         u8 kind = Random() % GK_COUNT;
+        if (forceAbility && !abilityUsed)
+            kind = GK_ABILITY; // Enemy Grafts: More gives bosses' aces an ability first
 
         if (kind == GK_STAT)
         {
@@ -648,10 +740,38 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount)
     }
 }
 
-void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
+static bool32 IsBossTrainer(u16 trainerNum)
 {
-    u8 badges = GetBadgeCount();
-    u8 graftCount = 2 + badges; // 2 base + 1 per badge
+    switch (GetTrainerClassFromId(trainerNum))
+    {
+    case TRAINER_CLASS_LEADER:
+    case TRAINER_CLASS_ELITE_FOUR:
+    case TRAINER_CLASS_CHAMPION:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+u32 GetEnemyGraftCount(void)
+{
+    u32 badges = GetBadgeCount();
+    switch (GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS))
+    {
+    case GRAFT_ENEMY_GRAFTS_FEWER:
+        return 1 + badges / 2;
+    case GRAFT_ENEMY_GRAFTS_MORE:
+        return 3 + badges;
+    default:
+        return 2 + badges;
+    }
+}
+
+void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
+{
+    u8 graftCount = GetEnemyGraftCount();
+    u8 aceSlot = 0;
+    bool32 boostAce = GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS) == GRAFT_ENEMY_GRAFTS_MORE && IsBossTrainer(trainerNum);
 #if TESTING
     // Battle tests expect trainer parties exactly as written; random grafts break them.
     if (gTestRunnerEnabled)
@@ -660,10 +780,17 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count)
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;
+    // The ace is the highest-level mon (the last one on ties)
+    for (u8 i = 0; i < count && i < PARTY_SIZE; i++)
+    {
+        if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE
+         && GetMonData(&party[i], MON_DATA_LEVEL) >= GetMonData(&party[aceSlot], MON_DATA_LEVEL))
+            aceSlot = i;
+    }
     for (u8 i = 0; i < count && i < PARTY_SIZE; i++)
     {
         if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE)
-            ApplyEnemyGrafts(&party[i], graftCount);
+            ApplyEnemyGrafts(&party[i], graftCount, boostAce && i == aceSlot);
     }
 }
 

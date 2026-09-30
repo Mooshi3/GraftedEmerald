@@ -43,6 +43,7 @@
 #include "constants/metatile_behaviors.h"
 #include "constants/rgb.h"
 #include "constants/songs.h"
+#include "graft_settings.h"
 
 #define TAG_SCROLL_ARROW   2100
 #define TAG_ITEM_ICON_BASE 9110 // immune to time blending
@@ -132,6 +133,18 @@ static void Task_BuyMenu(u8 taskId);
 // 0 = always available. Used for graft item gating.
 static u8 GetItemBadgeRequirement(u16 itemId)
 {
+    // GRAFT: with rationed graft items, grafting items are never sold
+    if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) == GRAFT_SUPPLY_RATIONS)
+    {
+        switch (itemId)
+        {
+        case ITEM_PATCH_BALL:
+        case ITEM_GRAFT_BALL:
+        case ITEM_SPLICE_BALL:
+        case ITEM_GRAFT_SPLICER:
+            return 0xFF;
+        }
+    }
     switch (itemId)
     {
     case ITEM_GRAFT_BALL:

@@ -44,6 +44,10 @@ u8 GetStatGraftCap(void);
 u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon);
 bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex);
 const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex);
+const u8 *GetGraftRejectReason(const struct BoxPokemon *boxMon, u8 graftMenuType, u8 statIndex);
+bool32 IsGraftKindGated(u8 graftMenuType);
+u32 CountBudgetGraftsOnBoxMon(const struct BoxPokemon *boxMon);
+u32 GetGraftBudget(void);
 bool8 IsGraftHusk(const struct BoxPokemon *boxMon);
 // Pointer-based setters (work on any Pokemon, not just gPlayerParty)
 void SetGraftedStatOnMon(struct Pokemon *mon, u8 statIndex, u16 statValue);
@@ -52,4 +56,5 @@ void SetGraftedAbilityOnMon(struct Pokemon *mon, u16 ability);
 void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId);
 // Enemy trainer graft system
 void BuildNearbyGraftPool(void);
-void ApplyTrainerGrafts(struct Pokemon *party, u8 count);
+void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum);
+u32 GetEnemyGraftCount(void);

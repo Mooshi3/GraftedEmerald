@@ -1,4 +1,5 @@
 Common_EventScript_SetGymTrainers::
+	call Common_EventScript_GiveGraftRations
 	switch VAR_0x8008
 	case 1, RustboroCity_Gym_SetGymTrainers
 	case 2, DewfordTown_Gym_SetGymTrainers
@@ -166,4 +167,15 @@ EventScript_SetViridianGymTrainers::
 	settrainerflag TRAINER_COOLTRAINER_SAMUEL
 	settrainerflag TRAINER_COOLTRAINER_YUJI
 	settrainerflag TRAINER_COOLTRAINER_WARREN
+	return
+
+@ GRAFT: Graft Items = Rations. Every Gym badge comes with Splice Balls, and a Graft Splicer from 3 badges on.
+Common_EventScript_GiveGraftRations::
+	specialvar VAR_RESULT, GetGraftRationSplicers
+	goto_if_eq VAR_RESULT, 0xFF, Common_EventScript_GiveGraftRationsEnd
+	copyvar VAR_0x8009, VAR_RESULT
+	giveitem ITEM_SPLICE_BALL, 3
+	goto_if_eq VAR_0x8009, 0, Common_EventScript_GiveGraftRationsEnd
+	giveitem ITEM_GRAFT_SPLICER, 1
+Common_EventScript_GiveGraftRationsEnd::
 	return

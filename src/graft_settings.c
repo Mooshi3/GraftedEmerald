@@ -3,6 +3,8 @@
 #include "bg.h"
 #include "event_data.h"
 #include "gpu_regs.h"
+#include "graft_data.h"
+#include "item.h"
 #include "graft_settings.h"
 #include "main.h"
 #include "menu.h"
@@ -16,6 +18,7 @@
 #include "text_window.h"
 #include "window.h"
 #include "constants/rgb.h"
+#include "constants/items.h"
 #include "constants/songs.h"
 
 // ============================================================
@@ -326,6 +329,19 @@ void ApplyPendingGraftSettings(void)
     for (i = 0; i < GRAFT_SETTINGS_COUNT; i++)
         SetGraftSetting(i, sHasPendingChoices ? sPendingChoices[i] : sGraftSettings[i].defaultChoice);
     sHasPendingChoices = FALSE;
+
+    // Rationed graft items: a starting ration, since marts won't sell any
+    if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) == GRAFT_SUPPLY_RATIONS)
+        AddBagItem(ITEM_SPLICE_BALL, 3);
+}
+
+// Special for Common_EventScript_GiveGraftRations: 0xFF if graft items aren't rationed,
+// otherwise whether this badge's ration includes a Graft Splicer.
+u16 GetGraftRationSplicers(void)
+{
+    if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) != GRAFT_SUPPLY_RATIONS)
+        return 0xFF;
+    return GetBadgeCount() >= 3;
 }
 
 

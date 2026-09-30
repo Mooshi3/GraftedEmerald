@@ -442,9 +442,22 @@ static u32 WriteSubmenuDetail(u8 category, u8 subCursor, u8 *dest)
 // Category display order (shuffled for Patch/Graft balls)
 static EWRAM_DATA u8 sCategoryOrder[GRAFT_CATEGORY_COUNT];
 
+static u8 CategoryToGraftMenuType(u8 category)
+{
+    switch (category)
+    {
+    case GRAFT_CATEGORY_ABILITY: return GRAFT_MENU_ABILITY;
+    case GRAFT_CATEGORY_MOVE:    return GRAFT_MENU_MOVE;
+    case GRAFT_CATEGORY_TYPE:    return GRAFT_MENU_TYPE;
+    case GRAFT_CATEGORY_STAT:    return GRAFT_MENU_STAT;
+    default:                     return GRAFT_MENU_NATURE;
+    }
+}
+
 static void ShuffleCategoryOrder(void)
 {
-    u8 i, j, tmp;
+    u8 i, j, tmp, n = 0;
+    u8 gated[GRAFT_CATEGORY_COUNT];
     for (i = GRAFT_CATEGORY_COUNT - 1; i > 0; i--)
     {
         j = Random() % (i + 1);
@@ -452,6 +465,16 @@ static void ShuffleCategoryOrder(void)
         sCategoryOrder[i] = sCategoryOrder[j];
         sCategoryOrder[j] = tmp;
     }
+    // Graft Gates: badge-gated kinds go last, so a Patch/Graft Ball doesn't offer only locked kinds
+    for (i = 0, j = 0; i < GRAFT_CATEGORY_COUNT; i++)
+    {
+        if (IsGraftKindGated(CategoryToGraftMenuType(sCategoryOrder[i])))
+            gated[n++] = sCategoryOrder[i];
+        else
+            sCategoryOrder[j++] = sCategoryOrder[i];
+    }
+    for (i = 0; i < n; i++)
+        sCategoryOrder[j++] = gated[i];
 }
 
 u8 GetGraftMenuRealCategory(u8 displayPos)

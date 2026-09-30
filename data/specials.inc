@@ -642,3 +642,4 @@ gSpecials::
 def_special SleepingBagSetMorning
 def_special SleepingBagSetDay
 def_special SleepingBagSetNight
+def_special GetGraftRationSplicers

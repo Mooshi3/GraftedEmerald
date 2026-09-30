@@ -94,5 +94,6 @@ u32 GetPlayerShinyOddsThreshold(void);
 // New game: the settings screen stores choices here; NewGameInitData() applies them after vars are cleared.
 void ApplyPendingGraftSettings(void);
 void CB2_InitGraftSettingsMenu(void);
+u16 GetGraftRationSplicers(void);
 
 #endif // GUARD_GRAFT_SETTINGS_H

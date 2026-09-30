@@ -1528,6 +1528,22 @@ static s8 *GetCurrentPartySlotPtr(void)
         return &gPartyMenu.slotId;
 }
 
+// GRAFT: refuse a graft target that breaks the graft rules (husk, gates, limits),
+// with the reason, and stay in the party menu. Returns TRUE if refused.
+static bool8 TryRejectGraftTarget(u8 taskId, u8 slot)
+{
+    const u8 *reason = GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][slot].box, GetSelectedGraftType(), GetSelectedGraftStatIndex());
+    if (reason == NULL)
+        return FALSE;
+    PlaySE(SE_FAILURE);
+    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
+    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
+    DisplayPartyMenuMessage(reason, FALSE);
+    ScheduleBgCopyTilemapToVram(2);
+    gTasks[taskId].func = Task_ReturnToChooseMonAfterText;
+    return TRUE;
+}
+
 static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
 {
     if (*slotPtr == PARTY_SIZE)
@@ -1643,6 +1659,8 @@ static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
             break;
         }
 case PARTY_ACTION_GRAFT:
+            if (TryRejectGraftTarget(taskId, (u8)*slotPtr))
+                break;
             {
                 PlaySE(SE_SELECT);
                 gGraftSelectedPartySlot = (u8)*slotPtr;
@@ -7575,6 +7593,8 @@ static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *mon)
 static void CursorCb_ApplyGraft(u8 taskId)
 {
     u8 slot = GetCursorSelectionMonId();
+    if (TryRejectGraftTarget(taskId, slot))
+        return;
     // Store selected slot — ALL graft application happens in Cmd_graftmenu sub-states
     gGraftSelectedPartySlot = slot;
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
@@ -9045,10 +9065,19 @@ void Task_GraftSplicer(u8 taskId)
     case SPLICER_VALIDATE_TARGET:
     {
         u8 targetSlot = gPartyMenu.slotId;
+        const u8 *rejectReason = GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][targetSlot].box, GetSelectedGraftType(), GetSelectedGraftStatIndex());
         if (targetSlot == gPartyMenu.slotId2)
         {
             PlaySE(SE_FAILURE);
             DisplayPartyMenuMessage(sText_SplicerSameMon, TRUE);
+            ScheduleBgCopyTilemapToVram(2);
+            sPartyMenuInternal->data[0] = SPLICER_CANCEL_TARGET;
+        }
+        else if (rejectReason != NULL)
+        {
+            // GRAFT: husk, gates and graft limits; checked before the donor is used up
+            PlaySE(SE_FAILURE);
+            DisplayPartyMenuMessage(rejectReason, TRUE);
             ScheduleBgCopyTilemapToVram(2);
             sPartyMenuInternal->data[0] = SPLICER_CANCEL_TARGET;
         }

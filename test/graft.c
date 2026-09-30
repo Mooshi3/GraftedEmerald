@@ -1,6 +1,7 @@
 #include "global.h"
 #include "graft_data.h"
 #include "graft_settings.h"
+#include "graft_menu.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
 #include "caps.h"
@@ -296,4 +297,78 @@ TEST("Level cap settings: off, hard and soft")
     FlagClear(FLAG_BADGE01_GET);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}
+
+static void ResetGraftSettingsForTest(void)
+{
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    for (u32 i = 0; i < NUM_BADGES; i++)
+        FlagClear(FLAG_BADGE01_GET + i);
+}
+
+TEST("Graft Gates hold back type, stat and ability grafts by badge")
+{
+    struct Pokemon mon;
+    ResetGraftSettingsForTest();
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_ABILITY, 0) == NULL); // gates off
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_GATES, TRUE);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_TYPE, 0) != NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_MOVE, 0) == NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_NATURE, 0) == NULL);
+    FlagSet(FLAG_BADGE01_GET);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_TYPE, 0) == NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_ATK) != NULL);
+    FlagSet(FLAG_BADGE02_GET);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_ATK) == NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_ABILITY, 0) != NULL);
+    FlagSet(FLAG_BADGE03_GET);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_ABILITY, 0) == NULL);
+    ResetGraftSettingsForTest();
+}
+
+TEST("Graft Limit: Free ignores the stat cap, Strict allows 3 grafts, replacing is free")
+{
+    struct Pokemon mon;
+    ResetGraftSettingsForTest();
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    SetGraftedStatOnMon(&mon, STAT_ATK, 100);
+    // Standard: 1 stat graft at 0 badges
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) != NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_ATK) == NULL);
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) == NULL);
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_STRICT);
+    SetGraftedTypeOnMon(&mon, 0, TYPE_FIRE);
+    SetGraftedTypeOnMon(&mon, 1, TYPE_WATER); // both type slots count as one graft
+    SetGraftedAbilityOnMon(&mon, ABILITY_INTIMIDATE);
+    EXPECT_EQ(CountBudgetGraftsOnBoxMon(&mon.box), 3);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) != NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_NATURE, 0) != NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_TYPE, 0) == NULL);    // replaces
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_ABILITY, 0) == NULL); // replaces
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_MOVE, 0) == NULL);    // moves never count
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_BUDGET);
+    EXPECT_EQ(GetGraftBudget(), 2);
+    FlagSet(FLAG_BADGE01_GET);
+    FlagSet(FLAG_BADGE02_GET);
+    EXPECT_EQ(GetGraftBudget(), 3);
+    ResetGraftSettingsForTest();
+}
+
+TEST("Enemy Grafts setting scales the enemy graft count")
+{
+    ResetGraftSettingsForTest();
+    FlagSet(FLAG_BADGE01_GET);
+    FlagSet(FLAG_BADGE02_GET);
+    EXPECT_EQ(GetEnemyGraftCount(), 4);
+    SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, GRAFT_ENEMY_GRAFTS_FEWER);
+    EXPECT_EQ(GetEnemyGraftCount(), 2);
+    SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, GRAFT_ENEMY_GRAFTS_MORE);
+    EXPECT_EQ(GetEnemyGraftCount(), 5);
+    ResetGraftSettingsForTest();
 }
