@@ -3,6 +3,7 @@
 #include "graft_settings.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
+#include "text.h"
 #include "test/test.h"
 #include "event_data.h"
 #include "pokedex.h"
@@ -228,4 +229,45 @@ TEST("New-game settings round-trip and set the shiny odds")
     ApplyPendingGraftSettings(); // nothing chosen: back to defaults
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GRAFT_SHINY_ODDS_BOOSTED);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
+}
+
+TEST("New-game settings text fits the settings screen")
+{
+    u32 i, value;
+    for (i = 0; i < GRAFT_SETTINGS_COUNT; i++)
+    {
+        EXPECT_LE(GetStringWidth(FONT_NORMAL, GetGraftSettingName(i), 0), 104);
+        for (value = 0; value < GetGraftSettingChoiceCount(i); value++)
+        {
+            if (!IsGraftSettingValidChoice(i, value))
+                continue;
+            EXPECT_LE(GetStringWidth(FONT_NORMAL, GetGraftSettingChoiceName(i, value), 0), 80);
+            EXPECT_LE(GetStringWidth(FONT_NORMAL, GetGraftSettingDescription(i, value), 0), 200);
+        }
+    }
+}
+
+TEST("Every new-game setting reads back what was set")
+{
+    u32 i, value;
+    for (i = 0; i < GRAFT_SETTINGS_COUNT; i++)
+    {
+        for (value = 0; value < GetGraftSettingChoiceCount(i); value++)
+        {
+            if (!IsGraftSettingValidChoice(i, value))
+                continue;
+            VarSet(VAR_GRAFTED_SETTINGS, 0);
+            VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+            SetGraftSetting(i, value);
+            EXPECT_EQ(GetGraftSetting(i), value);
+            // No other setting moved off its default
+            for (u32 j = 0; j < GRAFT_SETTINGS_COUNT; j++)
+            {
+                if (j != i)
+                    EXPECT_EQ(GetGraftSetting(j), GetGraftSettingDefault(j));
+            }
+        }
+    }
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
 }
