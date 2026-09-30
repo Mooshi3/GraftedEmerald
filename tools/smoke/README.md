@@ -34,7 +34,7 @@ Commands, separated by `;`:
 
 Walking one tile is `press DIR 16`. Pressing a direction for 2-4 frames only turns the player.
 
-`lib.sh` has step builders that print command strings: `intro`, `settings ROW:RIGHTS ...`, `truck`, `give_mon SPECIES LEVEL`, `give_item ITEM QTY`, `give_bp`, `warp GROUP NUM WARP`, `trainer_battle TRAINER_ID`, `dex_on`, `all_badges_on`, and `N FROM TO` for the debug menu's number inputs. Scenario scripts in `scenarios/` combine them; read one before writing a new one.
+`lib.sh` has step builders that print command strings: `intro`, `settings ROW:RIGHTS ...`, `truck`, `give_mon SPECIES LEVEL`, `give_item ITEM QTY`, `give_bp`, `warp GROUP NUM WARP`, `trainer_battle TRAINER_ID`, `dex_on`, `all_badges_on`, `toggle_flag ID`, `pokemon_menu_on` (debug gifts don't set the flag that shows POKéMON in the start menu; don't use Utilities > Cheat start, it replaces the party), and `N FROM TO` for the debug menu's number inputs. Scenario scripts in `scenarios/` combine them; read one before writing a new one.
 
 ## Scenarios
 
