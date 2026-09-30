@@ -331,17 +331,26 @@ void ApplyPendingGraftSettings(void)
     sHasPendingChoices = FALSE;
 
     // Rationed graft items: a starting ration, since marts won't sell any
-    if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) == GRAFT_SUPPLY_RATIONS)
+    if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) == GRAFT_SUPPLY_RATIONS && !AreGraftBallsUseless())
         AddBagItem(ITEM_SPLICE_BALL, 3);
 }
 
-// Special for Common_EventScript_GiveGraftRations: 0xFF if graft items aren't rationed,
-// otherwise whether this badge's ration includes a Graft Splicer.
+// Harvests: None makes grafting balls useless, so marts and rations leave them out.
+bool32 AreGraftBallsUseless(void)
+{
+    return GetGraftSetting(GRAFT_SETTING_HARVESTS) == GRAFT_HARVESTS_NONE;
+}
+
+// Special for Common_EventScript_GiveGraftRations: what this badge's ration holds.
+// 0xFF nothing (not rationed), 0 Splice Balls, 1 Splice Balls and a Splicer, 2 a Splicer only.
 u16 GetGraftRationSplicers(void)
 {
+    bool32 splicer = GetBadgeCount() >= 3;
     if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) != GRAFT_SUPPLY_RATIONS)
         return 0xFF;
-    return GetBadgeCount() >= 3;
+    if (AreGraftBallsUseless())
+        return splicer ? 2 : 0xFF;
+    return splicer;
 }
 
 

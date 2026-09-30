@@ -1,4 +1,5 @@
 #include "global.h"
+#include "constants/opponents.h"
 #include "pokemon.h"
 #include "graft_data.h"
 #include "graft_menu.h"
@@ -787,6 +788,23 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
     }
 }
 
+// The first rival battle on Route 103 is a tutorial fight; it stays ungrafted.
+static bool32 IsUngraftedTrainer(u16 trainerNum)
+{
+    switch (trainerNum)
+    {
+    case TRAINER_BRENDAN_ROUTE_103_MUDKIP:
+    case TRAINER_BRENDAN_ROUTE_103_TREECKO:
+    case TRAINER_BRENDAN_ROUTE_103_TORCHIC:
+    case TRAINER_MAY_ROUTE_103_MUDKIP:
+    case TRAINER_MAY_ROUTE_103_TREECKO:
+    case TRAINER_MAY_ROUTE_103_TORCHIC:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
 static bool32 IsBossTrainer(u16 trainerNum)
 {
     switch (GetTrainerClassFromId(trainerNum))
@@ -824,6 +842,8 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
     if (gTestRunnerEnabled)
         return;
 #endif
+    if (IsUngraftedTrainer(trainerNum))
+        return;
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;

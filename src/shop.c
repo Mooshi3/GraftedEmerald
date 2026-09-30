@@ -145,6 +145,17 @@ static u8 GetItemBadgeRequirement(u16 itemId)
             return 0xFF;
         }
     }
+    // GRAFT: with no harvests allowed, grafting balls have no use
+    if (AreGraftBallsUseless())
+    {
+        switch (itemId)
+        {
+        case ITEM_PATCH_BALL:
+        case ITEM_GRAFT_BALL:
+        case ITEM_SPLICE_BALL:
+            return 0xFF;
+        }
+    }
     switch (itemId)
     {
     case ITEM_GRAFT_BALL:

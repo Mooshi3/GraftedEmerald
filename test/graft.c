@@ -667,3 +667,28 @@ TEST("Encounter screen: a single time of day lists only that time, with its own 
     }
     EXPECT_EQ(grassTotal, 100); // one time's grass table adds up exactly
 }
+
+TEST("Rations leave out grafting balls when harvests are off")
+{
+    u32 i;
+    for (i = FLAG_BADGE01_GET; i <= FLAG_BADGE08_GET; i++)
+        FlagClear(i);
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    EXPECT_EQ(GetGraftRationSplicers(), 0xFF); // shops: no rations
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY, GRAFT_SUPPLY_RATIONS);
+    EXPECT_EQ(GetGraftRationSplicers(), 0); // Splice Balls only
+    FlagSet(FLAG_BADGE01_GET);
+    FlagSet(FLAG_BADGE02_GET);
+    FlagSet(FLAG_BADGE03_GET);
+    EXPECT_EQ(GetGraftRationSplicers(), 1); // Splice Balls and a Splicer
+
+    SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_NONE);
+    EXPECT(AreGraftBallsUseless());
+    EXPECT_EQ(GetGraftRationSplicers(), 2); // a Splicer only
+    FlagClear(FLAG_BADGE03_GET);
+    EXPECT_EQ(GetGraftRationSplicers(), 0xFF); // nothing before the Splicer unlocks
+    FlagClear(FLAG_BADGE01_GET);
+    FlagClear(FLAG_BADGE02_GET);
+}

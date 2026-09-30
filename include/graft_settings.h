@@ -95,5 +95,6 @@ u32 GetPlayerShinyOddsThreshold(void);
 void ApplyPendingGraftSettings(void);
 void CB2_InitGraftSettingsMenu(void);
 u16 GetGraftRationSplicers(void);
+bool32 AreGraftBallsUseless(void);
 
 #endif // GUARD_GRAFT_SETTINGS_H

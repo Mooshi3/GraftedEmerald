@@ -1677,6 +1677,7 @@ static void ChangeStatLabel(s16 mode)
     u32 statsBlock = 169;
     u32 ivsBlock = 221;
     u32 evsBlock = 218;
+    u32 baseBlock = 236; // GRAFT: "BASE" label tiles added to iv_ev_tiles.png
 
     u32 statsCoordX = 44;
     u32 statsCoordY = 102;
@@ -1698,7 +1699,7 @@ static void ChangeStatLabel(s16 mode)
         WriteToStatsTilemapBuffer(ivEvLength, evsBlock, statsCoordX, statsCoordY);
         break;
     case SUMMARY_SKILLS_MODE_BASE_STATS:
-        WriteToStatsTilemapBuffer(ivEvLength, evsBlock, statsCoordX, statsCoordY);
+        WriteToStatsTilemapBuffer(statsLength, baseBlock, statsCoordX, statsCoordY);
         break;
     }
     CopyBgTilemapBufferToVram(1);

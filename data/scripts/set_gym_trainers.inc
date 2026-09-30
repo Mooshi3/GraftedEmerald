@@ -174,8 +174,10 @@ Common_EventScript_GiveGraftRations::
 	specialvar VAR_RESULT, GetGraftRationSplicers
 	goto_if_eq VAR_RESULT, 0xFF, Common_EventScript_GiveGraftRationsEnd
 	copyvar VAR_0x8009, VAR_RESULT
+	goto_if_eq VAR_0x8009, 2, Common_EventScript_GiveGraftRationsSplicer
 	giveitem ITEM_SPLICE_BALL, 3
 	goto_if_eq VAR_0x8009, 0, Common_EventScript_GiveGraftRationsEnd
+Common_EventScript_GiveGraftRationsSplicer::
 	giveitem ITEM_GRAFT_SPLICER, 1
 Common_EventScript_GiveGraftRationsEnd::
 	return
