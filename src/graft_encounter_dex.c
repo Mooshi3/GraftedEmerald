@@ -11,6 +11,7 @@
 #include "pokedex.h"
 #include "pokemon.h"
 #include "region_map.h"
+#include "rtc.h"
 #include "scanline_effect.h"
 #include "sound.h"
 #include "sprite.h"
@@ -165,7 +166,8 @@ static int CompareEntries(const struct EncounterDexEntry *a, const struct Encoun
 }
 
 // Fills entries (ENCDEX_MAX_ENTRIES) for an area, sorted by method then rate. Returns the count.
-u32 GetEncounterAreaEntries(u32 mapsec, struct EncounterDexEntry *entries)
+// timeOfDay: one time's tables, or TIMES_OF_DAY_COUNT for all of them merged (rate = best over times).
+u32 GetEncounterAreaEntries(u32 mapsec, struct EncounterDexEntry *entries, u32 timeOfDay)
 {
     struct SlotTotal totals[ENCDEX_MAX_ENTRIES];
     u32 count = 0, i, j;
@@ -177,6 +179,8 @@ u32 GetEncounterAreaEntries(u32 mapsec, struct EncounterDexEntry *entries)
         for (u32 t = 0; t < TIMES_OF_DAY_COUNT; t++)
         {
             u32 totalCount = 0;
+            if (timeOfDay != TIMES_OF_DAY_COUNT && t != timeOfDay)
+                continue;
             u8 lmin = 0, lmax = 0;
             u16 legend;
 
@@ -212,7 +216,7 @@ enum
     WIN_LIST,
 };
 
-#define VISIBLE_LINES 7
+#define VISIBLE_LINES 6 // plus the legend line: 7 x 16px fills the 14-tile window
 #define MAX_LINES (ENCDEX_MAX_ENTRIES + ENCDEX_METHOD_COUNT)
 
 struct EncounterDexLine
@@ -229,6 +233,7 @@ struct EncounterDexState
     u8 lineCount;
     u8 scroll;
     u8 entryCount;
+    u8 timeFilter; // a TimeOfDay, or TIMES_OF_DAY_COUNT for all
     struct EncounterDexEntry entries[ENCDEX_MAX_ENTRIES];
     struct EncounterDexLine lines[MAX_LINES];
 };
@@ -246,6 +251,14 @@ static const u8 *const sMethodNames[ENCDEX_METHOD_COUNT] =
 };
 
 static const u8 sTimeLetters[TIMES_OF_DAY_COUNT] = { CHAR_M, CHAR_D, CHAR_E, CHAR_N };
+static const u8 *const sTimeFilterNames[TIMES_OF_DAY_COUNT + 1] =
+{
+    [TIME_MORNING]       = COMPOUND_STRING("Morning"),
+    [TIME_DAY]           = COMPOUND_STRING("Day"),
+    [TIME_EVENING]       = COMPOUND_STRING("Evening"),
+    [TIME_NIGHT]         = COMPOUND_STRING("Night"),
+    [TIMES_OF_DAY_COUNT] = COMPOUND_STRING("All times"),
+};
 
 static const u8 sText_NoAreas[] = _("No areas with wild Pokémon\nvisited yet.");
 static const u8 sText_Unknown[] = _("?????");
@@ -309,7 +322,7 @@ static void BuildAreaList(void)
 static void LoadArea(void)
 {
     u32 i, lastMethod = ENCDEX_METHOD_COUNT;
-    sEncDex->entryCount = GetEncounterAreaEntries(sEncDex->areas[sEncDex->areaIndex], sEncDex->entries);
+    sEncDex->entryCount = GetEncounterAreaEntries(sEncDex->areas[sEncDex->areaIndex], sEncDex->entries, sEncDex->timeFilter);
     sEncDex->lineCount = 0;
     sEncDex->scroll = 0;
     for (i = 0; i < sEncDex->entryCount; i++)
@@ -371,7 +384,7 @@ static void DrawLine(u32 lineIndex, u32 y)
             *str++ = CHAR_HYPHEN;
             str = ConvertIntToDecimalStringN(str, entry->maxLevel, STR_CONV_MODE_LEFT_ALIGN, 3);
         }
-        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 104, y + 2, sColors_Normal, TEXT_SKIP_DRAW, buffer);
+        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 96, y + 2, sColors_Normal, TEXT_SKIP_DRAW, buffer);
 
         str = ConvertIntToDecimalStringN(buffer, entry->rate, STR_CONV_MODE_LEFT_ALIGN, 3);
         *str++ = CHAR_PERCENT;
@@ -379,7 +392,7 @@ static void DrawLine(u32 lineIndex, u32 y)
         AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 168 - GetStringWidth(FONT_SMALL, buffer, 0), y + 2, sColors_Normal, TEXT_SKIP_DRAW, buffer);
 
         // Times of day it appears, when it isn't all of them
-        if (entry->timeMask != (1 << TIMES_OF_DAY_COUNT) - 1)
+        if (sEncDex->timeFilter == TIMES_OF_DAY_COUNT && entry->timeMask != (1 << TIMES_OF_DAY_COUNT) - 1)
         {
             str = buffer;
             for (t = 0; t < TIMES_OF_DAY_COUNT; t++)
@@ -402,9 +415,13 @@ static void DrawList(void)
     {
         for (i = 0; i < VISIBLE_LINES && sEncDex->scroll + i < sEncDex->lineCount; i++)
             DrawLine(sEncDex->scroll + i, i * 16 + 1);
+        if (sEncDex->lineCount == 0)
+            AddTextPrinterParameterized3(WIN_LIST, FONT_NORMAL, 8, 1, sColors_Normal, TEXT_SKIP_DRAW, COMPOUND_STRING("Nothing at this time of day."));
         // Legend and controls on the last line
-        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 4, VISIBLE_LINES * 16 + 1, sColors_Header, TEXT_SKIP_DRAW,
-                                     COMPOUND_STRING("{DPAD_LEFTRIGHT} Area  {DPAD_UPDOWN} Scroll  M D E N: time of day"));
+        u8 legend[48];
+        StringCopy(legend, COMPOUND_STRING("{DPAD_LEFTRIGHT} Area  {DPAD_UPDOWN} Scroll  SELECT "));
+        StringAppend(legend, sTimeFilterNames[sEncDex->timeFilter]);
+        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 4, VISIBLE_LINES * 16 + 3, sColors_Header, TEXT_SKIP_DRAW, legend);
     }
     CopyWindowToVram(WIN_LIST, COPYWIN_FULL);
 }
@@ -450,6 +467,7 @@ void CB2_OpenEncounterDex(void)
     case 0:
         SetVBlankCallback(NULL);
         sEncDex = AllocZeroed(sizeof(*sEncDex));
+        sEncDex->timeFilter = OW_TIME_OF_DAY_ENCOUNTERS ? GetTimeOfDay() : TIMES_OF_DAY_COUNT; // what's around right now
         BuildAreaList();
         if (sEncDex->areaCount != 0)
             LoadArea();
@@ -523,7 +541,14 @@ static void Task_EncDexInput(u8 taskId)
     if (sEncDex->areaCount == 0)
         return;
 
-    if (JOY_REPEAT(DPAD_LEFT) || JOY_REPEAT(DPAD_RIGHT) || JOY_NEW(L_BUTTON) || JOY_NEW(R_BUTTON))
+    if (JOY_NEW(SELECT_BUTTON) && OW_TIME_OF_DAY_ENCOUNTERS)
+    {
+        sEncDex->timeFilter = (sEncDex->timeFilter + 1) % (TIMES_OF_DAY_COUNT + 1);
+        PlaySE(SE_SELECT);
+        LoadArea();
+        DrawList();
+    }
+    else if (JOY_REPEAT(DPAD_LEFT) || JOY_REPEAT(DPAD_RIGHT) || JOY_NEW(L_BUTTON) || JOY_NEW(R_BUTTON))
     {
         if (sEncDex->areaCount > 1)
         {

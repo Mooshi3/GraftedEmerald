@@ -29,7 +29,7 @@ struct EncounterDexEntry
 void MarkEncounterAreaVisited(u32 mapsec);
 bool32 IsEncounterAreaVisited(u32 mapsec);
 bool32 AreaHasWildEncounters(u32 mapsec);
-u32 GetEncounterAreaEntries(u32 mapsec, struct EncounterDexEntry *entries);
+u32 GetEncounterAreaEntries(u32 mapsec, struct EncounterDexEntry *entries, u32 timeOfDay);
 void CB2_OpenEncounterDex(void);
 
 #endif // GUARD_GRAFT_ENCOUNTER_DEX_H

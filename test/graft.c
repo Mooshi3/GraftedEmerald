@@ -591,7 +591,7 @@ TEST("Encounter screen: area lists come from the wild tables, sorted by method t
     FlagClear(FLAG_SYS_GAME_CLEAR);
     EXPECT(AreaHasWildEncounters(MAPSEC_PETALBURG_WOODS));
     EXPECT(!AreaHasWildEncounters(MAPSEC_LITTLEROOT_TOWN));
-    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries, TIMES_OF_DAY_COUNT);
     EXPECT_GT(count, 0);
     EXPECT(FindEncDexEntry(entries, count, SPECIES_SHROOMISH, ENCDEX_GRASS) != NULL);
     for (i = 0; i < count; i++)
@@ -613,18 +613,18 @@ TEST("Encounter screen: postgame legendaries only show after the Champion win, u
     const struct EncounterDexEntry *legend;
     FlagClear(FLAG_SYS_GAME_CLEAR);
     GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_VIRIZION), FLAG_SET_SEEN);
-    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries, TIMES_OF_DAY_COUNT);
     EXPECT(FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS) == NULL);
 
     FlagSet(FLAG_SYS_GAME_CLEAR);
-    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries, TIMES_OF_DAY_COUNT);
     legend = FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS);
     EXPECT(legend != NULL);
     EXPECT_EQ(legend->rate, 1);
     EXPECT_EQ(legend->minLevel, 50);
 
     GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_VIRIZION), FLAG_SET_CAUGHT);
-    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries);
+    count = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, entries, TIMES_OF_DAY_COUNT);
     EXPECT(FindEncDexEntry(entries, count, SPECIES_VIRIZION, ENCDEX_GRASS) == NULL);
     FlagClear(FLAG_SYS_GAME_CLEAR);
 }
@@ -649,4 +649,21 @@ TEST("Encounter slot rates add up to 100 for every method")
     EXPECT_EQ(sum, 100);
     for (i = 0, sum = 0; i < NUM_FISHING_MONS_ENCOUNTER_SLOTS; i++) sum += gEncounterSlotRatesFishing[i];
     EXPECT_EQ(sum, 300); // three rods
+}
+
+TEST("Encounter screen: a single time of day lists only that time, with its own rates")
+{
+    struct EncounterDexEntry all[ENCDEX_MAX_ENTRIES], day[ENCDEX_MAX_ENTRIES];
+    u32 allCount = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, all, TIMES_OF_DAY_COUNT);
+    u32 dayCount = GetEncounterAreaEntries(MAPSEC_PETALBURG_WOODS, day, TIME_DAY);
+    u32 i, grassTotal = 0;
+    EXPECT_GT(dayCount, 0);
+    EXPECT_LE(dayCount, allCount);
+    for (i = 0; i < dayCount; i++)
+    {
+        EXPECT_EQ(day[i].timeMask, 1 << TIME_DAY);
+        if (day[i].method == ENCDEX_GRASS)
+            grassTotal += day[i].rate;
+    }
+    EXPECT_EQ(grassTotal, 100); // one time's grass table adds up exactly
 }
