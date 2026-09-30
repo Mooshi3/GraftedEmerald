@@ -83,6 +83,10 @@ void Nuzlocke_OnWildEncounter(void)
     sEncounterState = NUZLOCKE_ENCOUNTER_FREE;
     if (!IsNuzlockeOn() || GetSafariZoneFlag())
         return;
+    // Standard Nuzlocke: the rules start once you can catch, i.e. once you get the Pokédex
+    // (that's when Poké Balls unlock). A flag, not "has balls", so emptying the Bag can't dodge it.
+    if (!FlagGet(FLAG_SYS_POKEDEX_GET))
+        return;
 
     if (GetGraftSetting(GRAFT_SETTING_SHINY_CLAUSE) && GetMonData(wild, MON_DATA_IS_SHINY))
         return; // shinies are always catchable and don't use up the area
@@ -222,6 +226,10 @@ static bool32 DoFaintingRulesApply(void)
         return FALSE;
     if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_FIRST_BATTLE))
         return FALSE;
+    // Partner battles (Steven, NPC followers) put the partner's mons in the player's party
+    // and restore the real party afterwards, so the slots here aren't the player's own.
+    if (gBattleTypeFlags & (BATTLE_TYPE_INGAME_PARTNER | BATTLE_TYPE_MULTI))
+        return FALSE;
     if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE || InBattlePike() || InTrainerHillChallenge())
         return FALSE;
     // A whiteout ends a Nuzlocke run; the game doesn't take the party away on top of that.
@@ -302,12 +310,16 @@ bool32 IsMonotypeLegal(struct Pokemon *mon)
 {
     u32 type = GetGraftSetting(GRAFT_SETTING_MONOTYPE);
     struct Pokemon *party = gParties[B_TRAINER_PLAYER];
+    u32 ownSlots = PARTY_SIZE;
 
-    if (type == TYPE_NONE || mon < party || mon >= party + PARTY_SIZE)
+    // In partner battles (Steven, NPC followers) the second half of the party is the partner's
+    if (gMain.inBattle && (gBattleTypeFlags & (BATTLE_TYPE_INGAME_PARTNER | BATTLE_TYPE_MULTI)))
+        ownSlots = MULTI_PARTY_SIZE;
+    if (type == TYPE_NONE || mon < party || mon >= party + ownSlots)
         return TRUE;
     if (MonHasMonotype(mon, type))
         return TRUE;
-    for (u32 i = 0; i < PARTY_SIZE; i++)
+    for (u32 i = 0; i < ownSlots; i++)
     {
         if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE
          && !GetMonData(&party[i], MON_DATA_IS_EGG)

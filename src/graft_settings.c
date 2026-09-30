@@ -60,7 +60,7 @@ static const u8 *const sLevelCapDescriptions[GRAFT_LEVEL_CAP_COUNT] =
 {
     [GRAFT_LEVEL_CAP_OFF] = COMPOUND_STRING("No level cap."),
     [GRAFT_LEVEL_CAP_HARD] = COMPOUND_STRING("No EXP once a Pokémon reaches the\nnext Leader's strongest level."),
-    [GRAFT_LEVEL_CAP_SOFT] = COMPOUND_STRING("Much less EXP once a Pokémon hits\nthe next Leader's strongest level."),
+    [GRAFT_LEVEL_CAP_SOFT] = COMPOUND_STRING("Past the next Leader's strongest\nlevel: much less EXP, may disobey."),
 };
 
 static const u8 *const sGraftLimitChoices[GRAFT_LIMIT_COUNT] =

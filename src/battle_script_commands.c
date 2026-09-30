@@ -4359,7 +4359,7 @@ static void Cmd_graftmenu(void)
                 BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
                 gBattleCommunication[MULTIUSE_STATE] = 100;
             }
-        if (JOY_NEW(A_BUTTON))
+        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
             {
                 PlaySE(SE_SELECT);
                 // Player picked a graft - open party menu to choose target mon
@@ -4580,7 +4580,7 @@ case 3: // Wait for party menu to return to battle
             FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
             BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
         }
-        if (JOY_NEW(A_BUTTON))
+        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
         {
             PlaySE(SE_SELECT);
             SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
@@ -4667,7 +4667,7 @@ case 3: // Wait for party menu to return to battle
             FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
             BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
         }
-        if (JOY_NEW(A_BUTTON))
+        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
         {
             PlaySE(SE_SELECT);
             SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
@@ -4737,7 +4737,7 @@ case 3: // Wait for party menu to return to battle
             FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
             BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
         }
-        if (JOY_NEW(A_BUTTON))
+        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
         {
             PlaySE(SE_SELECT);
             SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);

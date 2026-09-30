@@ -5,6 +5,7 @@
 #include "graft_challenge.h"
 #include "battle.h"
 #include "battle_controllers.h"
+#include "item.h"
 #include "item_use.h"
 #include "script_pokemon_util.h"
 #include "fieldmap.h"
@@ -385,6 +386,24 @@ static void SetupWildEncounterForTest(u16 species, u32 mapsec)
     gMapHeader.regionMapSectionId = mapsec;
     gBattleTypeFlags = 0;
     CreateRandomMonWithIVs(&gParties[B_TRAINER_OPPONENT_A][0], species, 5, 0);
+    FlagSet(FLAG_SYS_POKEDEX_GET);
+}
+
+TEST("Nuzlocke: encounters before the Pokédex don't use up the area")
+{
+    ResetGraftSettingsForTest();
+    memset(gSaveBlock1Ptr->graftCaughtAreas, 0, sizeof(gSaveBlock1Ptr->graftCaughtAreas));
+    SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, TRUE);
+    SetGraftSetting(GRAFT_SETTING_SHINY_CLAUSE, FALSE);
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_101);
+    FlagClear(FLAG_SYS_POKEDEX_GET);
+    Nuzlocke_OnWildEncounter();
+    Nuzlocke_OnBattleEnd();
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_101); // sets the Pokédex flag
+    Nuzlocke_OnWildEncounter();
+    EXPECT_EQ(Nuzlocke_GetEncounterState(), NUZLOCKE_ENCOUNTER_FREE); // still the area's first
+    Nuzlocke_OnBattleEnd();
+    ResetGraftSettingsForTest();
 }
 
 TEST("Nuzlocke: only the first encounter in an area can be caught; grafting balls follow the harvest rule")

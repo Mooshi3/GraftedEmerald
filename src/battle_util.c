@@ -6,6 +6,8 @@
 #include "battle_environment.h"
 #include "battle_pyramid.h"
 #include "battle_util.h"
+#include "caps.h"
+#include "graft_settings.h"
 #include "graft_data.h"
 #include "battle_controllers.h"
 #include "battle_interface.h"
@@ -5641,9 +5643,12 @@ enum Obedience GetAttackerObedienceForAction(void)
         return OBEYS;
     if (gBattleTypeFlags & BATTLE_TYPE_RECORDED)
         return OBEYS;
-    if (B_OBEDIENCE_MECHANICS < GEN_8 && !IsOtherTrainer(gBattleMons[gBattlerAttacker].otId, gBattleMons[gBattlerAttacker].otName))
+    // GRAFT: under the Soft level cap, the player's own mons above the cap may disobey
+    bool32 softCapObedience = GetGraftSetting(GRAFT_SETTING_LEVEL_CAP) == GRAFT_LEVEL_CAP_SOFT
+                           && !IsOtherTrainer(gBattleMons[gBattlerAttacker].otId, gBattleMons[gBattlerAttacker].otName);
+    if (!softCapObedience && B_OBEDIENCE_MECHANICS < GEN_8 && !IsOtherTrainer(gBattleMons[gBattlerAttacker].otId, gBattleMons[gBattlerAttacker].otName))
         return OBEYS;
-    if (FlagGet(FLAG_BADGE08_GET)) // Rain Badge, ignore obedience altogether
+    if (!softCapObedience && FlagGet(FLAG_BADGE08_GET)) // Rain Badge, ignore obedience altogether
         return OBEYS;
 
     obedienceLevel = 10;
@@ -5663,7 +5668,13 @@ enum Obedience GetAttackerObedienceForAction(void)
     if (FlagGet(FLAG_BADGE07_GET)) // Mind Badge
         obedienceLevel = 80;
 
-    if (B_OBEDIENCE_MECHANICS >= GEN_8
+    if (softCapObedience)
+    {
+        u32 cap = GetLevelCapTarget();
+        obedienceLevel = cap > 255 ? 255 : cap;
+        levelReferenced = gBattleMons[gBattlerAttacker].level;
+    }
+    else if (B_OBEDIENCE_MECHANICS >= GEN_8
      && !IsOtherTrainer(gBattleMons[gBattlerAttacker].otId, gBattleMons[gBattlerAttacker].otName))
         levelReferenced = gBattleMons[gBattlerAttacker].metLevel;
     else
