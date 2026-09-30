@@ -94,4 +94,3 @@ Next:
 1. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish.
 
 
-Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).
