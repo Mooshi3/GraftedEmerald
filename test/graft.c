@@ -3,6 +3,7 @@
 #include "graft_settings.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
+#include "caps.h"
 #include "text.h"
 #include "test/test.h"
 #include "event_data.h"
@@ -268,6 +269,31 @@ TEST("Every new-game setting reads back what was set")
             }
         }
     }
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}
+
+TEST("Level cap settings: off, hard and soft")
+{
+    FlagClear(FLAG_BADGE01_GET);
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    EXPECT_EQ(GetCurrentLevelCap(), MAX_LEVEL);
+    EXPECT_EQ(GetSoftLevelCapExpValue(20, 1000), 1000);
+
+    SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_HARD);
+    EXPECT_EQ(GetCurrentLevelCap(), 15); // Roxanne's Nosepass
+    EXPECT_EQ(GetSoftLevelCapExpValue(14, 1000), 1000);
+    EXPECT_EQ(GetSoftLevelCapExpValue(15, 1000), 0);
+
+    SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_SOFT);
+    EXPECT_EQ(GetCurrentLevelCap(), MAX_LEVEL); // soft caps never stop leveling
+    EXPECT_EQ(GetSoftLevelCapExpValue(15, 1000), 250);
+    EXPECT_EQ(GetSoftLevelCapExpValue(30, 1000), 1000 / 64);
+
+    FlagSet(FLAG_BADGE01_GET);
+    EXPECT_EQ(GetLevelCapTarget(), 19);
+    FlagClear(FLAG_BADGE01_GET);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
 }

@@ -3576,7 +3576,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *mon, enum Item item, u8 partyIndex, 
         case 3:
             // Rare Candy / EXP Candy
             if ((itemEffect[i] & ITEM3_LEVEL_UP)
-             && GetMonData(mon, MON_DATA_LEVEL) != MAX_LEVEL)
+             && GetMonData(mon, MON_DATA_LEVEL) < GetCurrentLevelCap()) // GRAFT: the hard level cap stops candies too
             {
                 u8 param = GetItemHoldEffectParam(item);
                 dataUnsigned = 0;
@@ -3590,7 +3590,7 @@ bool8 PokemonUseItemEffects(struct Pokemon *mon, enum Item item, u8 partyIndex, 
                     enum Species species = GetMonData(mon, MON_DATA_SPECIES);
                     dataUnsigned = sExpCandyExperienceTable[param - 1] + GetMonData(mon, MON_DATA_EXP);
 
-                    if (B_RARE_CANDY_CAP && B_EXP_CAP_TYPE == EXP_CAP_HARD)
+                    if (IsHardLevelCapActive()) // GRAFT: runtime setting
                     {
                         u32 currentLevelCap = GetCurrentLevelCap();
                         if (dataUnsigned > gExperienceTables[gSpeciesInfo[species].growthRate][currentLevelCap])
