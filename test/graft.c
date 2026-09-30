@@ -18,6 +18,7 @@
 #include "test/test.h"
 #include "event_data.h"
 #include "pokedex.h"
+#include "shop_criteria.h"
 #include "wild_encounter.h"
 #include "constants/items.h"
 #include "constants/map_groups.h"
@@ -707,4 +708,27 @@ TEST("EXP Share and Poké Center settings")
     EXPECT(ArePokeCentersClosed());
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}
+
+TEST("Marts that sell Poké Balls also sell the grafting items")
+{
+    static const u16 ballMart[] = { ITEM_POKE_BALL, ITEM_POTION, ITEM_GRAFT_BALL, ITEM_NONE };
+    static const u16 herbShop[] = { ITEM_ENERGY_POWDER, ITEM_HEAL_POWDER, ITEM_NONE };
+    const u16 *list = ballMart;
+    u16 count = 3;
+
+    TryBuildDynamicShopItemList(&list, &count);
+    EXPECT_EQ(count, 8); // 3 + the 5 grafting items it didn't list
+    EXPECT_EQ(list[2], ITEM_GRAFT_BALL);
+    EXPECT_EQ(list[3], ITEM_PATCH_BALL);
+    EXPECT_EQ(list[7], ITEM_UNGRAFTER);
+    EXPECT_EQ(list[8], ITEM_NONE);
+    TryFreeDynamicShopItemList(&list);
+    EXPECT(list == ballMart);
+
+    list = herbShop;
+    count = 2;
+    TryBuildDynamicShopItemList(&list, &count);
+    EXPECT_EQ(count, 2);
+    TryFreeDynamicShopItemList(&list);
 }

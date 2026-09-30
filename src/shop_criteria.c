@@ -12,12 +12,35 @@ static UNUSED bool32 ShopCriteriaByBadgeCount(u32 count);
 static UNUSED bool32 ShopCriteriaByFlag(u32 flagId);
 static UNUSED bool32 ShopCriteriaByVar(u32 varId, u32 varValue);
 
+// GRAFT: every mart that sells Poké Balls also sells the grafting items, added here so no
+// map's list can miss them. Badge gates and Rations filter them later (GetItemBadgeRequirement).
+static const u16 sGraftMartItems[] =
+{
+    ITEM_PATCH_BALL,
+    ITEM_GRAFT_BALL,
+    ITEM_SPLICE_BALL,
+    ITEM_GRAFT_SPLICER,
+    ITEM_GRAFT_KNOT,
+    ITEM_UNGRAFTER,
+};
+
+static bool32 ListHasItem(const u16 *list, u32 count, u16 item)
+{
+    for (u32 i = 0; i < count; i++)
+    {
+        if (list[i] == item)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 void TryBuildDynamicShopItemList(const u16 **ogItemList, u16 *resultingTotal)
 {
     sDynamicShopItemListRef = *ogItemList;
 
-    u16 *list = AllocZeroed((*resultingTotal + 1) * sizeof(u16));
+    u16 *list = AllocZeroed((*resultingTotal + ARRAY_COUNT(sGraftMartItems) + 1) * sizeof(u16));
     u32 overallIdx = 0, idx = 0;
+    bool32 sellsBalls = FALSE;
 
     while (idx < *resultingTotal)
     {
@@ -27,9 +50,20 @@ void TryBuildDynamicShopItemList(const u16 **ogItemList, u16 *resultingTotal)
         {
             list[overallIdx] = item;
             overallIdx++;
+            if (GetItemPocket(item) == POCKET_POKE_BALLS)
+                sellsBalls = TRUE;
         }
 
         idx++;
+    }
+
+    if (sellsBalls)
+    {
+        for (idx = 0; idx < ARRAY_COUNT(sGraftMartItems); idx++)
+        {
+            if (!ListHasItem(list, overallIdx, sGraftMartItems[idx]))
+                list[overallIdx++] = sGraftMartItems[idx];
+        }
     }
 
     list[overallIdx] = ITEM_NONE;

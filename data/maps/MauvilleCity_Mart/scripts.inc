@@ -25,12 +25,6 @@ MauvilleCity_Mart_Pokemart:
 	.2byte ITEM_GUARD_SPEC
 	.2byte ITEM_DIRE_HIT
 	.2byte ITEM_X_ACCURACY
-.2byte ITEM_PATCH_BALL
-.2byte ITEM_GRAFT_BALL
-.2byte ITEM_SPLICE_BALL
-.2byte ITEM_GRAFT_SPLICER
-.2byte ITEM_GRAFT_KNOT
-.2byte ITEM_UNGRAFTER
 	pokemartlistend
 
 MauvilleCity_Mart_EventScript_ExpertM::

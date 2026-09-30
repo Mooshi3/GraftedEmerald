@@ -25,7 +25,7 @@ Five graft kinds: **move, ability, type, stat, nature**.
 Sources:
 - **Balls** consume the caught wild mon and offer graft categories: Patch Ball (1 random category), Graft Ball (3), Splice Ball (all 5). A wild mon offers its actual ability (never its hidden one), the 4 moves it currently knows, its species' base stats, its types and its nature (`GatherGraftSourceDataBattle`, `src/graft_menu.c`).
 - **Graft Splicer** (3 badges) sacrifices a party mon to graft its traits, including evolved forms and grafts it already has (`GatherGraftSourceDataPartyMon`).
-- Marts: Graft Ball needs 1 badge; Splice Ball and Splicer need 3. Filtered in the shop menu (`GetItemBadgeRequirement`, `src/shop.c`).
+- Marts: every mart that sells Poké Balls also sells Patch/Graft/Splice Balls, the Splicer, the Graft Knot and the Ungrafter; they're appended in code (`TryBuildDynamicShopItemList`, `src/shop_criteria.c`), not listed per map. Graft Ball needs 1 badge; Splice Ball and Splicer need 3. Badge gates, Rations and Harvests None filter afterwards in the shop menu (`GetItemBadgeRequirement`, `src/shop.c`).
 - **Ungrafter** (200, no badge gate, single use): clears every graft and the grafted-move relearner history; moves the mon knows stay, a grafted nature reverts to its personality nature (`UngraftMon`, `src/graft_data.c`). It isn't a grafting item, so Rations don't hide it.
 
 ### Data model
