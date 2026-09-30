@@ -78,6 +78,10 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 - **Battle Items:** Banned leaves only balls usable from the Bag in battle (`CannotUseItemsInBattle`). **Force Set:** battles always use Set style and the option is locked.
 - **Monotype:** any type or Off. Only party mons with that type (natural or grafted) pass `IsValidForBattle` and can switch in; if no party mon has it, everyone may battle, so there's always someone to send out. In partner battles only the player's half of the party is restricted. The starter gets the type grafted as its second type.
 
+## Smoke tests
+
+`tools/smoke/` plays the real ROM in a headless mGBA and takes screenshots (see its README). Use it for menus, scripts and flows the unit tests can't see. To save main-session context, run smoke tests through a subagent on a cheaper model: point it at `tools/smoke/README.md`, name the flows to check, and ask for a report plus a contact sheet of the frames that matter. Decide yourself whether what it found is a real bug.
+
 ## Roadmap / decisions log
 
 Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5428 passed as of 2026-09-30; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
@@ -87,6 +91,6 @@ Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-
 
 Next:
 1. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
-2. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
+
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).
