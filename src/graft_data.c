@@ -247,6 +247,7 @@ bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
 
 static const u8 sText_HuskHPGraft[] = _("It won't have any effect.");
 static const u8 sText_StatGraftLimit[] = _("Stat graft limit reached!\nNeed more badges.");
+static const u8 sText_FallenTarget[] = _("Fallen Pokémon can't take grafts.");
 static const u8 sText_GraftBudgetFull[] = _("It can't take any more grafts.");
 static const u8 sText_GateType[] = _("Type grafts need a badge.");
 static const u8 sText_GateStat[] = _("Stat grafts need 2 badges.");
@@ -302,6 +303,8 @@ const u8 *GetGraftRejectReason(const struct BoxPokemon *boxMon, u8 graftMenuType
 {
     u32 badges = GetBadgeCount();
 
+    if (boxMon->graftFlags & GRAFT_FLAG_FALLEN)
+        return sText_FallenTarget;
     if (graftMenuType == GRAFT_MENU_STAT && statIndex == STAT_HP && IsGraftHusk(boxMon))
         return sText_HuskHPGraft;
 

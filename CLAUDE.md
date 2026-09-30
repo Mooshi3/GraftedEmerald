@@ -58,22 +58,30 @@ Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2
 
 ## New-game settings
 
-After Birch's intro, before the game starts, a GAME SETTINGS screen (`src/graft_settings.c`) picks per-save options; they can't be changed later. They're packed into `VAR_GRAFTED_SETTINGS`, stored XOR each setting's default so an unwritten var reads as defaults. `NewGameInitData` applies the choices after vars are cleared (`ApplyPendingGraftSettings`). To add a setting: add an enum entry and a row in `sGraftSettings[]` with its own bit range; the screen picks it up.
+After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`src/graft_settings.c`) picks per-save options; they can't be changed later. They're packed into a 32-bit word across `VAR_GRAFTED_SETTINGS` (low) and `VAR_GRAFTED_SETTINGS_2` (high), stored XOR each setting's default so an unwritten var reads as defaults. `NewGameInitData` applies the choices after vars are cleared (`ApplyPendingGraftSettings`). To add a setting: add an enum entry and a row in `sGraftSettings[]` with its own bit range (and per-choice descriptions if the modes differ); the screen picks it up and `test/graft.c` checks the text fits.
 
-- Shiny odds: 1/4096, 1/512 (default, the old hard-coded rate) or 1/128, read by `ComputePlayerShinyOdds` via `GetPlayerShinyOddsThreshold`. `SHINY_ODDS` itself must never change: stored shininess is measured against it.
+- **Shiny Odds:** 1/4096, 1/512 (default, the old hard-coded rate) or 1/128, read by `ComputePlayerShinyOdds` via `GetPlayerShinyOddsThreshold`. `SHINY_ODDS` itself must never change: stored shininess is measured against it.
+- **Level Cap:** Off / Hard / Soft (`src/caps.c`, replacing the compile-time `B_EXP_CAP_TYPE`). The cap is the next Gym Leader's (then the Champion's) strongest level. Hard stops EXP, candies and Day Care growth; Soft divides EXP past it (1/4 down to 1/64).
+- **Graft Limit:** Free / Standard (stat grafts capped at 1 + badges until 5 badges) / Budget (2 + badges/2 grafts per mon) / Strict (3). Budget counts types (both slots as one), ability, nature and each stat; moves never count. **Graft Gates:** types need 1 badge, stats 2, abilities 3. All of it, plus the husk rule and fallen mons, goes through `GetGraftRejectReason` (`src/graft_data.c`), checked when a graft target is picked in battle or with the Splicer.
+- **Graft Items:** Shops / Rations. Rations: marts don't sell graft balls or Splicers; a new game starts with 3 Splice Balls and every gym badge gives 3 more (plus a Splicer from 3 badges), from `Common_EventScript_GiveGraftRations`, called by the shared `Common_EventScript_SetGymTrainers`.
+- **Harvests** (grafting from wild mons with a ball): None / 1 per area / 1 per mon (each party mon, per map section, stored in `graftHarvestArea` on BoxPokemon) / Any.
+- **Enemy Grafts:** Fewer (1 + badges/2) / Normal (2 + badges) / More (3 + badges; Leaders', Elite Four and Champion aces always roll an ability graft).
+- **Nuzlocke** (`src/graft_challenge.c`): only the first random wild encounter per map section is catchable (`graftCaughtAreas` in SaveBlock1); scripted/static battles are free. Dupes clause (default on) and shiny clause (default on). Harvesting uses a grafting ball, so it follows the Harvests setting rather than the catch rule; harvesting the area's first encounter uses up its catch too.
+- **Fainting:** Normal / Release (fainted mons are released after battle, held items return to the Bag) / Graveyard (`GRAFT_FLAG_FALLEN`: HP is clamped to 0 in `SetMonData`, items fail, they can't take grafts, but they can be the Splicer's donor) / Auto-splice (after battle, each fallen mon opens the Splicer as a free donor, or can be let go). Applied in `ReturnFromBattleToOverworld`; not after a whiteout (a wipe ends a Nuzlocke run, on the player's honor), and not in link, Frontier, Pyramid, Pike or Trainer Hill battles. Known gap: a mon that faints from overworld poison isn't marked.
+- **Battle Items:** Banned leaves only balls usable from the Bag in battle (`CannotUseItemsInBattle`). **Force Set:** battles always use Set style and the option is locked.
+- **Monotype:** any type or Off. Only party mons with that type (natural or grafted) pass `IsValidForBattle` and can switch in; if no party mon has it, everyone may battle, so there's always someone to send out. The starter gets the type grafted as its second type.
 
 ## Roadmap / decisions log
 
 Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5428 passed as of 2026-09-30; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
 
 
-Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds.
+Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories.
 
 Next:
-1. Challenge settings on the new-game settings screen: level caps, graft caps of various kinds, ability/stat gates, custom Nuzlocke rules (e.g. first encounter only, N grafts per route), monotype.
-2. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
-3. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
-4. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
-5. Someday: visual smoke tests (script mGBA to press buttons and screenshot UI flows). Deferred: expensive, and the test ROM covers the data paths.
+1. Ungrafter: clears grafts and their relearner entries; moves the mon currently knows stay.
+2. Bottle caps / hyper training at the Battle Frontier. Expansion has the engine support, but Emerald has no source of caps and no hyper-training NPC.
+3. An in-game encounter dex. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish first.
+4. Visual smoke tests: a scripted mGBA screenshot tool exists outside the repo (built from mGBA source against the ROM; see the 2026-09-30 session). Worth checking into `tools/` if UI work keeps coming.
 
 Debug leftovers to remove before release: Select+R sets money to 999999 (`src/overworld.c`).

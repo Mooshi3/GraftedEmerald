@@ -47,6 +47,7 @@
 #include "overworld.h"
 #include "palette.h"
 #include "party_menu.h"
+#include "graft_challenge.h"
 #include "player_pc.h"
 #include "pokemon.h"
 #include "pokemon_icon.h"
@@ -515,6 +516,7 @@ static const u8 sText_askText[] = _("Would you like to change {STR_VAR_1}'s\nabi
 static const u8 sText_doneText[] = _("{STR_VAR_1}'s ability became\n{STR_VAR_2}!{PAUSE_UNTIL_PRESS}");
 static const u8 sText_BasePointsResetToZero[] = _("{STR_VAR_1}'s base points\nwere all reset to zero!{PAUSE_UNTIL_PRESS}");
 static const u8 sText_CannotSendMonToBoxHM[] = _("Cannot send that mon to the box,\nbecause it knows a HM move.{PAUSE_UNTIL_PRESS}");
+static const u8 sText_MonotypeCantBattle[] = _("{STR_VAR_1} isn't the right type\nto battle!{PAUSE_UNTIL_PRESS}");
 static const u8 sText_CannotSendMonToBoxPartner[] = _("Cannot send a mon that doesn't\nbelong to you to the box.{PAUSE_UNTIL_PRESS}");
 
 // static const data
@@ -1534,7 +1536,12 @@ static bool8 TryRejectGraftTarget(u8 taskId, u8 slot)
 {
     const u8 *reason = GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][slot].box, GetSelectedGraftType(), GetSelectedGraftStatIndex());
     if (reason == NULL)
+        reason = GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][slot]);
+    if (reason == NULL)
+    {
+        OnHarvestTargetChosen(&gParties[B_TRAINER_PLAYER][slot]);
         return FALSE;
+    }
     PlaySE(SE_FAILURE);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
@@ -7641,6 +7648,13 @@ static bool8 TrySwitchInPokemon(void)
         StringExpandPlaceholders(gStringVar4, gText_EggCantBattle);
         return FALSE;
     }
+    if (!IsMonotypeLegal(&party[partySlot]))
+    {
+        // GRAFT: Monotype
+        GetMonNickname(&party[partySlot], gStringVar1);
+        StringExpandPlaceholders(gStringVar4, sText_MonotypeCantBattle);
+        return FALSE;
+    }
     if (BattlersShareParty(gBattlerInMenuId, GetPartnerBattler(gBattlerInMenuId))
      && battlePartyId == gBattleStruct->prevSelectedPartySlot)
     {
@@ -8687,6 +8701,9 @@ enum SplicerState
     SPLICER_MOVE_REPLACE_YESNO,
     SPLICER_TYPE_SLOT,
     SPLICER_APPLY_FINISH,
+    SPLICER_AUTO_INTRO,      // Auto-splice: "X has fallen", then the categories
+    SPLICER_AUTO_SKIP,       // Auto-splice: B on the categories asks to let it go instead
+    SPLICER_AUTO_SKIP_YESNO,
 };
 
 static const u8 sText_SplicerSacrifice[] = _("{STR_VAR_1} will be lost.\nAre you sure?");
@@ -8698,6 +8715,68 @@ static const u8 sText_SplicerMoveReplaced[] = _("{STR_VAR_1} learned\n{STR_VAR_2
 static const u8 sText_SplicerTypeSlot1[] = _("Replace type1 ({STR_VAR_1})\nwith {STR_VAR_2}?");
 static const u8 sText_SplicerTypeSlot2[] = _("Replace type2 ({STR_VAR_1})\nwith {STR_VAR_2}?");
 static const u8 sText_SplicerApplied[] = _("Graft applied!\n{STR_VAR_1} was released.");
+static const u8 sText_AutoSpliceIntro[] = _("{STR_VAR_1} has fallen.\nPick a graft to pass on.");
+static const u8 sText_AutoSpliceSkip[] = _("Let {STR_VAR_1} go without\npassing anything on?");
+static const u8 sText_AutoSpliceReleased[] = _("{STR_VAR_1} was released.");
+
+// ============================================================
+// Auto-splice (Fainting setting): after a battle, each fallen party mon is the Splicer donor
+// for a free graft onto a teammate, or is let go. Reuses Task_GraftSplicer.
+// ============================================================
+
+static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
+static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
+
+static void CB2_AutoSpliceContinue(void);
+
+static void Task_AutoSpliceBegin(u8 taskId)
+{
+    u32 donor;
+    if (gPaletteFade.active)
+        return;
+    donor = GetNextAutoSpliceDonor();
+    gPartyMenu.slotId = donor;
+    gPartyMenu.slotId2 = donor;
+    GatherGraftSourceDataPartyMon(donor);
+    GetMonNickname(&gParties[B_TRAINER_PLAYER][donor], gStringVar1);
+    StringExpandPlaceholders(gStringVar4, sText_AutoSpliceIntro);
+    DisplayPartyMenuMessage(gStringVar4, TRUE);
+    ScheduleBgCopyTilemapToVram(2);
+    sPartyMenuInternal->data[0] = SPLICER_AUTO_INTRO;
+    sPartyMenuInternal->data[1] = 0;
+    gTasks[taskId].func = Task_GraftSplicer;
+}
+
+bool32 StartAutoSplice(MainCallback next)
+{
+    if (GetNextAutoSpliceDonor() >= PARTY_SIZE)
+    {
+        sAutoSpliceActive = FALSE;
+        return FALSE;
+    }
+    sAutoSpliceNext = next;
+    sAutoSpliceActive = TRUE;
+    InitPartyMenu(PARTY_MENU_TYPE_FIELD, PARTY_LAYOUT_SINGLE, PARTY_ACTION_CHOOSE_MON, FALSE, PARTY_MSG_NONE, Task_AutoSpliceBegin, CB2_AutoSpliceContinue);
+    return TRUE;
+}
+
+// Every exit from the menu comes back here: the next fallen mon, or on to where the battle was going.
+static void CB2_AutoSpliceContinue(void)
+{
+    if (!StartAutoSplice(sAutoSpliceNext))
+        SetMainCallback2(sAutoSpliceNext);
+}
+
+static void ReleaseSplicerDonor(void)
+{
+    u8 sacrificeSlot = gPartyMenu.slotId2;
+    u16 item = GetMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot], MON_DATA_HELD_ITEM);
+    if (item != ITEM_NONE)
+        AddBagItem(item, 1);
+    ZeroMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot]);
+    CompactPartySlots();
+    CalculatePlayerPartyCount();
+}
 
 void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
 {
@@ -8865,10 +8944,10 @@ void Task_GraftSplicer(u8 taskId)
         {
             PlaySE(SE_SELECT);
             GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
-            StringExpandPlaceholders(gStringVar4, sText_SplicerSacrifice);
+            StringExpandPlaceholders(gStringVar4, sAutoSpliceActive ? sText_AutoSpliceSkip : sText_SplicerSacrifice);
             DisplayPartyMenuMessage(gStringVar4, TRUE);
             ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_CONFIRM_SACRIFICE;
+            sPartyMenuInternal->data[0] = sAutoSpliceActive ? SPLICER_AUTO_SKIP : SPLICER_CONFIRM_SACRIFICE;
         }
         break;
 
@@ -9351,11 +9430,57 @@ bool8 graftResult = ApplyGraftFromMenuToSlot(targetSlot);
         }
         break;
 
+    case SPLICER_AUTO_INTRO:
+        if (IsPartyMenuTextPrinterActive() == TRUE)
+            return;
+        if (!JOY_NEW(A_BUTTON | B_BUTTON))
+            return;
+        PlaySE(SE_SELECT);
+        sPartyMenuInternal->data[1] = 0;
+        SetSelectedGraftCategory(0);
+        SetGraftMenuSubCursor(0);
+        UpdateGraftMenuCursorOverworld(0);
+        DisplayPartyMenuMessage(gStringVar4, TRUE);
+        ScheduleBgCopyTilemapToVram(2);
+        sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
+        break;
+
+    case SPLICER_AUTO_SKIP:
+        if (IsPartyMenuTextPrinterActive() == TRUE)
+            return;
+        PartyMenuDisplayYesNoMenu();
+        sPartyMenuInternal->data[0] = SPLICER_AUTO_SKIP_YESNO;
+        break;
+
+    case SPLICER_AUTO_SKIP_YESNO:
+        switch (Menu_ProcessInputNoWrapClearOnChoose())
+        {
+        case 0: // YES - let it go
+            PlaySE(SE_SELECT);
+            GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
+            ReleaseSplicerDonor();
+            StringExpandPlaceholders(gStringVar4, sText_AutoSpliceReleased);
+            DisplayPartyMenuMessage(gStringVar4, TRUE);
+            ScheduleBgCopyTilemapToVram(2);
+            sPartyMenuInternal->data[0] = SPLICER_DONE;
+            break;
+        case 1: // NO - back to the categories
+        case MENU_B_PRESSED:
+            PlaySE(SE_SELECT);
+            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
+            DisplayPartyMenuMessage(gStringVar4, TRUE);
+            ScheduleBgCopyTilemapToVram(2);
+            sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
+            break;
+        }
+        break;
+
     case SPLICER_APPLY_FINISH:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
-        // Consume the Graft Splicer item
-        RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
+        // Consume the Graft Splicer item (Auto-splice is free)
+        if (!sAutoSpliceActive)
+            RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
         gPartyMenuUseExitCallback = TRUE;
         gTasks[taskId].func = Task_ClosePartyMenu;
         sPartyMenuInternal->data[0] = SPLICER_DONE;

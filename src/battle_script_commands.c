@@ -34,6 +34,7 @@
 #include "string_util.h"
 #include "pokemon_icon.h"
 #include "caps.h"
+#include "graft_challenge.h"
 #include "m4a.h"
 #include "mail.h"
 #include "event_data.h"
@@ -4323,6 +4324,7 @@ static void Cmd_graftmenu(void)
     case 0:
         // Initialize graft menu
         GatherGraftSourceDataBattle(); StartGraftMenu();
+        OnWildHarvest(); // GRAFT: Harvests 1 per area
         gGraftLearnMovePending = FALSE;
         gBattleCommunication[MULTIUSE_STATE] = 1;
         gBattleCommunication[CURSOR_POSITION] = 0;

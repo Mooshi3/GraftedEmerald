@@ -45,6 +45,7 @@ bool8 gGraftLearnMovePending = FALSE;
 
 static struct GraftSourceData sGraftSource;
 static struct GraftMenuState sGraftMenu;
+static void ResetGraftCategoryOrder(void);
 
 // Legacy compatibility
 static u16 sCaughtMonSpecies;
@@ -146,10 +147,12 @@ void GatherGraftSourceDataBattle(void)
 
     sCaughtMonSpecies = species;
 
-    // Initialize menu state
+    // Initialize menu state. The Splicer offers all 5 categories in their natural order;
+    // without this it showed whatever order and count the last Graft Ball rolled.
     sGraftMenu.category = 0;
     sGraftMenu.subCursor = 0;
     sGraftMenu.phase = 0;
+    ResetGraftCategoryOrder();
 }
 
 // ============================================================
@@ -247,10 +250,12 @@ void GatherGraftSourceDataPartyMon(u8 partySlot)
 
     sCaughtMonSpecies = species;
 
-    // Initialize menu state
+    // Initialize menu state. The Splicer offers all 5 categories in their natural order;
+    // without this it showed whatever order and count the last Graft Ball rolled.
     sGraftMenu.category = 0;
     sGraftMenu.subCursor = 0;
     sGraftMenu.phase = 0;
+    ResetGraftCategoryOrder();
 }
 
 // ============================================================
@@ -475,6 +480,14 @@ static void ShuffleCategoryOrder(void)
     }
     for (i = 0; i < n; i++)
         sCategoryOrder[j++] = gated[i];
+}
+
+static void ResetGraftCategoryOrder(void)
+{
+    u8 i;
+    for (i = 0; i < GRAFT_CATEGORY_COUNT; i++)
+        sCategoryOrder[i] = i;
+    sGraftMenu.numCategories = GRAFT_CATEGORY_COUNT;
 }
 
 u8 GetGraftMenuRealCategory(u8 displayPos)

@@ -4,6 +4,7 @@
 #include "pokemon.h"
 #include "battle_controllers.h"
 #include "battle_interface.h"
+#include "graft_challenge.h"
 #include "battle_z_move.h"
 #include "graphics.h"
 #include "sprite.h"
@@ -2984,6 +2985,8 @@ bool32 CanThrowLastUsedBall(void)
     if (B_LAST_USED_BALL == FALSE)
         return FALSE;
     if (!CanThrowBall())
+        return FALSE;
+    if (GetChallengeBallBlockReason(gBallToDisplay) != NULL) // GRAFT: Nuzlocke/harvest rules
         return FALSE;
     if (gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_FRONTIER))
         return FALSE;

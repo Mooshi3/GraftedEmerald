@@ -153,4 +153,6 @@ bool32 SetUpFieldMove_RockClimb(void);
 s8 Test_UpdatePartySelectionSingleLayout(s8 slotId, s8 movementDir, bool8 chooseHalf, u8 lastSelectedSlot);
 #endif
 
+bool32 StartAutoSplice(MainCallback next);
+
 #endif // GUARD_PARTY_MENU_H

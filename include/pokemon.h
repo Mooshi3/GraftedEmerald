@@ -290,6 +290,7 @@ struct BoxPokemon
     u16 graftAbility;      // ability override (0 = no override)
     u8 graftFlags;         // bitmask: which grafts are active
     u8 graftStatOverrides[6]; // HP, ATK, DEF, SPD, SPATK, SPDEF (0 = no override)
+    u8 graftHarvestArea;   // Harvests per mon: map section of this mon's last wild graft (was padding)
     u16 graftMoves[4];      // grafted move IDs (MOVE_NONE = no graft move)
 };
 

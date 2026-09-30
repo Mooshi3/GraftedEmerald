@@ -1204,6 +1204,9 @@ struct SaveBlock1
     /*0x3???*/ struct TrainerHillSave trainerHill;
 #endif //FREE_TRAINER_HILL
     /*0x3???*/ struct WaldaPhrase waldaPhrase;
+    // GRAFT: challenge settings, one bit per map section (graft_challenge.c)
+    u8 graftCaughtAreas[32];  // Nuzlocke: this area's encounter is spent
+    u8 graftHarvestAreas[32]; // Harvests 1 per area: this area's harvest is spent
 #if FREE_TRAINER_TOWER == FALSE && IS_FRLG
     u32 towerChallengeId;
     struct TrainerTower trainerTower[NUM_TOWER_CHALLENGE_TYPES];

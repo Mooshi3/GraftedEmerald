@@ -10,6 +10,7 @@
 #include "battle_hold_effects.h"
 #include "battle_interface.h"
 #include "battle_main.h"
+#include "graft_challenge.h"
 #include "battle_message.h"
 #include "battle_pyramid.h"
 #include "battle_scripts.h"
@@ -2745,7 +2746,7 @@ static void ClearSetBScriptingStruct(void)
     memset(&gBattleScripting, 0, sizeof(gBattleScripting));
 
     gBattleScripting.windowsType = temp;
-    gBattleScripting.battleStyle = gSaveBlock2Ptr->optionsBattleStyle;
+    gBattleScripting.battleStyle = IsForceSetMode() ? OPTIONS_BATTLE_STYLE_SET : gSaveBlock2Ptr->optionsBattleStyle; // GRAFT: Force Set
     #if TESTING
     gBattleScripting.battleStyle = OPTIONS_BATTLE_STYLE_SET;
     #endif
@@ -5446,6 +5447,10 @@ static void ReturnFromBattleToOverworld(void)
     }
 
     m4aSongNumStop(SE_LOW_HEALTH);
+    Nuzlocke_OnBattleEnd();
+    // GRAFT: Fainting rules (release / mark fallen); Auto-splice runs its menu, then continues itself
+    if (ApplyFaintingRulesAfterBattle(gMain.savedCallback))
+        return;
     SetMainCallback2(gMain.savedCallback);
 }
 

@@ -2587,6 +2587,8 @@ void SetMonData(struct Pokemon *mon, s32 field, const void *dataArg)
     {
         u32 hpLost;
         SET16(mon->hp);
+        if (mon->box.graftFlags & GRAFT_FLAG_FALLEN)
+            mon->hp = 0; // GRAFT: fallen mons can't be healed or revived
         hpLost = mon->maxHP - mon->hp;
         SetBoxMonData(&mon->box, MON_DATA_HP_LOST, &hpLost);
         break;
@@ -2595,6 +2597,8 @@ void SetMonData(struct Pokemon *mon, s32 field, const void *dataArg)
     {
         u32 hpLost;
         SET16(hpLost);
+        if (mon->box.graftFlags & GRAFT_FLAG_FALLEN)
+            hpLost = mon->maxHP; // GRAFT: fallen mons can't be healed or revived
         mon->hp = mon->maxHP - hpLost;
         SetBoxMonData(&mon->box, MON_DATA_HP_LOST, &hpLost);
         break;
@@ -3486,6 +3490,8 @@ void PokemonToBattleMon(struct Pokemon *src, struct BattlePokemon *dst)
 
 bool8 ExecuteTableBasedItemEffect(struct Pokemon *mon, enum Item item, u8 partyIndex, u8 moveIndex)
 {
+    if (mon->box.graftFlags & GRAFT_FLAG_FALLEN)
+        return TRUE; // GRAFT: items don't work on fallen mons
     return PokemonUseItemEffects(mon, item, partyIndex, moveIndex, FALSE);
 }
 

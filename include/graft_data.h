@@ -7,6 +7,7 @@
 #define GRAFT_FLAG_TYPE (1 << 2)
 #define GRAFT_FLAG_STAT (1 << 3)
 #define GRAFT_FLAG_NATURE (1 << 4)
+#define GRAFT_FLAG_FALLEN (1 << 5) // Fainting: Graveyard/Auto-splice; HP is stuck at 0 (graft_challenge.c)
 
 #define GRAFT_TYPE_NONE 0xFF
 #define GRAFT_STAT_NONE 0

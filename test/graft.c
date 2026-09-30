@@ -2,6 +2,13 @@
 #include "graft_data.h"
 #include "graft_settings.h"
 #include "graft_menu.h"
+#include "graft_challenge.h"
+#include "battle.h"
+#include "battle_controllers.h"
+#include "item_use.h"
+#include "script_pokemon_util.h"
+#include "fieldmap.h"
+#include "constants/region_map_sections.h"
 #include "pokemon_storage_system.h"
 #include "save.h"
 #include "caps.h"
@@ -370,5 +377,151 @@ TEST("Enemy Grafts setting scales the enemy graft count")
     EXPECT_EQ(GetEnemyGraftCount(), 2);
     SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, GRAFT_ENEMY_GRAFTS_MORE);
     EXPECT_EQ(GetEnemyGraftCount(), 5);
+    ResetGraftSettingsForTest();
+}
+
+static void SetupWildEncounterForTest(u16 species, u32 mapsec)
+{
+    gMapHeader.regionMapSectionId = mapsec;
+    gBattleTypeFlags = 0;
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_OPPONENT_A][0], species, 5, 0);
+}
+
+TEST("Nuzlocke: only the first encounter in an area can be caught; grafting balls follow the harvest rule")
+{
+    ResetGraftSettingsForTest();
+    memset(gSaveBlock1Ptr->graftCaughtAreas, 0, sizeof(gSaveBlock1Ptr->graftCaughtAreas));
+    memset(gSaveBlock1Ptr->graftHarvestAreas, 0, sizeof(gSaveBlock1Ptr->graftHarvestAreas));
+    SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, TRUE);
+    SetGraftSetting(GRAFT_SETTING_SHINY_CLAUSE, FALSE);
+
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_102);
+    Nuzlocke_OnWildEncounter();
+    EXPECT(GetChallengeBallBlockReason(ITEM_POKE_BALL) == NULL);
+    Nuzlocke_OnBattleEnd();
+
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_102);
+    Nuzlocke_OnWildEncounter();
+    EXPECT_EQ(Nuzlocke_GetEncounterState(), NUZLOCKE_ENCOUNTER_AREA_USED);
+    EXPECT(GetChallengeBallBlockReason(ITEM_POKE_BALL) != NULL);
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL); // harvests: Any
+    SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_ONE);
+    OnWildHarvest();
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) != NULL);
+    SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_NONE);
+    EXPECT(GetChallengeBallBlockReason(ITEM_PATCH_BALL) != NULL);
+    Nuzlocke_OnBattleEnd();
+
+    // A new area is open again; scripted battles (no OnWildEncounter) are always free
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_103);
+    Nuzlocke_OnWildEncounter();
+    EXPECT(GetChallengeBallBlockReason(ITEM_POKE_BALL) == NULL);
+    Nuzlocke_OnBattleEnd();
+    EXPECT_EQ(Nuzlocke_GetEncounterState(), NUZLOCKE_ENCOUNTER_FREE);
+    ResetGraftSettingsForTest();
+}
+
+TEST("Nuzlocke dupes clause: a caught family doesn't count and keeps the area open")
+{
+    ResetGraftSettingsForTest();
+    memset(gSaveBlock1Ptr->graftCaughtAreas, 0, sizeof(gSaveBlock1Ptr->graftCaughtAreas));
+    SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, TRUE);
+    GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_POOCHYENA), FLAG_SET_CAUGHT);
+    EXPECT(IsFamilyCaught(SPECIES_MIGHTYENA));
+    EXPECT(!IsFamilyCaught(SPECIES_WURMPLE));
+
+    SetupWildEncounterForTest(SPECIES_MIGHTYENA, MAPSEC_ROUTE_104);
+    Nuzlocke_OnWildEncounter();
+    EXPECT_EQ(Nuzlocke_GetEncounterState(), NUZLOCKE_ENCOUNTER_DUPE);
+    Nuzlocke_OnBattleEnd();
+    SetupWildEncounterForTest(SPECIES_WURMPLE, MAPSEC_ROUTE_104);
+    Nuzlocke_OnWildEncounter();
+    EXPECT_EQ(Nuzlocke_GetEncounterState(), NUZLOCKE_ENCOUNTER_FREE);
+    Nuzlocke_OnBattleEnd();
+    ResetGraftSettingsForTest();
+}
+
+TEST("Harvests per mon: each party mon takes one wild graft per area")
+{
+    ResetGraftSettingsForTest();
+    ZeroPlayerPartyMons();
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0);
+    SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_PER_MON);
+    SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_102);
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL);
+    EXPECT(GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][0]) == NULL);
+    OnHarvestTargetChosen(&gParties[B_TRAINER_PLAYER][0]);
+    EXPECT(GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][0]) != NULL);
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) != NULL); // nobody left to take one here
+    gMapHeader.regionMapSectionId = MAPSEC_ROUTE_103;
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL);
+    ResetGraftSettingsForTest();
+}
+
+TEST("Fainting: fallen mons stay at 0 HP through healing and items; Release removes them")
+{
+    u16 potion = ITEM_REVIVE;
+    ResetGraftSettingsForTest();
+    ZeroPlayerPartyMons();
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0);
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][1], SPECIES_WYNAUT, 20, 0);
+    SetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP, &(u16){ 0 });
+
+    // Normal: nothing happens
+    gBattleTypeFlags = 0;
+    gBattleOutcome = B_OUTCOME_WON;
+    EXPECT(!ApplyFaintingRulesAfterBattle(NULL));
+    EXPECT(!IsMonFallen(&gParties[B_TRAINER_PLAYER][1]));
+
+    // Graveyard: marked fallen, can't be healed or revived
+    SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_GRAVEYARD);
+    EXPECT(!ApplyFaintingRulesAfterBattle(NULL));
+    EXPECT(IsMonFallen(&gParties[B_TRAINER_PLAYER][1]));
+    HealPlayerParty();
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP), 0);
+    EXPECT_GT(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_HP), 0);
+    EXPECT(ExecuteTableBasedItemEffect(&gParties[B_TRAINER_PLAYER][1], potion, 1, 0)); // TRUE = can't use
+    EXPECT(GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][1].box, GRAFT_MENU_MOVE, 0) != NULL);
+
+    // Release: gone after the battle
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][1], SPECIES_WYNAUT, 20, 0);
+    SetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP, &(u16){ 0 });
+    SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_RELEASE);
+    gBattleOutcome = B_OUTCOME_LOST; // a whiteout doesn't take the party
+    EXPECT(!ApplyFaintingRulesAfterBattle(NULL));
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_SPECIES), SPECIES_WYNAUT);
+    gBattleOutcome = B_OUTCOME_WON;
+    EXPECT(!ApplyFaintingRulesAfterBattle(NULL));
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_SPECIES), SPECIES_NONE);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_WOBBUFFET);
+    ResetGraftSettingsForTest();
+}
+
+TEST("Monotype: off-type party mons can't battle unless nobody has the type; grafted types count")
+{
+    ResetGraftSettingsForTest();
+    ZeroPlayerPartyMons();
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0); // Psychic
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][1], SPECIES_ZIGZAGOON, 20, 0); // Normal
+    SetGraftSetting(GRAFT_SETTING_MONOTYPE, TYPE_WATER);
+    // Nobody is Water: everyone may battle
+    EXPECT(IsValidForBattle(&gParties[B_TRAINER_PLAYER][0]));
+    GraftMonotypeOntoStarter(&gParties[B_TRAINER_PLAYER][0]);
+    EXPECT(IsValidForBattle(&gParties[B_TRAINER_PLAYER][0]));
+    EXPECT(!IsValidForBattle(&gParties[B_TRAINER_PLAYER][1]));
+    // Enemy parties are never restricted
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_ZIGZAGOON, 20, 0);
+    EXPECT(IsValidForBattle(&gParties[B_TRAINER_OPPONENT_A][0]));
+    ResetGraftSettingsForTest();
+}
+
+TEST("Battle Items: Banned leaves only balls")
+{
+    ResetGraftSettingsForTest();
+    ZeroPlayerPartyMons();
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0);
+    SetGraftSetting(GRAFT_SETTING_BATTLE_ITEMS, TRUE);
+    EXPECT(AreBattleItemsBanned());
+    EXPECT(CannotUseItemsInBattle(ITEM_X_ATTACK, &gParties[B_TRAINER_PLAYER][0]));
     ResetGraftSettingsForTest();
 }

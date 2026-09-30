@@ -1,5 +1,6 @@
 #include "global.h"
 #include "item_use.h"
+#include "graft_challenge.h"
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_stat_change.h"
@@ -1168,6 +1169,7 @@ bool32 CanThrowBall(void)
 static const u8 sText_CantThrowPokeBall_TwoMons[] = _("Cannot throw a ball!\nThere are two Pokémon out there!\p");
 static const u8 sText_CantThrowPokeBall_SemiInvulnerable[] = _("Cannot throw a ball!\nThere's no Pokémon in sight!\p");
 static const u8 sText_CantThrowPokeBall_Disabled[] = _("POKé BALLS cannot be used\nright now!\p");
+static const u8 sText_BattleItemsBanned[] = _("Only POKé BALLS can be used\nin battle!\p");
 
 static void ItemUseInBattle_ShowPartyMenu(u8 taskId)
 {
@@ -1240,6 +1242,19 @@ bool32 CannotUseItemsInBattle(enum Item itemId, struct Pokemon *mon)
             return TRUE;
     }
 
+    // GRAFT: Battle Items: Banned leaves only Poké Balls usable in battle
+    if (AreBattleItemsBanned() && battleUsage != EFFECT_ITEM_THROW_BALL)
+    {
+        StringExpandPlaceholders(gStringVar4, sText_BattleItemsBanned);
+        return TRUE;
+    }
+    // GRAFT: fallen mons (Fainting: Graveyard/Auto-splice) can't be revived
+    if (mon != NULL && IsMonFallen(mon))
+    {
+        StringExpandPlaceholders(gStringVar4, gText_WontHaveEffect);
+        return TRUE;
+    }
+
     // battleUsage checks
     switch (battleUsage)
     {
@@ -1264,6 +1279,13 @@ bool32 CannotUseItemsInBattle(enum Item itemId, struct Pokemon *mon)
             cannotUse = TRUE;
         break;
     case EFFECT_ITEM_THROW_BALL:
+        // GRAFT: Nuzlocke encounters and harvest limits
+        failStr = GetChallengeBallBlockReason(itemId);
+        if (failStr != NULL)
+        {
+            cannotUse = TRUE;
+            break;
+        }
         switch (GetBallThrowableState())
         {
         case BALL_THROW_UNABLE_TWO_MONS:

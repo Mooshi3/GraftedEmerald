@@ -4,7 +4,7 @@
 
 // If you would like to ensure save compatibility, update the values below with those for your hack. You can find these through the debug menu.
 // Please note that this simple check is not 100% foolproof, but should be able to catch most unintended shifts.
-#define T_SAVEBLOCK1_SIZE 15728
+#define T_SAVEBLOCK1_SIZE 15792 // GRAFT: +64 for the Nuzlocke/harvest area bitfields
 #define T_SAVEBLOCK2_SIZE 3884
 #define T_SAVEBLOCK3_SIZE 16
 #define T_POKEMONSTORAGE_SIZE 33596 // GRAFT: 11 boxes of 100-byte BoxPokemon (sizes are for the test build)
