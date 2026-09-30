@@ -30,6 +30,8 @@ u32 gGraftSelectedPartyPersonality = 0;
 u8 ResolveGraftTargetSlot(void)
 {
     s32 i;
+    if (gGraftSelectedPartySlot >= PARTY_SIZE)
+        return 0xFF; // no target picked
     for (i = 0; i < PARTY_SIZE; i++)
     {
         if (GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_PERSONALITY) == gGraftSelectedPartyPersonality)

@@ -53,6 +53,31 @@ static void shot(const char *path)
     png_write_end(p, 0); fclose(f);
 }
 
+// heap ADDR: walk the game's malloc heap (gHeap's address from pokeemerald.map) and print allocated blocks
+static void heap(uint32_t start)
+{
+    uint32_t b = start, total = 0, freeTotal = 0, largestFree = 0;
+    int guard = 0;
+    do {
+        uint32_t w0 = core->busRead32(core, b), w1 = core->busRead32(core, b + 4);
+        uint32_t next = core->busRead32(core, b + 12);
+        uint32_t size = w1 & 0x3FFFF;
+        if ((w0 >> 16) != 0xA3A3) { printf("heap: bad magic at %08x\n", b); break; }
+        if (w0 & 1) {
+            uint32_t loc = 0x08000000 | (((w0 >> 5) & 0x7FF) << 14) | (w1 >> 18);
+            char name[80] = {0};
+            for (int i = 0; i < 79; i++) { name[i] = core->busRead8(core, loc + i); if (!name[i]) break; }
+            printf("heap: %6u %s\n", size, name);
+            total += size;
+        } else {
+            freeTotal += size;
+            if (size > largestFree) largestFree = size;
+        }
+        b = next;
+    } while (b != start && ++guard < 10000);
+    printf("heap: allocated %u, free %u, largest free %u\n", total, freeTotal, largestFree);
+}
+
 int main(int argc, char **argv)
 {
     mLogSetDefaultLogger(&logger);
@@ -71,6 +96,7 @@ int main(int argc, char **argv)
         else if (sscanf(line, "mash %63s %d %d", a, &n, &m) == 3) for (int i = 0; i < n; i++) { frames(2, parsekeys(a)); frames(m, 0); }
         else if (sscanf(line, "press %63s %d", a, &n) >= 1) { frames(n ? n : 2, parsekeys(a)); frames(1, 0); }
         else if (sscanf(line, "shot %63s", b) == 1) shot(b);
+        else if (sscanf(line, "heap %x", (unsigned *)&n) == 1) heap((uint32_t)n);
         else if (sscanf(line, "save %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_CREAT|O_TRUNC|O_RDWR); mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
         else if (sscanf(line, "load %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_RDONLY); mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
     }

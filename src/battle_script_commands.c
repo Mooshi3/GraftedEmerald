@@ -7,6 +7,7 @@
 #include "battle_ai_record.h"
 #include "battle_ai_util.h"
 #include "battle_scripts.h"
+#include "battle_util2.h"
 #include "battle_switch_in.h"
 #include "battle_environment.h"
 #include "battle_gimmick.h"
@@ -4417,14 +4418,24 @@ static void Cmd_graftmenu(void)
         // Wait for fade out, then open party menu
         if (!gPaletteFade.active)
         {
-            FreeAllWindowBuffers();
+            CloseMainBattleScreen(); // GRAFT: frees the battle gfx buffers too; the reshow reallocates them
+            // No target until one is picked: backing out (Cancel or B) must not reuse the last graft's target
+            gGraftSelectedPartySlot = 0xFF;
+            gGraftSelectedPartyPersonality = 0;
             OpenPartyMenuInBattle(PARTY_ACTION_GRAFT);
             gBattleCommunication[MULTIUSE_STATE] = 3;
         }
         break;
 
 case 3: // Wait for party menu to return to battle
-        if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2)
+        if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2 && ResolveGraftTargetSlot() >= PARTY_SIZE)
+        {
+            // Backed out of the party menu: return to the category menu
+            gBattleCommunication[MULTIUSE_STATE] = 1;
+            gBattleCommunication[CURSOR_POSITION] = 0;
+            gBattleCommunication[4] = 0;
+        }
+        else if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2)
         {
             u8 graftType = GetSelectedGraftType();
             if (graftType == GRAFT_MENU_TYPE)

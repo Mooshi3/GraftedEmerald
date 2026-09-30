@@ -31,6 +31,7 @@ Commands, separated by `;`:
 | `press KEYS [N]` | hold for N frames (default 2). Keys: `A B START SELECT UP DOWN LEFT RIGHT L R`, combine with `+` |
 | `mash KEYS COUNT GAP` | press COUNT times, GAP frames apart |
 | `shot NAME.png` | screenshot into `out/` |
+| `heap ADDR` | print the game's heap: each allocated block with its size and the `file:line` that allocated it, then totals. ADDR is `gHeap`'s address in hex, from `grep " gHeap$" pokeemerald.map` (drop the `0x`). |
 
 Walking one tile is `press DIR 16`. Pressing a direction for 2-4 frames only turns the player.
 
@@ -56,6 +57,7 @@ Most failures are inputs sent at the wrong moment. Before assuming a game bug, s
 - **Save states break when the ROM changes.** After `make`, a state from the old ROM loads garbled graphics or crashes. Rerun the scenario from `-`.
 - **Obedience:** traded mons above the badge level disobey. Debug gifts are the player's own, so they obey, except under the Soft level cap, where mons above the cap may disobey.
 - **Wild encounters are deterministic.** The same inputs from the same state give the same encounter, so a step that found a battle once will find it again.
+- **Out of memory / leaks:** the `malloc.c` crash screen means the heap ran out. Take `heap` readings before and after the suspect step; a menu that returns to battle should leave the totals where they were. A battle normally uses about 89 KB of the 115 KB heap.
 - **Emulator log:** `SHOTLOG=1 ./run.py ...` prints mGBA's log. A crash shows up as the game restarting at the copyright screen.
 
 ## Reporting
