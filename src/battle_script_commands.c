@@ -447,13 +447,6 @@ static void Cmd_jumptocalledmove(void);
 static void Cmd_statusanimation(void);
 static void Cmd_futuresighttargetfailure(void);
 static void Cmd_getpossiblenexttarget(void);
-static void Cmd_graftrecordmove(void)
-{
-    // Record the move that was just learned via the graft learn flow
-    // in the graftMoves history for move relearner
-    RecordGraftMove(&gParties[B_TRAINER_PLAYER][gBattleStruct->expGetterMonId].box, gMoveToLearn);
-    gBattlescriptCurrInstr++;
-}
 
 static void Cmd_yesnobox(void);
 static void Cmd_graftharvest(void);
@@ -786,7 +779,7 @@ void (*const gBattleScriptingCommandsTable[])(void) =
     [B_SCR_OP_TRYBATTLERSTATCHANGE]                  = Cmd_trybattlerstatchange,
     [B_SCR_OP_JUMPIFTERRAIN]                         = Cmd_jumpifterrain,
     [B_SCR_OP_GRAFT_HARVEST]                         = Cmd_graftharvest,
-    [B_SCR_OP_GRAFT_RECORD_MOVE]                     = Cmd_graftrecordmove,
+    [B_SCR_OP_UNUSED_2]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_3]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_4]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_5]                              = Cmd_dummy,

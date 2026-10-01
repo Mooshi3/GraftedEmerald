@@ -42,6 +42,7 @@ Walking one tile is `press DIR 16`. Pressing a direction for 2-4 frames only tur
 Each ends in a documented spot; see the comment at the top of each script.
 
 - `autosplice.sh`: Rations, Auto-splice and Monotype Fire; a trainer battle where the lead will faint.
+- `graftbag.sh`: default settings, Sandygast and Splice Balls; one wild mon broken down into pieces; ends on the Graft Bag screen.
 - `hyper.sh`: next to the hyper trainer at the Battle Frontier, with caps and BP.
 - `splicer.sh`: two mons and two Graft Splicers, start menu open.
 - `wild.sh`: Nuzlocke, 1 harvest per area and Graveyard fainting, in Petalburg Woods with Poké Balls and Graft Balls.

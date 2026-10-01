@@ -574,9 +574,6 @@
 	.byte B_SCR_OP_GRAFT_HARVEST
 .endm
 
-.macro graftrecordmove
-	.byte B_SCR_OP_GRAFT_RECORD_MOVE
-	.endm
 	.macro cancelallactions
 	.byte B_SCR_OP_CANCELALLACTIONS
 	.endm
