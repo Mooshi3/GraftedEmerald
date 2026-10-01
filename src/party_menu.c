@@ -258,6 +258,7 @@ static void DisplayPartyPokemonDataForChooseHalf(u8);
 static void DisplayPartyPokemonDataForWirelessMinigame(u8);
 static void DisplayPartyPokemonDataForBattlePyramidHeldItem(u8);
 static bool8 DisplayPartyPokemonDataForMoveTutorOrEvolutionItem(u8);
+static void DisplayPartyPokemonDataForGraftPiece(u8 slot);
 static void DisplayPartyPokemonData(u8);
 static void DisplayPartyPokemonNickname(struct Pokemon *, struct PartyMenuBox *, u8);
 static void DisplayPartyPokemonLevelCheck(struct Pokemon *, struct PartyMenuBox *, u8);
@@ -1055,6 +1056,8 @@ static void RenderPartyMenuBox(u8 slot)
                 DisplayPartyPokemonDataForWirelessMinigame(slot);
             else if (gPartyMenu.menuType == PARTY_MENU_TYPE_STORE_PYRAMID_HELD_ITEMS)
                 DisplayPartyPokemonDataForBattlePyramidHeldItem(slot);
+            else if (gPartyMenu.action == PARTY_ACTION_GRAFT_PIECE)
+                DisplayPartyPokemonDataForGraftPiece(slot); // GRAFT: ABLE / NOT ABLE, like a TM
             else if (!DisplayPartyPokemonDataForMoveTutorOrEvolutionItem(slot))
                 DisplayPartyPokemonData(slot);
 
@@ -9041,6 +9044,28 @@ static void CommitGraftPiece(void)
     ShowPieceMessage(sText_PieceGrafted);
 }
 
+// Why the piece in use can't go on this mon, or NULL. The party menu's ABLE / NOT ABLE labels use it too.
+static const u8 *GetPieceRejectReason(struct Pokemon *mon)
+{
+    const u8 *reason;
+    if (GetMonData(mon, MON_DATA_IS_EGG))
+        return gText_EggCantBattle;
+    reason = GetGraftRejectReason(&mon->box, GraftPieceMenuType(), gGraftPieceInUse.stat);
+    if (reason == NULL && gGraftPieceInUse.kind == GRAFT_PIECE_MOVE && MonKnowsMove(mon, gGraftPieceInUse.value))
+        reason = sText_PieceKnowsMove;
+    return reason;
+}
+
+static void DisplayPartyPokemonDataForGraftPiece(u8 slot)
+{
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][slot];
+    const u8 *reason = GetPieceRejectReason(mon);
+    if (reason == sText_PieceKnowsMove)
+        DisplayPartyPokemonDescriptionData(slot, PARTYBOX_DESC_LEARNED);
+    else
+        DisplayPartyPokemonDescriptionData(slot, reason == NULL ? PARTYBOX_DESC_ABLE : PARTYBOX_DESC_NOT_ABLE);
+}
+
 static void Task_GraftPiece(u8 taskId)
 {
     u8 slot = gPartyMenu.slotId;
@@ -9053,15 +9078,9 @@ static void Task_GraftPiece(u8 taskId)
 
     case PIECE_VALIDATE:
     {
-        const u8 *rejectReason = NULL;
-        if (GetMonData(mon, MON_DATA_IS_EGG))
-            rejectReason = gText_EggCantBattle;
-        else
-            rejectReason = GetGraftRejectReason(&mon->box, GraftPieceMenuType(), gGraftPieceInUse.stat);
+        const u8 *rejectReason = GetPieceRejectReason(mon);
         GetMonNickname(mon, gStringVar1);
         GetGraftPieceName(gStringVar2, &gGraftPieceInUse);
-        if (rejectReason == NULL && gGraftPieceInUse.kind == GRAFT_PIECE_MOVE && MonKnowsMove(mon, gGraftPieceInUse.value))
-            rejectReason = sText_PieceKnowsMove;
         if (rejectReason != NULL)
         {
             PlaySE(SE_FAILURE);
