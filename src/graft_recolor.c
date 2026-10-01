@@ -6,7 +6,7 @@
 // 2. Each of the species' types is matched to the group that looks most like it. A type with no group of its
 //    own takes the next biggest group, else the shadows of the main one (highlights would read as spots; but a
 //    very dark group gives its highlights, and so does one whose highlights leave the rest looking like its type).
-//    Whites only ever stand for a whitish type (Normal, Steel, Rock, Ghost, Dark).
+//    Whites only ever stand for a light whitish type (Normal, Steel, Rock).
 // 3. A region is repainted in its type's color, keeping each color's brightness, when its type was replaced or
 //    when its colors don't look like the type (a kept type's colors stay only if they're recognizable).
 //
@@ -48,7 +48,10 @@ typedef int bool32;
 #define LUM_PULL        6   // of 16: how far a region's mean brightness moves toward the type color's
 #define REC_DIST        120 // a kept type's region looks like it within this hue/saturation distance...
 #define REC_LUM         9   // ...and this brightness difference
-#define NEUTRAL_CHROMA  40  // a type color this close to gray can be shown by whites
+#define NEUTRAL_CHROMA  40  // a type color this close to gray and this bright (Normal, Steel, Rock) can be shown by whites
+#define NEUTRAL_MIN_LUM 15
+#define DARK_TYPE_LUM   9   // a type color darker than this (Dark) pulls harder toward its own brightness, to read as dark
+#define DARK_PULL       12
 #define MAX_GROUPS      4
 
 #define R5(c) ((c) & 31)
@@ -102,7 +105,7 @@ static s32 ChromaDist(s32 r1, s32 g1, s32 b1, u16 c2)
 static bool32 IsNeutralColor(u16 c)
 {
     s32 a = R5(c) - G5(c), b = (R5(c) + G5(c)) / 2 - B5(c);
-    return a * a + b * b <= NEUTRAL_CHROMA;
+    return a * a + b * b <= NEUTRAL_CHROMA && ColorLum(c) >= NEUTRAL_MIN_LUM;
 }
 
 struct RecolorGroups
@@ -297,7 +300,7 @@ static void Paint(const u16 *src, u16 *dst, const u8 *members, u32 n, u16 color)
         return;
     for (u32 k = 0; k < n; k++)
         sum += ColorLum(src[members[k]]);
-    shift = (ColorLum(color) - sum / (s32)n) * LUM_PULL / 16;
+    shift = (ColorLum(color) - sum / (s32)n) * (ColorLum(color) < DARK_TYPE_LUM ? DARK_PULL : LUM_PULL) / 16;
     for (u32 k = 0; k < n; k++)
     {
         s32 l = ColorLum(src[members[k]]) + shift;
@@ -461,7 +464,10 @@ void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 
         // The shadows, unless they're too dark to show a color, or the highlights would leave the rest looking
         // like the kept type (a hued group only: Absol's dark face stays, its pale fur takes the type)
         MeanColor(src, region[0], regionSize[0], &r, &gr, &b);
-        bright = (Lum(r, gr, b) < DARK_MON_LUM);
+        // (and the highlights when a kept type doesn't look right on the main group, so it's repainted anyway:
+        // Buizel's light belly and float take the second type instead of its shading clashing with the body)
+        bright = (Lum(r, gr, b) < DARK_MON_LUM)
+              || (!changed[0] && !Recognizable(src, region[0], regionSize[0], efColor[0]));
         SplitGroup(src, counts, region[0], regionSize[0], bright, rest, &nRest, part, &nPart);
         for (k = 0; k < regionSize[0]; k++)
         {
