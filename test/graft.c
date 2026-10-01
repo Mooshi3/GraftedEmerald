@@ -22,6 +22,7 @@
 #include "graft_bag.h"
 #include "overworld.h"
 #include "battle_setup.h"
+#include "party_menu.h"
 #include "data.h"
 #include "string_util.h"
 #include "wild_encounter.h"
@@ -1028,7 +1029,7 @@ TEST("Enemy grafts leave every species valid (fuzz, max grafts, several donor po
             ZeroEnemyPartyMons();
             CreateMonWithIVs(mon, s, 50, 0, OTID_STRUCT_PRESET(0), 0);
             GiveMonInitialMoveset(mon);
-            Test_RollTrainerGrafts(mon, 1, TRAINER_SIDNEY); // a boss: More forces an ability graft on the ace
+            Test_RollTrainerGrafts(mon, 1, 1); // an ordinary trainer (bosses also get an ace)
             ExpectValidGraftedEnemy(mon, s);
             mons++;
             if (mon->box.graftFlags != 0)
@@ -1041,4 +1042,57 @@ TEST("Enemy grafts leave every species valid (fuzz, max grafts, several donor po
         FlagClear(f);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}
+
+TEST("Bosses keep their specialty type and bring a wrong-type ace with it grafted on")
+{
+    struct Pokemon *party = gParties[B_TRAINER_OPPONENT_A];
+    u32 i, run, aceSpecies;
+
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    for (i = FLAG_BADGE01_GET; i <= FLAG_BADGE08_GET; i++)
+        FlagSet(i); // the most grafts: every type slot gets tried
+    DonorPoolSizeAt(MAP_ROUTE119, MAP_EVER_GRANDE_CITY);
+    for (run = 0; run < 20; run++)
+    {
+        // Roxanne's first team
+        ZeroEnemyPartyMons();
+        CreateMonWithIVs(&party[0], SPECIES_GEODUDE, 12, 0, OTID_STRUCT_PRESET(0), 0);
+        CreateMonWithIVs(&party[1], SPECIES_GEODUDE, 12, 0, OTID_STRUCT_PRESET(0), 0);
+        CreateMonWithIVs(&party[2], SPECIES_NOSEPASS, 15, 0, OTID_STRUCT_PRESET(0), 0);
+        Test_RollTrainerGrafts(party, 3, TRAINER_ROXANNE_1);
+        for (i = 0; i < 4; i++)
+        {
+            EXPECT(GetEffectiveTypeFromMon(&party[i], 0) == TYPE_ROCK || GetEffectiveTypeFromMon(&party[i], 1) == TYPE_ROCK);
+            ExpectValidGraftedEnemy(&party[i], TRAINER_ROXANNE_1);
+        }
+        // The ace: Sandygast at the ace's level, Rock grafted on, a Rock attack
+        EXPECT_EQ(GetMonData(&party[3], MON_DATA_SPECIES), SPECIES_SANDYGAST);
+        EXPECT_EQ(GetMonData(&party[3], MON_DATA_LEVEL), 15);
+        EXPECT_EQ(party[3].box.graftTypes[1], TYPE_ROCK);
+        EXPECT(MonKnowsMove(&party[3], MOVE_ROCK_TOMB) || MonKnowsMove(&party[3], MOVE_ANCIENT_POWER));
+    }
+    // Rematches level the ace up through its evolutions; the Elite Four have one too
+    ZeroEnemyPartyMons();
+    CreateMonWithIVs(&party[0], SPECIES_MACHAMP, 50, 0, OTID_STRUCT_PRESET(0), 0);
+    Test_RollTrainerGrafts(party, 1, TRAINER_BRAWLY_5);
+    aceSpecies = GetMonData(&party[1], MON_DATA_SPECIES);
+    EXPECT_EQ(aceSpecies, SPECIES_LOPUNNY);
+    ZeroEnemyPartyMons();
+    CreateMonWithIVs(&party[0], SPECIES_SHELGON, 52, 0, OTID_STRUCT_PRESET(0), 0);
+    CreateMonWithIVs(&party[1], SPECIES_ALTARIA, 54, 0, OTID_STRUCT_PRESET(0), 0);
+    CreateMonWithIVs(&party[2], SPECIES_SALAMENCE, 55, 0, OTID_STRUCT_PRESET(0), 0);
+    Test_RollTrainerGrafts(party, 3, TRAINER_DRAKE);
+    EXPECT_EQ(GetMonData(&party[3], MON_DATA_SPECIES), SPECIES_CHARIZARD);
+    EXPECT_EQ(party[3].box.graftTypes[1], TYPE_DRAGON);
+    // No room: a full party gets no ace
+    ZeroEnemyPartyMons();
+    for (i = 0; i < PARTY_SIZE; i++)
+        CreateMonWithIVs(&party[i], SPECIES_WAILORD, 58, 0, OTID_STRUCT_PRESET(0), 0);
+    Test_RollTrainerGrafts(party, PARTY_SIZE, TRAINER_WALLACE);
+    for (i = 0; i < PARTY_SIZE; i++)
+        EXPECT_EQ(GetMonData(&party[i], MON_DATA_SPECIES), SPECIES_WAILORD);
+    for (i = FLAG_BADGE01_GET; i <= FLAG_BADGE08_GET; i++)
+        FlagClear(i);
 }

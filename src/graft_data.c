@@ -3,6 +3,7 @@
 #include "pokemon.h"
 #include "graft_data.h"
 #include "overworld.h"
+#include "party_menu.h"
 #include "graft_menu.h"
 #include "graft_settings.h"
 #include "move.h"
@@ -698,7 +699,8 @@ static u16 PickDonorMove(u16 donor, u8 recipientLevel)
     return n ? moves[Random() % n] : MOVE_NONE;
 }
 
-static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbility)
+// keepType: a boss's specialty type, which type grafts never replace (TYPE_NONE for anyone else)
+static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbility, u8 keepType)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     bool8 statUsed[6] = { FALSE };
@@ -800,7 +802,11 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
             u8 newType = picks[Random() % n];
             // Pick slot: if mono-type, add as type2; else random slot
             u8 slot;
-            if (type1 == type2)
+            if (keepType != TYPE_NONE && type1 == keepType)
+                slot = 1; // a boss's mons keep their specialty type
+            else if (keepType != TYPE_NONE && type2 == keepType)
+                slot = 0;
+            else if (type1 == type2)
                 slot = 1;
             else if (typeSlotUsed[0] && typeSlotUsed[1])
                 continue;
@@ -843,7 +849,7 @@ void TryApplyWildGrafts(struct Pokemon *mon)
     if (!FlagGet(FLAG_SYS_POKEDEX_GET) || Random() % 100 >= chance)
         return;
     BuildNearbyGraftPool();
-    ApplyEnemyGrafts(mon, 1 + GetBadgeCount() / 2, FALSE);
+    ApplyEnemyGrafts(mon, 1 + GetBadgeCount() / 2, FALSE, TYPE_NONE);
 }
 
 // The first rival battle on Route 103 is a tutorial fight; it stays ungrafted.
@@ -863,8 +869,13 @@ static bool32 IsUngraftedTrainer(u16 trainerNum)
     }
 }
 
+struct BossAce;
+static const struct BossAce *GetBossAce(u16 trainerNum);
+
 static bool32 IsBossTrainer(u16 trainerNum)
 {
+    if (GetBossAce(trainerNum) != NULL || trainerNum == TRAINER_WALLACE)
+        return TRUE; // Emerald's Leaders (rematches too), Elite Four and Champion
     switch (GetTrainerClassFromId(trainerNum))
     {
     case TRAINER_CLASS_LEADER:
@@ -910,14 +921,190 @@ void Test_RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 }
 #endif
 
+// ============================================================
+// Boss specialty types and "Tera" aces (like Scarlet/Violet's Gym Leaders): every Leader and
+// Elite Four member brings an extra ace of the wrong type, grafted with their specialty type and a
+// specialty-type attack that scales with level. Their own mons never lose the specialty type.
+// ============================================================
+
+// The type most of the party shares (a boss's specialty), or TYPE_NONE for an empty party
+static u8 GetPartySpecialtyType(struct Pokemon *party, u8 count)
+{
+    u8 tally[NUMBER_OF_MON_TYPES] = {0};
+    u32 i, best = TYPE_NONE;
+    for (i = 0; i < count && i < PARTY_SIZE; i++)
+    {
+        u32 species = GetMonData(&party[i], MON_DATA_SPECIES);
+        u32 t1 = GetSpeciesType(species, 0), t2 = GetSpeciesType(species, 1);
+        if (species == SPECIES_NONE)
+            continue;
+        tally[t1]++;
+        if (t2 != t1)
+            tally[t2]++;
+    }
+    for (i = 0; i < NUMBER_OF_MON_TYPES; i++)
+    {
+        if (tally[i] > tally[best])
+            best = i;
+    }
+    return tally[best] != 0 ? best : TYPE_NONE;
+}
+
+struct BossAce
+{
+    u16 species;
+    u16 lateSpecies; // for an evolution the level rule below can't do (friendship, stones)
+    u8 lateLevel;
+};
+
+// Leaders in gym order (first fights 265-272, rematches 770-801 in blocks of 4), then the Elite Four
+static const struct BossAce sBossAces[] =
+{
+    { SPECIES_SANDYGAST },                          // Roxanne (Rock): a sandcastle
+    { SPECIES_BUNEARY, SPECIES_LOPUNNY, 30 },       // Brawly (Fighting): a kickboxer
+    { SPECIES_KLINK },                              // Wattson (Electric): gears
+    { SPECIES_SANDILE },                            // Flannery (Fire): desert heat
+    { SPECIES_SNUBBULL },                           // Norman (Normal)
+    { SPECIES_TRAPINCH },                           // Winona (Flying): Vibrava/Flygon's wings
+    { SPECIES_CLEFFA, SPECIES_CLEFABLE, 35 },       // Tate & Liza (Psychic): the moon
+    { SPECIES_RALTS },                              // Juan (Water): grace
+    { SPECIES_CROAGUNK },                           // Sidney (Dark)
+    { SPECIES_GOTHITA },                            // Phoebe (Ghost)
+    { SPECIES_VULPIX, SPECIES_NINETALES, 30 },      // Glacia (Ice): a nod to Alolan Ninetales
+    { SPECIES_CHARMANDER },                         // Drake (Dragon): a nod to Mega Charizard X
+};
+
+static const struct BossAce *GetBossAce(u16 trainerNum)
+{
+    if (trainerNum >= TRAINER_ROXANNE_1 && trainerNum <= TRAINER_JUAN_1)
+        return &sBossAces[trainerNum - TRAINER_ROXANNE_1];
+    if (trainerNum >= TRAINER_ROXANNE_2 && trainerNum <= TRAINER_JUAN_5)
+        return &sBossAces[(trainerNum - TRAINER_ROXANNE_2) / 4];
+    if (trainerNum >= TRAINER_SIDNEY && trainerNum <= TRAINER_DRAKE)
+        return &sBossAces[8 + trainerNum - TRAINER_SIDNEY];
+    return NULL;
+}
+
+// The form a level-appropriate trainer would have: follows level evolutions, plus the table's own
+static u16 GetBossAceSpecies(const struct BossAce *ace, u32 level)
+{
+    u16 species = ace->species;
+    bool32 evolved = TRUE;
+    if (ace->lateSpecies != SPECIES_NONE && level >= ace->lateLevel)
+        species = ace->lateSpecies;
+    while (evolved)
+    {
+        const struct Evolution *evos = GetSpeciesEvolutions(species);
+        evolved = FALSE;
+        for (u32 i = 0; evos != NULL && evos[i].method != EVOLUTIONS_END; i++)
+        {
+            if (evos[i].method == EVO_LEVEL && evos[i].param <= level && IsSpeciesEnabled(evos[i].targetSpecies))
+            {
+                species = evos[i].targetSpecies;
+                evolved = TRUE;
+                break;
+            }
+        }
+    }
+    return species;
+}
+
+// A specialty-type attack by tier (below Lv25, below Lv42, from Lv42) and category
+static const u16 sBossAceMoves[NUMBER_OF_MON_TYPES][2][3] =
+{
+    [TYPE_ROCK]     = { { MOVE_ROCK_TOMB,     MOVE_ROCK_SLIDE,   MOVE_STONE_EDGE },   { MOVE_ANCIENT_POWER, MOVE_POWER_GEM,    MOVE_POWER_GEM } },
+    [TYPE_FIGHTING] = { { MOVE_KARATE_CHOP,   MOVE_BRICK_BREAK,  MOVE_CLOSE_COMBAT }, { MOVE_VACUUM_WAVE,   MOVE_AURA_SPHERE,  MOVE_FOCUS_BLAST } },
+    [TYPE_ELECTRIC] = { { MOVE_SPARK,         MOVE_THUNDER_PUNCH, MOVE_WILD_CHARGE }, { MOVE_SHOCK_WAVE,    MOVE_THUNDERBOLT,  MOVE_THUNDER } },
+    [TYPE_FIRE]     = { { MOVE_FLAME_WHEEL,   MOVE_FIRE_PUNCH,   MOVE_FLARE_BLITZ },  { MOVE_INCINERATE,    MOVE_FLAMETHROWER, MOVE_FIRE_BLAST } },
+    [TYPE_NORMAL]   = { { MOVE_HEADBUTT,      MOVE_BODY_SLAM,    MOVE_DOUBLE_EDGE },  { MOVE_SWIFT,         MOVE_HYPER_VOICE,  MOVE_BOOMBURST } },
+    [TYPE_FLYING]   = { { MOVE_WING_ATTACK,   MOVE_DRILL_PECK,   MOVE_BRAVE_BIRD },   { MOVE_AIR_CUTTER,    MOVE_AIR_SLASH,    MOVE_HURRICANE } },
+    [TYPE_PSYCHIC]  = { { MOVE_PSYCHO_CUT,    MOVE_ZEN_HEADBUTT, MOVE_PSYCHIC_FANGS }, { MOVE_PSYBEAM,      MOVE_PSYSHOCK,     MOVE_PSYCHIC } },
+    [TYPE_WATER]    = { { MOVE_AQUA_JET,      MOVE_WATERFALL,    MOVE_LIQUIDATION },  { MOVE_WATER_PULSE,   MOVE_SURF,         MOVE_HYDRO_PUMP } },
+    [TYPE_DARK]     = { { MOVE_BITE,          MOVE_CRUNCH,       MOVE_CRUNCH },       { MOVE_SNARL,         MOVE_DARK_PULSE,   MOVE_DARK_PULSE } },
+    [TYPE_GHOST]    = { { MOVE_SHADOW_PUNCH,  MOVE_SHADOW_CLAW,  MOVE_POLTERGEIST },  { MOVE_HEX,           MOVE_SHADOW_BALL,  MOVE_SHADOW_BALL } },
+    [TYPE_ICE]      = { { MOVE_ICE_FANG,      MOVE_ICE_PUNCH,    MOVE_ICICLE_CRASH }, { MOVE_ICY_WIND,      MOVE_ICE_BEAM,     MOVE_BLIZZARD } },
+    [TYPE_DRAGON]   = { { MOVE_DRAGON_TAIL,   MOVE_DRAGON_CLAW,  MOVE_OUTRAGE },      { MOVE_DRAGON_BREATH, MOVE_DRAGON_PULSE, MOVE_DRACO_METEOR } },
+    [TYPE_GRASS]    = { { MOVE_RAZOR_LEAF,    MOVE_SEED_BOMB,    MOVE_POWER_WHIP },   { MOVE_MEGA_DRAIN,    MOVE_ENERGY_BALL,  MOVE_LEAF_STORM } },
+    [TYPE_GROUND]   = { { MOVE_BULLDOZE,      MOVE_DIG,          MOVE_EARTHQUAKE },   { MOVE_MUD_SHOT,      MOVE_EARTH_POWER,  MOVE_EARTH_POWER } },
+    [TYPE_POISON]   = { { MOVE_POISON_FANG,   MOVE_POISON_JAB,   MOVE_GUNK_SHOT },    { MOVE_ACID,          MOVE_SLUDGE_BOMB,  MOVE_SLUDGE_BOMB } },
+    [TYPE_BUG]      = { { MOVE_BUG_BITE,      MOVE_X_SCISSOR,    MOVE_MEGAHORN },     { MOVE_STRUGGLE_BUG,  MOVE_BUG_BUZZ,     MOVE_BUG_BUZZ } },
+    [TYPE_STEEL]    = { { MOVE_METAL_CLAW,    MOVE_IRON_HEAD,    MOVE_IRON_HEAD },    { MOVE_MIRROR_SHOT,   MOVE_FLASH_CANNON, MOVE_FLASH_CANNON } },
+    [TYPE_FAIRY]    = { { MOVE_PLAY_ROUGH,    MOVE_PLAY_ROUGH,   MOVE_PLAY_ROUGH },   { MOVE_DRAINING_KISS, MOVE_DAZZLING_GLEAM, MOVE_MOONBLAST } },
+};
+
+// Adds the boss's "Tera" ace after the party (same level as their strongest mon). Returns the new count.
+static u8 TryAddBossAce(struct Pokemon *party, u8 count, u16 trainerNum, u8 specialty)
+{
+    const struct BossAce *ace = GetBossAce(trainerNum);
+    struct Pokemon *mon;
+    u32 i, level = 1, species, move, tier, physical, worst = 0, worstPower = 0xFFFF;
+
+    if (ace == NULL || specialty == TYPE_NONE || count >= PARTY_SIZE)
+        return count;
+    for (i = 0; i < count; i++)
+    {
+        if (GetMonData(&party[i], MON_DATA_LEVEL) > level)
+            level = GetMonData(&party[i], MON_DATA_LEVEL);
+    }
+    species = GetBossAceSpecies(ace, level);
+    mon = &party[count];
+    CreateMonWithIVs(mon, species, level, 0, OTID_STRUCT_RANDOM_NO_SHINY, 24); // IVs like the Leaders' aces
+    GiveMonInitialMoveset(mon);
+    {
+        // Like a mon built from trainer data (trainer_util.c): no Dynamax or Tera for the AI, and the
+        // team's trainer name and ball
+        u8 otName[PLAYER_NAME_LENGTH + 1];
+        u32 data = BLOCK_AI_DYNAMAX;
+        SetMonData(mon, MON_DATA_DYNAMAX_LEVEL, &data);
+        data = TYPE_MYSTERY;
+        SetMonData(mon, MON_DATA_TERA_TYPE, &data);
+        GetMonData(&party[0], MON_DATA_OT_NAME, otName);
+        SetMonData(mon, MON_DATA_OT_NAME, otName);
+        data = GetMonData(&party[0], MON_DATA_OT_GENDER);
+        SetMonData(mon, MON_DATA_OT_GENDER, &data);
+        data = GetMonData(&party[0], MON_DATA_POKEBALL);
+        SetMonData(mon, MON_DATA_POKEBALL, &data);
+    }
+
+    // The specialty type replaces its second type; it keeps its own first one
+    SetGraftedTypeOnMon(mon, 1, specialty);
+
+    // A specialty-type attack in the category its stats favor, in place of its weakest move
+    tier = level < 25 ? 0 : (level < 42 ? 1 : 2);
+    physical = GetSpeciesBaseStat(species, STAT_ATK) >= GetSpeciesBaseStat(species, STAT_SPATK);
+    move = sBossAceMoves[specialty][physical ? 0 : 1][tier];
+    if (move != MOVE_NONE && !MonKnowsMove(mon, move))
+    {
+        for (i = 0; i < MAX_MON_MOVES; i++)
+        {
+            u32 cur = GetMonData(mon, MON_DATA_MOVE1 + i);
+            u32 power = cur == MOVE_NONE ? 0 : GetMovePower(cur);
+            if (cur == MOVE_NONE || power < worstPower)
+            {
+                worst = i;
+                worstPower = power;
+                if (cur == MOVE_NONE)
+                    break;
+            }
+        }
+        SetMonMoveSlot(mon, move, worst);
+        RecordGraftMove(&mon->box, move);
+    }
+    return count + 1;
+}
+
 static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 {
     u8 graftCount = GetEnemyGraftCount();
     u8 aceSlot = 0;
-    bool32 boostAce = GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS) == GRAFT_ENEMY_GRAFTS_MORE && IsBossTrainer(trainerNum);
+    bool32 boss = IsBossTrainer(trainerNum);
+    bool32 boostAce = GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS) == GRAFT_ENEMY_GRAFTS_MORE && boss;
+    u8 keepType = boss ? GetPartySpecialtyType(party, count) : TYPE_NONE;
 
     if (IsUngraftedTrainer(trainerNum))
         return;
+    if (boss)
+        count = TryAddBossAce(party, count, trainerNum, keepType);
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;
@@ -931,7 +1118,7 @@ static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
     for (u8 i = 0; i < count && i < PARTY_SIZE; i++)
     {
         if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE)
-            ApplyEnemyGrafts(&party[i], graftCount, boostAce && i == aceSlot);
+            ApplyEnemyGrafts(&party[i], graftCount, boostAce && i == aceSlot, keepType);
     }
 }
 
