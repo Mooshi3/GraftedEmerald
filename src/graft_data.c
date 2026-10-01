@@ -699,7 +699,9 @@ static u16 PickDonorMove(u16 donor, u8 recipientLevel)
     return n ? moves[Random() % n] : MOVE_NONE;
 }
 
-// keepType: a boss's specialty type, which type grafts never replace (TYPE_NONE for anyone else)
+// keepType: a boss's specialty type, which type grafts never replace (TYPE_NONE for anyone else),
+// or KEEP_BOTH_TYPES for a boss's ace, whose wrong type plus grafted specialty is the point
+#define KEEP_BOTH_TYPES 0xFE
 static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbility, u8 keepType)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
@@ -781,6 +783,8 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
         }
         else // GK_TYPE
         {
+            if (keepType == KEEP_BOTH_TYPES)
+                continue;
             u8 type1 = gSpeciesInfo[species].types[0];
             u8 type2 = gSpeciesInfo[species].types[1];
             // Check grafted types too
@@ -1103,8 +1107,14 @@ static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 
     if (IsUngraftedTrainer(trainerNum))
         return;
+    u8 bossAceSlot = PARTY_SIZE;
     if (boss)
+    {
+        u8 before = count;
         count = TryAddBossAce(party, count, trainerNum, keepType);
+        if (count > before)
+            bossAceSlot = before;
+    }
     BuildNearbyGraftPool();
     if (sGraftDonorCount == 0)
         return;
@@ -1118,7 +1128,7 @@ static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
     for (u8 i = 0; i < count && i < PARTY_SIZE; i++)
     {
         if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE)
-            ApplyEnemyGrafts(&party[i], graftCount, boostAce && i == aceSlot, keepType);
+            ApplyEnemyGrafts(&party[i], graftCount, boostAce && i == aceSlot, i == bossAceSlot ? KEEP_BOTH_TYPES : keepType);
     }
 }
 

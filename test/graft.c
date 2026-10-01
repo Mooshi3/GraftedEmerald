@@ -1070,6 +1070,7 @@ TEST("Bosses keep their specialty type and bring a wrong-type ace with it grafte
         // The ace: Sandygast at the ace's level, Rock grafted on, a Rock attack
         EXPECT_EQ(GetMonData(&party[3], MON_DATA_SPECIES), SPECIES_SANDYGAST);
         EXPECT_EQ(GetMonData(&party[3], MON_DATA_LEVEL), 15);
+        EXPECT_EQ(party[3].box.graftTypes[0], GRAFT_TYPE_NONE); // keeps its own Ghost type
         EXPECT_EQ(party[3].box.graftTypes[1], TYPE_ROCK);
         EXPECT(MonKnowsMove(&party[3], MOVE_ROCK_TOMB) || MonKnowsMove(&party[3], MOVE_ANCIENT_POWER));
     }
