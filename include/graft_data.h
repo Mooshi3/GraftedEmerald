@@ -61,5 +61,8 @@ void SetGraftedNatureOnMon(struct Pokemon *mon, u8 natureId);
 void BuildNearbyGraftPool(void);
 u32 GetGraftDonorPoolSize(void);
 void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum);
+#if TESTING
+void Test_RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum);
+#endif
 void TryApplyWildGrafts(struct Pokemon *mon);
 u32 GetEnemyGraftCount(void);

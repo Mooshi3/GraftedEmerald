@@ -21,6 +21,8 @@
 #include "shop_criteria.h"
 #include "graft_bag.h"
 #include "overworld.h"
+#include "battle_setup.h"
+#include "data.h"
 #include "string_util.h"
 #include "wild_encounter.h"
 #include "constants/items.h"
@@ -959,4 +961,84 @@ TEST("Boss rooms with no wild Pokémon still get an enemy graft donor pool")
     EXPECT_NE(DonorPoolSizeAt(MAP_MAGMA_HIDEOUT_4F, MAP_JAGGED_PASS), 0);
     EXPECT_NE(DonorPoolSizeAt(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F, MAP_MOSSDEEP_CITY), 0);
     EXPECT_NE(DonorPoolSizeAt(MAP_RUSTBORO_CITY_GYM, MAP_RUSTBORO_CITY), 0);
+}
+
+// Every enemy graft must leave a valid mon: real moves (no duplicates), a real ability, real types,
+// stat grafts that are improvements, full HP (1 for a Wonder Guard husk).
+static void ExpectValidGraftedEnemy(struct Pokemon *mon, u32 trainerId)
+{
+    u32 i, j, species = GetMonData(mon, MON_DATA_SPECIES), moves = 0;
+    struct BoxPokemon *box = &mon->box;
+
+    for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        u32 move = GetMonData(mon, MON_DATA_MOVE1 + i);
+        EXPECT_LT(move, MOVES_COUNT);
+        if (move == MOVE_NONE)
+            continue;
+        moves++;
+        for (j = i + 1; j < MAX_MON_MOVES; j++)
+            EXPECT_NE(move, GetMonData(mon, MON_DATA_MOVE1 + j));
+    }
+    EXPECT_GT(moves, 0);
+    if (box->graftFlags & GRAFT_FLAG_ABILITY)
+    {
+        EXPECT_NE(box->graftAbility, ABILITY_NONE);
+        EXPECT_LT(box->graftAbility, ABILITIES_COUNT);
+    }
+    for (i = 0; i < 2; i++)
+    {
+        if (box->graftTypes[i] == GRAFT_TYPE_NONE)
+            continue;
+        EXPECT_LT(box->graftTypes[i], NUMBER_OF_MON_TYPES);
+        EXPECT_NE(box->graftTypes[i], TYPE_NONE);
+        EXPECT_NE(box->graftTypes[i], TYPE_MYSTERY);
+    }
+    for (i = 0; i < NUM_STATS; i++)
+    {
+        if (box->graftStatOverrides[i] != 0)
+            EXPECT_GT(box->graftStatOverrides[i], GetSpeciesBaseStat(species, i));
+    }
+    if (GetMonAbility(mon) == ABILITY_WONDER_GUARD)
+        EXPECT_EQ(GetMonData(mon, MON_DATA_MAX_HP), 1);
+    EXPECT_GT(GetMonData(mon, MON_DATA_MAX_HP), 0);
+    EXPECT_EQ(GetMonData(mon, MON_DATA_HP), GetMonData(mon, MON_DATA_MAX_HP));
+    (void)trainerId;
+}
+
+TEST("Enemy grafts leave every species valid (fuzz, max grafts, several donor pools)")
+{
+    static const u16 sMaps[] = { MAP_ROUTE119, MAP_VICTORY_ROAD_B1F, MAP_EVER_GRANDE_CITY_DRAKES_ROOM, MAP_MAGMA_HIDEOUT_4F };
+    struct Pokemon *mon = &gParties[B_TRAINER_OPPONENT_A][0];
+    u32 m, s, f, grafted = 0, mons = 0;
+
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, GRAFT_ENEMY_GRAFTS_MORE);
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE08_GET; f++)
+        FlagSet(f);
+    for (m = 0; m < ARRAY_COUNT(sMaps); m++)
+    {
+        DonorPoolSizeAt(sMaps[m], MAP_EVER_GRANDE_CITY);
+        // Every species, with a different map's pool for each quarter of the dex
+        for (s = 1 + m; s < NUM_SPECIES; s += ARRAY_COUNT(sMaps))
+        {
+            if (!IsSpeciesEnabled(s) || gSpeciesInfo[s].baseHP == 0)
+                continue;
+            ZeroEnemyPartyMons();
+            CreateMonWithIVs(mon, s, 50, 0, OTID_STRUCT_PRESET(0), 0);
+            GiveMonInitialMoveset(mon);
+            Test_RollTrainerGrafts(mon, 1, TRAINER_SIDNEY); // a boss: More forces an ability graft on the ace
+            ExpectValidGraftedEnemy(mon, s);
+            mons++;
+            if (mon->box.graftFlags != 0)
+                grafted++;
+        }
+    }
+    EXPECT_GT(mons, 1000);
+    EXPECT_GT(grafted * 10, mons * 9); // nearly every mon got something
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE08_GET; f++)
+        FlagClear(f);
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
 }

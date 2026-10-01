@@ -890,16 +890,32 @@ u32 GetEnemyGraftCount(void)
     }
 }
 
+static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum);
+
 void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 {
-    u8 graftCount = GetEnemyGraftCount();
-    u8 aceSlot = 0;
-    bool32 boostAce = GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS) == GRAFT_ENEMY_GRAFTS_MORE && IsBossTrainer(trainerNum);
 #if TESTING
     // Battle tests expect trainer parties exactly as written; random grafts break them.
     if (gTestRunnerEnabled)
         return;
 #endif
+    RollTrainerGrafts(party, count, trainerNum);
+}
+
+#if TESTING
+// For the graft tests: the same roll, without the test-runner skip
+void Test_RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
+{
+    RollTrainerGrafts(party, count, trainerNum);
+}
+#endif
+
+static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
+{
+    u8 graftCount = GetEnemyGraftCount();
+    u8 aceSlot = 0;
+    bool32 boostAce = GetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS) == GRAFT_ENEMY_GRAFTS_MORE && IsBossTrainer(trainerNum);
+
     if (IsUngraftedTrainer(trainerNum))
         return;
     BuildNearbyGraftPool();
