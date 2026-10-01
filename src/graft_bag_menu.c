@@ -13,6 +13,10 @@
 #include "palette.h"
 #include "party_menu.h"
 #include "pokemon.h"
+#include "pokemon_summary_screen.h"
+#include "line_break.h"
+#include "graphics.h"
+#include "decompress.h"
 #include "scanline_effect.h"
 #include "sound.h"
 #include "sprite.h"
@@ -54,6 +58,7 @@ enum
 };
 
 #define VISIBLE_ROWS 4
+#define ROW_HEIGHT   14 // list rows, a little tighter than a text line so the description box gets a fifth tile row
 #define MAX_LIST     (NUM_STATS * 256) // the biggest tab's possible pieces
 
 struct GraftBagMenu
@@ -62,6 +67,8 @@ struct GraftBagMenu
     u16 count;
     u8 mode;
     u8 actionCursor;
+    u8 typeIconSpriteId;     // move pieces: the type and category icons, like the summary screen's
+    u8 categoryIconSpriteId;
 };
 
 static EWRAM_DATA struct GraftBagMenu *sGraftBag = NULL;
@@ -98,18 +105,11 @@ static const u8 *const sStatLongNames[NUM_STATS] =
     COMPOUND_STRING("Sp. Def"),
 };
 
-static const u8 *const sCategoryNames[] =
-{
-    [DAMAGE_CATEGORY_PHYSICAL] = COMPOUND_STRING("Physical"),
-    [DAMAGE_CATEGORY_SPECIAL]  = COMPOUND_STRING("Special"),
-    [DAMAGE_CATEGORY_STATUS]   = COMPOUND_STRING("Status"),
-};
-
 static const struct WindowTemplate sWinTemplates[] =
 {
     [WIN_HEADER] = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 1, .width = 26, .height = 2, .paletteNum = 1, .baseBlock = 2 },
-    [WIN_LIST]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 5, .width = 26, .height = 8, .paletteNum = 1, .baseBlock = 0x36 },
-    [WIN_DESC]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 15, .width = 26, .height = 4, .paletteNum = 1, .baseBlock = 0x106 },
+    [WIN_LIST]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 5, .width = 26, .height = 7, .paletteNum = 1, .baseBlock = 0x36 },
+    [WIN_DESC]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 14, .width = 26, .height = 5, .paletteNum = 1, .baseBlock = 0x106 },
     DUMMY_WIN_TEMPLATE
 };
 
@@ -184,7 +184,7 @@ static void DrawList(void)
     for (i = 0; i < VISIBLE_ROWS && sScroll[sTab] + i < sGraftBag->count; i++)
     {
         u32 index = sScroll[sTab] + i;
-        u32 y = i * 16 + 1;
+        u32 y = i * ROW_HEIGHT;
         u8 *str;
         if (index == sCursor[sTab])
             AddTextPrinterParameterized3(WIN_LIST, FONT_NORMAL, 2, y, sColors_Accent, TEXT_SKIP_DRAW, gText_SelectorArrow2);
@@ -199,35 +199,78 @@ static void DrawList(void)
     if (sScroll[sTab] > 0)
         AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 26 * 8 - 40, 0, sColors_Dim, TEXT_SKIP_DRAW, COMPOUND_STRING("{UP_ARROW}"));
     if (sScroll[sTab] + VISIBLE_ROWS < sGraftBag->count)
-        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 26 * 8 - 40, VISIBLE_ROWS * 16 - 10, sColors_Dim, TEXT_SKIP_DRAW, COMPOUND_STRING("{DOWN_ARROW}"));
+        AddTextPrinterParameterized3(WIN_LIST, FONT_SMALL, 26 * 8 - 40, VISIBLE_ROWS * ROW_HEIGHT - 10, sColors_Dim, TEXT_SKIP_DRAW, COMPOUND_STRING("{DOWN_ARROW}"));
     CopyWindowToVram(WIN_LIST, COPYWIN_FULL);
 }
 
-// Two lines about the selected piece
+// The description box's top-left, on screen (WIN_DESC is at tile 2, 14)
+#define DESC_X (2 * 8)
+#define DESC_Y (14 * 8)
+
+static void ShowMoveIcons(enum Move move)
+{
+    struct Sprite *type = &gSprites[sGraftBag->typeIconSpriteId];
+    struct Sprite *category = &gSprites[sGraftBag->categoryIconSpriteId];
+    enum Type typeId = GetMoveType(move);
+
+    StartSpriteAnim(type, typeId);
+    type->oam.paletteNum = gTypesInfo[typeId].palette;
+    type->x = DESC_X + 4 + 16;
+    type->y = DESC_Y + 1 + 8;
+    type->invisible = FALSE;
+    StartSpriteAnim(category, GetMoveCategory(move));
+    category->x = DESC_X + 38 + 8;
+    category->y = DESC_Y + 1 + 8;
+    category->invisible = FALSE;
+}
+
+static void HideMoveIcons(void)
+{
+    gSprites[sGraftBag->typeIconSpriteId].invisible = TRUE;
+    gSprites[sGraftBag->categoryIconSpriteId].invisible = TRUE;
+}
+
+// A move piece: type and category icons, power, accuracy and PP, then the move's description
+static void DrawMoveDescription(enum Move move)
+{
+    u8 *str = gStringVar4;
+
+    ShowMoveIcons(move);
+    str = StringCopy(str, COMPOUND_STRING("POW "));
+    if (GetMovePower(move) > 1)
+        str = ConvertIntToDecimalStringN(str, GetMovePower(move), STR_CONV_MODE_LEFT_ALIGN, 3);
+    else
+        str = StringCopy(str, gText_ThreeDashes);
+    str = StringCopy(str, COMPOUND_STRING("  ACC "));
+    if (GetMoveAccuracy(move) != 0)
+        str = ConvertIntToDecimalStringN(str, GetMoveAccuracy(move), STR_CONV_MODE_LEFT_ALIGN, 3);
+    else
+        str = StringCopy(str, gText_ThreeDashes);
+    str = StringCopy(str, COMPOUND_STRING("  PP "));
+    ConvertIntToDecimalStringN(str, GetMovePP(move), STR_CONV_MODE_LEFT_ALIGN, 2);
+    AddTextPrinterParameterized3(WIN_DESC, FONT_SMALL, 60, 2, sColors_Normal, TEXT_SKIP_DRAW, gStringVar4);
+
+    // The summary screen's description, rewrapped to this box's width (every move fits two lines)
+    StringCopy(gStringVar4, GetMoveDescription(move));
+    StripLineBreaks(gStringVar4);
+    BreakStringAutomatic(gStringVar4, 200, 2, FONT_SMALL, HIDE_SCROLL_PROMPT);
+    // Two lines under the icons
+    for (str = gStringVar4; *str != EOS && *str != CHAR_NEWLINE; str++)
+        ;
+    if (*str == CHAR_NEWLINE)
+    {
+        *str = EOS;
+        AddTextPrinterParameterized3(WIN_DESC, FONT_SMALL, 4, 26, sColors_Normal, TEXT_SKIP_DRAW, str + 1);
+    }
+    AddTextPrinterParameterized3(WIN_DESC, FONT_SMALL, 4, 14, sColors_Normal, TEXT_SKIP_DRAW, gStringVar4);
+}
+
+// Two lines about the selected piece (move pieces have their own layout, DrawMoveDescription)
 static void BufferPieceDescription(const struct GraftPiece *piece)
 {
     u8 *str = gStringVar4;
     switch (piece->kind)
     {
-    case GRAFT_PIECE_MOVE:
-    {
-        enum Move move = piece->value;
-        str = StringCopy(str, gTypesInfo[GetMoveType(move)].name);
-        str = StringCopy(str, COMPOUND_STRING("  "));
-        str = StringCopy(str, sCategoryNames[GetMoveCategory(move)]);
-        *str++ = CHAR_NEWLINE;
-        str = StringCopy(str, COMPOUND_STRING("Power "));
-        if (GetMovePower(move) > 1)
-            str = ConvertIntToDecimalStringN(str, GetMovePower(move), STR_CONV_MODE_LEFT_ALIGN, 3);
-        else
-            str = StringCopy(str, COMPOUND_STRING("-"));
-        str = StringCopy(str, COMPOUND_STRING("  Accuracy "));
-        if (GetMoveAccuracy(move) != 0)
-            str = ConvertIntToDecimalStringN(str, GetMoveAccuracy(move), STR_CONV_MODE_LEFT_ALIGN, 3);
-        else
-            str = StringCopy(str, COMPOUND_STRING("-"));
-        break;
-    }
     case GRAFT_PIECE_ABILITY:
         str = StringCopy(str, gAbilitiesInfo[piece->value].description);
         break;
@@ -262,6 +305,7 @@ static void BufferPieceDescription(const struct GraftPiece *piece)
 static void DrawDescription(void)
 {
     FillWindowPixelBuffer(WIN_DESC, PIXEL_FILL(1));
+    HideMoveIcons();
     if (sGraftBag->mode == MODE_ACTION || sGraftBag->mode == MODE_DISCARD)
     {
         u32 i, x = 8, count = sGraftBag->mode == MODE_ACTION ? ACTION_COUNT : 2;
@@ -284,6 +328,12 @@ static void DrawDescription(void)
             AddTextPrinterParameterized3(WIN_DESC, FONT_NORMAL, x, 17, i == sGraftBag->actionCursor ? sColors_Accent : sColors_Normal, TEXT_SKIP_DRAW, name);
             x += GetStringWidth(FONT_NORMAL, name, 0) + 20;
         }
+    }
+    else if (sGraftBag->count != 0 && sGraftBag->pieces[sCursor[sTab]].kind == GRAFT_PIECE_MOVE)
+    {
+        DrawMoveDescription(sGraftBag->pieces[sCursor[sTab]].value);
+        CopyWindowToVram(WIN_DESC, COPYWIN_FULL);
+        return;
     }
     else if (sGraftBag->count != 0)
     {
@@ -322,8 +372,8 @@ static void DrawFrame(u32 top, u32 height)
 static void DrawFrames(void)
 {
     DrawFrame(0, 2);  // rows 0-3
-    DrawFrame(4, 8);  // rows 4-13
-    DrawFrame(14, 4); // rows 14-19
+    DrawFrame(4, 7);  // rows 4-12
+    DrawFrame(13, 5); // rows 13-19
     CopyBgTilemapBufferToVram(1);
 }
 
@@ -372,6 +422,16 @@ static void CB2_InitGraftBag(void)
         LoadPalette(sBg_Pal, BG_PLTT_ID(0), sizeof(sBg_Pal));
         LoadPalette(GetWindowFrameTilesPal(gSaveBlock2Ptr->optionsWindowFrameType)->pal, BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         LoadPalette(sText_Pal, BG_PLTT_ID(1), sizeof(sText_Pal));
+        // Move pieces' type and category icons (the summary screen's sprites)
+        LoadCompressedSpriteSheet(&gSpriteSheet_MoveTypes);
+        LoadPalette(gMoveTypes_Pal, OBJ_PLTT_ID(13), 3 * PLTT_SIZE_4BPP);
+        LoadCompressedSpriteSheet(&gSpriteSheet_CategoryIcons);
+        LoadSpritePalette(&gSpritePal_CategoryIcons);
+        sGraftBag->typeIconSpriteId = CreateSprite(&gSpriteTemplate_MoveTypes, 0, 0, 0);
+        sGraftBag->categoryIconSpriteId = CreateSprite(&gSpriteTemplate_CategoryIcons, 0, 0, 0);
+        gSprites[sGraftBag->typeIconSpriteId].oam.priority = 0;
+        gSprites[sGraftBag->categoryIconSpriteId].oam.priority = 0;
+        HideMoveIcons();
         gMain.state++;
         break;
     case 4:
