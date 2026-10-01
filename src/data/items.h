@@ -497,9 +497,9 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Graft Ball"),
     .price = 400,
     .description = COMPOUND_STRING(
-        "Breaks a caught\n"
-        "Pokémon down into 3\n"
-        "random graft pieces."),
+        "Its catch is broken\n"
+        "down into 3 random\n"
+        "graft pieces."),
     .pocket = POCKET_POKE_BALLS,
     .type = ITEM_USE_BAG_MENU,
     .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -525,9 +525,9 @@ const struct ItemInfo gItemsInfo[] =
         .name = ITEM_NAME("Splice Ball"),
         .price = 800,
         .description = COMPOUND_STRING(
-            "A premium Ball. Its\n"
-            "catch becomes every\n"
-            "graft piece it has."),
+            "A premium Ball.\n"
+            "Its catch gives all\n"
+            "its graft pieces."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -575,9 +575,9 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Graft Bag"),
     .price = 0,
     .description = COMPOUND_STRING(
-        "Holds graft pieces.\n"
-        "Graft them onto your\n"
-        "Pokémon at any time."),
+        "Holds graft pieces\n"
+        "to graft onto your\n"
+        "Pokémon later."),
     .importance = 1,
     .pocket = POCKET_KEY_ITEMS,
     .type = ITEM_USE_FIELD,
@@ -594,7 +594,7 @@ const struct ItemInfo gItemsInfo[] =
     .description = COMPOUND_STRING(
         "Breaks a party\n"
         "Pokémon down into\n"
-        "all its graft pieces."),
+        "graft pieces."),
     .pocket = POCKET_ITEMS,
     .sortType = ITEM_TYPE_FIELD_USE,
     .type = ITEM_USE_PARTY_MENU,
