@@ -461,6 +461,7 @@ void HandleInputChooseTarget(enum BattlerId battler)
             ReloadMoveNames(battler);
         }
         TryToAddMoveInfoWindow();
+        TryToAddGraftInfoWindow(battler);
         DoBounceEffect(battler, BOUNCE_HEALTHBOX, 7, 1);
         DoBounceEffect(battler, BOUNCE_MON, 7, 1);
         EndBounceEffect(gMultiUsePlayerCursor, BOUNCE_HEALTHBOX);
@@ -2149,6 +2150,7 @@ void PlayerHandleChooseMove(enum BattlerId battler)
         InitMoveSelectionsVarsAndStrings(battler);
         gBattleStruct->gimmick.playerSelect = FALSE;
         TryToAddMoveInfoWindow();
+        TryToAddGraftInfoWindow(battler);
 
         AssignUsableZMoves(battler, moveInfo->moves);
         gBattleStruct->zmove.viable = (gBattleStruct->zmove.possibleZMoves[battler] & (1u << gMoveSelectionCursor[battler])) != 0;

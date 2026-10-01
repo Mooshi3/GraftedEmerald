@@ -702,6 +702,7 @@ u8 CreateBattlerHealthboxSprites(enum BattlerId battler)
     gBattleStruct->ballSpriteIds[0] = MAX_SPRITES;
     gBattleStruct->ballSpriteIds[1] = MAX_SPRITES;
     gBattleStruct->moveInfoSpriteId = MAX_SPRITES;
+    gBattleStruct->graftInfoSpriteId = MAX_SPRITES;
 
     return healthboxLeftSpriteId;
 }
@@ -2963,6 +2964,22 @@ static const struct SpriteSheet sSpriteSheet_MoveInfoWindow =
     sMoveInfoWindowGfx, sizeof(sMoveInfoWindowGfx), MOVE_INFO_WINDOW_TAG
 };
 
+// GRAFT: "R: graft info" box, the same window as the move info one, stacked above it
+#define GRAFT_INFO_WINDOW_TAG 0xE723
+static void SpriteCB_GraftInfoWin(struct Sprite *sprite);
+static const struct SpriteTemplate sSpriteTemplate_GraftInfoWindow =
+{
+    .tileTag = GRAFT_INFO_WINDOW_TAG,
+    .paletteTag = TAG_ABILITY_POP_UP,
+    .oam = &sOamData_MoveInfoWindow,
+    .callback = SpriteCB_GraftInfoWin
+};
+static const u8 sGraftInfoWindowGfx[] = INCGFX_U8("graphics/battle_interface/graft_info_window_r.png", ".4bpp");
+static const struct SpriteSheet sSpriteSheet_GraftInfoWindow =
+{
+    sGraftInfoWindowGfx, sizeof(sGraftInfoWindowGfx), GRAFT_INFO_WINDOW_TAG
+};
+
 #define LAST_USED_BALL_X_F    14
 #define LAST_USED_BALL_X_0    -14
 #define LAST_USED_BALL_Y      (IsDoubleBattle() ? 78 : 68)
@@ -3053,7 +3070,7 @@ void TryAddLastUsedBallItemSprites(void)
 static void DestroyLastUsedBallWinGfx(struct Sprite *sprite)
 {
     FreeSpriteTilesByTag(TAG_LAST_BALL_WINDOW);
-    if (GetSpriteTileStartByTag(MOVE_INFO_WINDOW_TAG) == 0xFFFF)
+    if (GetSpriteTileStartByTag(MOVE_INFO_WINDOW_TAG) == 0xFFFF && GetSpriteTileStartByTag(GRAFT_INFO_WINDOW_TAG) == 0xFFFF)
         FreeSpritePaletteByTag(TAG_ABILITY_POP_UP);
     DestroySprite(sprite);
     gBattleStruct->ballSpriteIds[1] = MAX_SPRITES;
@@ -3089,12 +3106,55 @@ void TryToAddMoveInfoWindow(void)
 void TryToHideMoveInfoWindow(void)
 {
     gSprites[gBattleStruct->moveInfoSpriteId].sHide = TRUE;
+    if (gBattleStruct->graftInfoSpriteId != MAX_SPRITES)
+        gSprites[gBattleStruct->graftInfoSpriteId].sHide = TRUE;
+}
+
+// GRAFT: during move selection, a box above the move info one says R shows the opponent's grafts (when it has any)
+void TryToAddGraftInfoWindow(enum BattlerId battler)
+{
+    if (GetBattlerMon(GetOppositeBattler(battler))->box.graftFlags == 0)
+        return;
+
+    LoadSpritePalette(&sSpritePalette_AbilityPopUp);
+    if (GetSpriteTileStartByTag(GRAFT_INFO_WINDOW_TAG) == 0xFFFF)
+        LoadSpriteSheet(&sSpriteSheet_GraftInfoWindow);
+
+    if (gBattleStruct->graftInfoSpriteId == MAX_SPRITES)
+        gBattleStruct->graftInfoSpriteId = CreateSprite(&sSpriteTemplate_GraftInfoWindow, LAST_BALL_WIN_X_0, LAST_USED_WIN_Y, 6);
+    if (gBattleStruct->graftInfoSpriteId != MAX_SPRITES)
+        gSprites[gBattleStruct->graftInfoSpriteId].sHide = FALSE;
+}
+
+static void DestroyGraftInfoWinGfx(struct Sprite *sprite)
+{
+    FreeSpriteTilesByTag(GRAFT_INFO_WINDOW_TAG);
+    if (GetSpriteTileStartByTag(TAG_LAST_BALL_WINDOW) == 0xFFFF && GetSpriteTileStartByTag(MOVE_INFO_WINDOW_TAG) == 0xFFFF)
+        FreeSpritePaletteByTag(TAG_ABILITY_POP_UP);
+    DestroySprite(sprite);
+    gBattleStruct->graftInfoSpriteId = MAX_SPRITES;
+}
+
+static void SpriteCB_GraftInfoWin(struct Sprite *sprite)
+{
+    if (sprite->sHide)
+    {
+        if (sprite->x != LAST_BALL_WIN_X_0)
+            sprite->x--;
+        if (sprite->x == LAST_BALL_WIN_X_0)
+            DestroyGraftInfoWinGfx(sprite);
+    }
+    else
+    {
+        if (sprite->x != LAST_BALL_WIN_X_F)
+            sprite->x++;
+    }
 }
 
 static void DestroyMoveInfoWinGfx(struct Sprite *sprite)
 {
     FreeSpriteTilesByTag(MOVE_INFO_WINDOW_TAG);
-    if (GetSpriteTileStartByTag(TAG_LAST_BALL_WINDOW) == 0xFFFF)
+    if (GetSpriteTileStartByTag(TAG_LAST_BALL_WINDOW) == 0xFFFF && GetSpriteTileStartByTag(GRAFT_INFO_WINDOW_TAG) == 0xFFFF)
         FreeSpritePaletteByTag(TAG_ABILITY_POP_UP);
     DestroySprite(sprite);
     gBattleStruct->moveInfoSpriteId = MAX_SPRITES;
