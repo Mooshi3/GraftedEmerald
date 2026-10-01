@@ -102,7 +102,7 @@ Done (2026-10-01): the Graft Bag (see Grafting): pieces instead of in-battle gra
 
 Next:
 1. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish.
-2. **Trainer rosters:** every trainer and Gym Leader party is still vanilla Emerald; the expanded roster only reaches them through enemy grafts. Rebuilding parties around the new encounters is its own design job (with Jacob).
+2. **Trainer rosters:** every trainer and Gym Leader party is still vanilla Emerald; the expanded roster only reaches them through enemy grafts. Rebuilding parties around the new encounters is its own design job (with Jacob). `tools/encounters/roster_reference.py OUT.html` lists each boss's team and the same-type lines catchable by that fight.
 3. **Type recolor:** a dedicated session, with Jacob's palette_lab.py (it can export sprites in bulk, so a subagent can hunt edge cases). Only 15 colors per palette limit what's possible.
 4. **Story checkpoint smoke tests:** Wally's tutorial, Steven's multi battle, Tate & Liza, the Elite Four, with enemy grafts on.
 5. **Ironmon:** left as a self-imposed challenge (one usable mon, a committed pivot catch is allowed, HM users are fine), so the engine can't enforce it well). The game-side parts already exist as settings: Battle Items banned, Poké Centers closed. Revisit if a rule turns out to need enforcing.
