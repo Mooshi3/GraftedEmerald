@@ -1,9 +1,9 @@
-"""Checks src/graft_recolor.c against recolor_v2.py: builds the C for the host and compares every sprite.
+"""Checks src/graft_recolor.c against recolor_v3.py: builds the C for the host and compares every sprite.
 
 usage: native_check.py [COMBOS_PER_MON]   (exits 1 on any difference)
 """
 import ctypes, os, random, subprocess, sys, tempfile
-import sheet, recolor_v2
+import sheet, recolor_v3
 
 ROOT = sheet.ROOT
 so = os.path.join(tempfile.gettempdir(), 'graft_recolor_native.so')
@@ -55,7 +55,7 @@ def main():
             ef = [rnd.choice(sheet.TYPES), rnd.choice(sheet.TYPES)]
             if rnd.random() < 0.6:
                 ef[rnd.randrange(2)] = sp[rnd.randrange(2)]
-            py = recolor_v2.recolor_types(pal, sp, tuple(ef), colors, (counts, edges))
+            py = recolor_v3.recolor_types(pal, sp, tuple(ef), colors, (counts, edges))
             dst = U16x16()
             lib.GraftRecolorPalette(U16x16(*map(rgb, pal)), dst, c_counts, c_edges,
                                     U8x2(*(TYPE_IDS[t] for t in sp)), U8x2(*(TYPE_IDS[t] for t in ef)),

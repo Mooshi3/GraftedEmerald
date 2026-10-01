@@ -1,15 +1,16 @@
-// Graft type recolor: the parts of a sprite that show a replaced type take the new type's color;
-// the rest keeps the original design.
+// Graft type recolor: both of a grafted mon's types show on its sprite.
 //
-// 1. Palette colors are split into groups: up to two hue groups (a weighted 2-means on hue) and the grays.
-//    Outlines stay: near-black colors, grays whose pixels mostly touch transparency, and near-whites.
-// 2. Each of the species' types is matched to the group that looks most like it (hue and saturation).
-//    A mono-type's second type, or a second type with no group of its own, takes the next biggest group,
-//    or the brightest part of the main one when the others are too small to see.
-// 3. A replaced type's group is repainted in the new type's color, keeping each color's brightness.
+// 1. Palette colors are split into groups: up to two hue groups (a weighted 2-means on hue), the grays, and
+//    the whites when they cover much of the sprite. Outlines stay: near-black colors, grays whose pixels mostly
+//    touch transparency, and small whites (eye whites, shine).
+// 2. Each of the species' types is matched to the group that looks most like it. A type with no group of its
+//    own takes the next biggest group, else the shadows of the main one (highlights would read as spots).
+//    Whites only ever stand for a whitish type (Normal, Steel, Rock, Ghost, Dark).
+// 3. A region is repainted in its type's color, keeping each color's brightness, when its type was replaced or
+//    when its colors don't look like the type (a kept type's colors stay only if they're recognizable).
 //
-// tools/recolor/ has the reference (recolor_v2.py) and contact sheets; keep the two in step.
-// The core works on plain arrays so tools/recolor/native_check.sh can compile it on the host.
+// tools/recolor/ has the reference (recolor_v3.py) and contact sheets; keep the two in step.
+// The core works on plain arrays so tools/recolor/native_check.py can compile it on the host.
 
 #ifdef GRAFT_RECOLOR_NATIVE
 #include <stdint.h>
@@ -18,6 +19,7 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int16_t s16;
+typedef int8_t s8;
 typedef int32_t s32;
 typedef int bool32;
 #define TRUE 1
@@ -32,16 +34,20 @@ typedef int bool32;
 #define PAL_SIZE        16
 #define SPRITE_DIM      64
 #define OUTLINE_LUM     4   // darker than this always stays (outlines, pupils)
-#define WHITE_LUM       27  // near-whites (eye whites, shine) stay
+#define WHITE_LUM       27  // near-white: stays unless whites cover much of the sprite
 #define WHITE_DELTA     6
+#define WHITE_BODY      4   // of 16: whites covering this share of the colored + white pixels are a body color
 #define GRAY_DELTA      3   // max - min channel below this: a gray with no usable hue
 #define OUTLINE_EDGE    5   // of 16: a gray whose pixels touch transparency this often is an outline
-#define HUE_SPLIT       200 // of 1536: two hue groups this far apart are separate color groups
-#define MIN_OWNER       2   // of 16: a group must cover this share of the colored pixels to stand for a type
-#define SECOND_MIN      4   // of 16: a second group must cover this share of the main group's pixels
-#define SPLIT           6   // of 16: share of the main group's pixels (brightest first) a second type takes
-#define LUM_PULL        6   // of 16: how far a group's mean brightness moves toward the type color's
-#define MAX_GROUPS      3
+#define HUE_SPLIT       96  // of 1536: two hue groups this far apart are separate color groups
+#define MIN_OWNER       2   // of 16: a group must cover this share of the pixels to stand for a type
+#define SECOND_MIN      2   // of 16: a second group must cover this share of the main group's pixels
+#define SPLIT           6   // of 16: share of the main group's pixels (its shadows) a type without a group takes
+#define LUM_PULL        6   // of 16: how far a region's mean brightness moves toward the type color's
+#define REC_DIST        120 // a kept type's region looks like it within this hue/saturation distance...
+#define REC_LUM         9   // ...and this brightness difference
+#define NEUTRAL_CHROMA  40  // a type color this close to gray can be shown by whites
+#define MAX_GROUPS      4
 
 #define R5(c) ((c) & 31)
 #define G5(c) (((c) >> 5) & 31)
@@ -91,34 +97,50 @@ static s32 ChromaDist(s32 r1, s32 g1, s32 b1, u16 c2)
     return a * a + b * b;
 }
 
+static bool32 IsNeutralColor(u16 c)
+{
+    s32 a = R5(c) - G5(c), b = (R5(c) + G5(c)) / 2 - B5(c);
+    return a * a + b * b <= NEUTRAL_CHROMA;
+}
+
 struct RecolorGroups
 {
     u8 count;
+    s8 white; // index of the whites' group, or -1
     u8 size[MAX_GROUPS];
     u8 members[MAX_GROUPS][PAL_SIZE];
     u32 weight[MAX_GROUPS];
 };
 
-static void GroupMean(const u16 *pal, const struct RecolorGroups *g, u32 j, s32 *r, s32 *gr, s32 *b)
+static void MeanColor(const u16 *pal, const u8 *members, u32 n, s32 *r, s32 *g, s32 *b)
 {
     s32 sr = 0, sg = 0, sb = 0;
-    for (u32 k = 0; k < g->size[j]; k++)
+    for (u32 k = 0; k < n; k++)
     {
-        u16 c = pal[g->members[j][k]];
-        sr += R5(c);
-        sg += G5(c);
-        sb += B5(c);
+        sr += R5(pal[members[k]]);
+        sg += G5(pal[members[k]]);
+        sb += B5(pal[members[k]]);
     }
-    *r = sr / g->size[j];
-    *gr = sg / g->size[j];
-    *b = sb / g->size[j];
+    *r = sr / (s32)n;
+    *g = sg / (s32)n;
+    *b = sb / (s32)n;
 }
 
-static s32 GroupDist(const u16 *pal, const struct RecolorGroups *g, u32 j, u16 color)
+// For matching a group to a type: hue and saturation, plus a little brightness
+static s32 MatchDist(const u16 *pal, const u8 *members, u32 n, u16 color)
 {
-    s32 r, gr, b;
-    GroupMean(pal, g, j, &r, &gr, &b);
-    return ChromaDist(r, gr, b, color);
+    s32 r, g, b, dl;
+    MeanColor(pal, members, n, &r, &g, &b);
+    dl = Lum(r, g, b) - ColorLum(color);
+    return ChromaDist(r, g, b, color) + dl * dl / 4;
+}
+
+static bool32 Recognizable(const u16 *pal, const u8 *members, u32 n, u16 color)
+{
+    s32 r, g, b, dl;
+    MeanColor(pal, members, n, &r, &g, &b);
+    dl = Lum(r, g, b) - ColorLum(color);
+    return ChromaDist(r, g, b, color) <= REC_DIST && dl <= REC_LUM && dl >= -REC_LUM;
 }
 
 static void AddGroup(struct RecolorGroups *g, const u8 *members, u32 n, const u16 *counts)
@@ -150,11 +172,12 @@ static s32 HueMean(const s32 *hue, const u8 *members, u32 n, const u16 *counts)
 
 static void FindGroups(const u16 *pal, const u16 *counts, const u16 *edges, struct RecolorGroups *g)
 {
-    u8 colored[PAL_SIZE], grays[PAL_SIZE], ga[PAL_SIZE], gb[PAL_SIZE];
-    u32 nc = 0, ng = 0, na = 0, nb = 0;
+    u8 colored[PAL_SIZE], grays[PAL_SIZE], whites[PAL_SIZE], ga[PAL_SIZE], gb[PAL_SIZE];
+    u32 nc = 0, ng = 0, nw = 0, na = 0, nb = 0, wsum = 0, rest = 0;
     s32 hue[PAL_SIZE];
 
     g->count = 0;
+    g->white = -1;
     for (u32 i = 1; i < PAL_SIZE; i++)
     {
         u16 c = pal[i];
@@ -162,8 +185,13 @@ static void FindGroups(const u16 *pal, const u16 *counts, const u16 *edges, stru
         s32 mx = r > gr ? (r > b ? r : b) : (gr > b ? gr : b);
         s32 mn = r < gr ? (r < b ? r : b) : (gr < b ? gr : b);
         s32 l = Lum(r, gr, b);
-        if (l < OUTLINE_LUM || (l >= WHITE_LUM && mx - mn < WHITE_DELTA) || counts[i] == 0)
+        if (l < OUTLINE_LUM || counts[i] == 0)
             continue;
+        if (l >= WHITE_LUM && mx - mn < WHITE_DELTA)
+        {
+            whites[nw++] = i;
+            continue;
+        }
         hue[i] = Hue(c);
         if (hue[i] < 0)
         {
@@ -235,6 +263,15 @@ static void FindGroups(const u16 *pal, const u16 *counts, const u16 *edges, stru
     }
     if (ng != 0)
         AddGroup(g, grays, ng, counts);
+    for (u32 k = 0; k < nw; k++)
+        wsum += counts[whites[k]];
+    for (u32 j = 0; j < g->count; j++)
+        rest += g->weight[j];
+    if (nw != 0 && wsum * 16 >= (wsum + rest) * WHITE_BODY)
+    {
+        g->white = g->count;
+        AddGroup(g, whites, nw, counts);
+    }
 }
 
 // The type color at brightness l
@@ -270,18 +307,18 @@ static void Paint(const u16 *src, u16 *dst, const u8 *members, u32 n, u16 color)
     }
 }
 
-// Splits a group by brightness: part gets the brightest colors covering about SPLIT/16 of its pixels
-static void SplitGroup(const u16 *pal, const u16 *counts, const u8 *members, u32 n, u8 *body, u32 *nBody, u8 *part, u32 *nPart)
+// Splits a group by brightness: part gets its darkest colors, covering about SPLIT/16 of its pixels
+static void SplitGroup(const u16 *pal, const u16 *counts, const u8 *members, u32 n, u8 *rest, u32 *nRest, u8 *part, u32 *nPart)
 {
     u8 order[PAL_SIZE];
     u32 total = 0, acc = 0, k;
     s32 target;
 
-    // Brightest first (stable)
+    // Darkest first (stable)
     for (k = 0; k < n; k++)
     {
         s32 j = k;
-        while (j > 0 && ColorLum(pal[order[j - 1]]) < ColorLum(pal[members[k]]))
+        while (j > 0 && ColorLum(pal[order[j - 1]]) > ColorLum(pal[members[k]]))
         {
             order[j] = order[j - 1];
             j--;
@@ -302,20 +339,39 @@ static void SplitGroup(const u16 *pal, const u16 *counts, const u8 *members, u32
     }
     if (*nPart == n)
         (*nPart)--;
-    *nBody = 0;
+    *nRest = 0;
     for (k = *nPart; k < n; k++)
-        body[(*nBody)++] = order[k];
+        rest[(*nRest)++] = order[k];
+}
+
+// The group (among those big enough) that looks most like a type color; whites only for a whitish type
+static u32 FindOwner(const u16 *pal, const struct RecolorGroups *g, const bool32 *big, u16 color)
+{
+    s32 bestDist = 0x7FFFFFFF, owner = -1;
+    for (u32 j = 0; j < g->count; j++)
+    {
+        if (!big[j] || ((s32)j == g->white && !IsNeutralColor(color)))
+            continue;
+        s32 d = MatchDist(pal, g->members[j], g->size[j], color);
+        if (d < bestDist)
+        {
+            bestDist = d;
+            owner = j;
+        }
+    }
+    return owner < 0 ? 0 : owner;
 }
 
 void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 *edges,
                          const u8 *speciesTypes, const u8 *effTypes, const u16 *speciesColors, const u16 *effColors)
 {
     struct RecolorGroups g;
-    bool32 changed[2];
+    bool32 changed[2], big[MAX_GROUPS];
     u8 sp[2], ef[2];
     u16 spColor[2], efColor[2];
-    s32 owner[2];
-    u32 big[MAX_GROUPS], nBig = 0, total = 0, j, k;
+    u32 owner[2], total = 0, j, k;
+    const u8 *region[2];
+    u32 regionSize[2];
 
     for (k = 0; k < PAL_SIZE; k++)
         dst[k] = src[k];
@@ -336,31 +392,16 @@ void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 
     for (j = 0; j < g.count; j++)
         total += g.weight[j];
     for (j = 0; j < g.count; j++)
-    {
-        if (g.weight[j] * 16 >= total * MIN_OWNER)
-            big[nBig++] = j;
-    }
-    if (nBig == 0)
-        big[nBig++] = 0;
+        big[j] = (g.weight[j] * 16 >= total * MIN_OWNER);
 
     // Which group shows each species type
-    for (k = 0; k < 2; k++)
-    {
-        s32 bestDist = 0x7FFFFFFF;
-        for (j = 0; j < nBig; j++)
-        {
-            s32 d = GroupDist(src, &g, big[j], spColor[k]);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                owner[k] = big[j];
-            }
-        }
-    }
+    owner[0] = FindOwner(src, &g, big, spColor[0]);
+    owner[1] = FindOwner(src, &g, big, spColor[1]);
     if (sp[0] != sp[1] && owner[0] == owner[1])
     {
         // Both types point at the same group: it shows the closer one; the other gets what's left
-        if (GroupDist(src, &g, owner[0], spColor[1]) < GroupDist(src, &g, owner[0], spColor[0]))
+        const u8 *m = g.members[owner[0]];
+        if (MatchDist(src, m, g.size[owner[0]], spColor[1]) < MatchDist(src, m, g.size[owner[0]], spColor[0]))
         {
             u8 t;
             u16 c;
@@ -371,40 +412,55 @@ void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 
             b = changed[0]; changed[0] = changed[1]; changed[1] = b;
         }
     }
-    if (sp[0] == sp[1] || owner[0] == owner[1])
+    region[0] = g.members[owner[0]];
+    regionSize[0] = g.size[owner[0]];
+    region[1] = NULL;
+    regionSize[1] = 0;
+    if (sp[0] != sp[1] && owner[0] != owner[1])
     {
-        // Second type: the biggest other group if it's big enough, else part of the main one
+        region[1] = g.members[owner[1]];
+        regionSize[1] = g.size[owner[1]];
+    }
+    else
+    {
+        // The next biggest group big enough to see (whites only for a whitish type)
         s32 other = -1;
         for (j = 0; j < g.count; j++)
         {
-            if ((s32)j != owner[0] && (other < 0 || g.weight[j] > g.weight[other]))
+            if (j == owner[0] || ((s32)j == g.white && !IsNeutralColor(efColor[1])))
+                continue;
+            if (other < 0 || g.weight[j] > g.weight[other])
                 other = j;
         }
         if (other >= 0 && g.weight[other] * 16 >= g.weight[owner[0]] * SECOND_MIN)
-            owner[1] = other;
-        else
-            owner[1] = -1;
+        {
+            region[1] = g.members[other];
+            regionSize[1] = g.size[other];
+        }
     }
 
-    if (owner[1] < 0)
+    if (ef[0] == ef[1])
     {
-        u8 body[PAL_SIZE], part[PAL_SIZE];
-        u32 nBody, nPart;
-        if (!changed[1])
-        {
-            Paint(src, dst, g.members[owner[0]], g.size[owner[0]], efColor[0]);
-            return;
-        }
-        SplitGroup(src, counts, g.members[owner[0]], g.size[owner[0]], body, &nBody, part, &nPart);
-        if (changed[0])
-            Paint(src, dst, body, nBody, efColor[0]);
+        // One type in both slots: all of it
+        for (j = 0; j < g.count; j++)
+            Paint(src, dst, g.members[j], g.size[j], efColor[0]);
+        return;
+    }
+    if (region[1] == NULL)
+    {
+        // No group for the second type: it takes the main group's shadows (new either way, so painted)
+        u8 rest[PAL_SIZE], part[PAL_SIZE];
+        u32 nRest, nPart;
+        SplitGroup(src, counts, region[0], regionSize[0], rest, &nRest, part, &nPart);
         Paint(src, dst, part, nPart, efColor[1]);
+        if (changed[0] || !Recognizable(src, rest, nRest, efColor[0]))
+            Paint(src, dst, rest, nRest, efColor[0]);
         return;
     }
     for (k = 0; k < 2; k++)
     {
-        if (changed[k])
-            Paint(src, dst, g.members[owner[k]], g.size[owner[k]], efColor[k]);
+        if (changed[k] || !Recognizable(src, region[k], regionSize[k], efColor[k]))
+            Paint(src, dst, region[k], regionSize[k], efColor[k]);
     }
 }
 
