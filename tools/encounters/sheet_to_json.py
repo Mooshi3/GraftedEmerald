@@ -257,6 +257,25 @@ def new_water_entry(entries, mapname):
     return e
 
 
+# The National Dex setting's "Off" (and "Postgame" before the Champion) uses Emerald's own tables:
+# a second map group, copied from the vanilla revision with its labels renamed so the arrays don't clash.
+VANILLA_GROUP = 'gWildMonHeadersVanilla'
+
+
+def set_vanilla_group(data, vanilla):
+    src = vanilla['wild_encounter_groups'][0]
+    # 'fields' stays empty: the header generator collects encounter types from every group's fields,
+    # so a copy would declare each type twice. The main group's fields cover this one too.
+    group = {'label': VANILLA_GROUP, 'for_maps': True, 'fields': [], 'encounters': []}
+    for e in emerald(src['encounters']):
+        e = json.loads(json.dumps(e))
+        e['base_label'] = e['base_label'] + '_Vanilla'
+        group['encounters'].append(e)
+    groups = [g for g in data['wild_encounter_groups'] if g['label'] != VANILLA_GROUP]
+    groups.append(group)
+    data['wild_encounter_groups'] = groups
+
+
 def set_species(field, species):
     for slot, sid in zip(field['mons'], species):
         slot['species'] = sid
@@ -420,6 +439,7 @@ def main():
     if check_only:
         print('Sheet OK (check only; nothing written).')
         return
+    set_vanilla_group(data, vanilla)
     with open(JSON_OUT, 'w', encoding='utf-8') as f:
         f.write(json.dumps(data, indent=4, ensure_ascii=False))
     with open(LEGENDS_OUT, 'w', encoding='utf-8') as f:

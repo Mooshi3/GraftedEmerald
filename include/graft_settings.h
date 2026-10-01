@@ -14,6 +14,7 @@ enum GraftSetting
     GRAFT_SETTING_HARVESTS,
     GRAFT_SETTING_ENEMY_GRAFTS,
     GRAFT_SETTING_WILD_GRAFTS,
+    GRAFT_SETTING_NATDEX,
     GRAFT_SETTING_ENCOUNTERS,
     GRAFT_SETTING_DUPES_CLAUSE,
     GRAFT_SETTING_SHINY_CLAUSE,
@@ -80,6 +81,14 @@ enum GraftWildGrafts
     GRAFT_WILD_GRAFTS_RARE,   // 5% of wild Pokémon
     GRAFT_WILD_GRAFTS_COMMON, // 20%
     GRAFT_WILD_GRAFTS_COUNT,
+};
+
+enum GraftNatDex
+{
+    GRAFT_NATDEX_OFF,      // Emerald's own wild Pokémon
+    GRAFT_NATDEX_ON,       // the encounter sheet: every family has a home
+    GRAFT_NATDEX_POSTGAME, // Emerald's own until the first Champion win, then the sheet's
+    GRAFT_NATDEX_COUNT,
 };
 
 enum GraftFainting

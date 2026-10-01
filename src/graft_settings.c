@@ -147,6 +147,20 @@ static const u8 *const sWildGraftDescriptions[GRAFT_WILD_GRAFTS_COUNT] =
     [GRAFT_WILD_GRAFTS_COMMON] = COMPOUND_STRING("1 in 5 wild Pokémon comes with\ngrafts from its neighbors."),
 };
 
+static const u8 *const sNatDexChoices[GRAFT_NATDEX_COUNT] =
+{
+    [GRAFT_NATDEX_OFF]      = COMPOUND_STRING("Off"),
+    [GRAFT_NATDEX_ON]       = COMPOUND_STRING("On"),
+    [GRAFT_NATDEX_POSTGAME] = COMPOUND_STRING("Postgame"),
+};
+
+static const u8 *const sNatDexDescriptions[GRAFT_NATDEX_COUNT] =
+{
+    [GRAFT_NATDEX_OFF] = COMPOUND_STRING("Only Emerald's own wild Pokémon.\nNo postgame legendaries."),
+    [GRAFT_NATDEX_ON] = COMPOUND_STRING("Wild Pokémon from every region,\nand legendaries after the League."),
+    [GRAFT_NATDEX_POSTGAME] = COMPOUND_STRING("Emerald's own wild Pokémon until\nyou beat the League, then all."),
+};
+
 static const u8 *const sPokeCenterChoices[] = { COMPOUND_STRING("Open"), COMPOUND_STRING("Closed") };
 
 static const u8 *const sBattleItemChoices[] = { COMPOUND_STRING("Allowed"), COMPOUND_STRING("Banned") };
@@ -218,6 +232,12 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .description = COMPOUND_STRING("How often wild Pokémon already\nhave grafts."),
         .choices = sWildGraftChoices, .choiceDescriptions = sWildGraftDescriptions, .choiceCount = GRAFT_WILD_GRAFTS_COUNT,
         .defaultChoice = GRAFT_WILD_GRAFTS_OFF, .shift = 25, .bits = 2, .requires = -1,
+    },
+    [GRAFT_SETTING_NATDEX] = {
+        .name = COMPOUND_STRING("National Dex"),
+        .description = COMPOUND_STRING("Which wild Pokémon appear."),
+        .choices = sNatDexChoices, .choiceDescriptions = sNatDexDescriptions, .choiceCount = GRAFT_NATDEX_COUNT,
+        .defaultChoice = GRAFT_NATDEX_ON, .shift = 28, .bits = 2, .requires = -1,
     },
     [GRAFT_SETTING_ENCOUNTERS] = {
         .name = COMPOUND_STRING("Nuzlocke"),

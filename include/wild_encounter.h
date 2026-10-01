@@ -45,7 +45,10 @@ struct WildPokemonHeader
 };
 
 
-extern const struct WildPokemonHeader gWildMonHeaders[];
+// GRAFT: the National Dex setting picks the sheet's tables or Emerald's own; every reader of
+// gWildMonHeaders goes through this (wild_encounter.c defines the real arrays)
+const struct WildPokemonHeader *GetActiveWildMonHeaders(void);
+#define gWildMonHeaders (GetActiveWildMonHeaders())
 extern const struct WildPokemonHeader gBattlePikeWildMonHeaders[];
 extern const struct WildPokemonHeader gBattlePyramidWildMonHeaders[];
 extern const struct WildPokemon gWildFeebas;

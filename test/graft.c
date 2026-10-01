@@ -881,3 +881,57 @@ TEST("Graft piece names")
     GetGraftPieceName(buffer, &rock);
     EXPECT_EQ(StringCompare(buffer, COMPOUND_STRING("Rock type")), 0);
 }
+
+static bool32 ActiveTablesAreEmeraldOnly(void)
+{
+    u32 i, t, s;
+    for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
+    {
+        for (t = 0; t < TIMES_OF_DAY_COUNT; t++)
+        {
+            const struct WildPokemonInfo *land = gWildMonHeaders[i].encounterTypes[t].landMonsInfo;
+            if (land == NULL)
+                continue;
+            for (s = 0; s < NUM_LAND_MONS_ENCOUNTER_SLOTS; s++)
+            {
+                if (SpeciesToNationalPokedexNum(land->wildPokemon[s].species) > NATIONAL_DEX_DEOXYS)
+                    return FALSE;
+            }
+        }
+    }
+    return TRUE;
+}
+
+TEST("National Dex setting: Off uses Emerald's own tables, Postgame switches after the League")
+{
+    const struct WildPokemonHeader *sheet;
+    u16 species = SPECIES_NONE;
+    u8 level = 0;
+
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_NATDEX), GRAFT_NATDEX_ON); // default: the sheet
+    sheet = GetActiveWildMonHeaders();
+    EXPECT(!ActiveTablesAreEmeraldOnly());
+
+    SetGraftSetting(GRAFT_SETTING_NATDEX, GRAFT_NATDEX_OFF);
+    EXPECT(GetActiveWildMonHeaders() != sheet);
+    EXPECT(ActiveTablesAreEmeraldOnly());
+
+    SetGraftSetting(GRAFT_SETTING_NATDEX, GRAFT_NATDEX_POSTGAME);
+    EXPECT(ActiveTablesAreEmeraldOnly());
+    FlagSet(FLAG_SYS_GAME_CLEAR);
+    EXPECT(GetActiveWildMonHeaders() == sheet);
+
+    // Postgame legendaries come with the National Dex, never with Off
+    gSaveBlock1Ptr->location.mapGroup = MAP_GROUP(MAP_ROUTE102); // Mesprit, not caught by any test
+    gSaveBlock1Ptr->location.mapNum = MAP_NUM(MAP_ROUTE102);
+    EXPECT(TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
+    SetGraftSetting(GRAFT_SETTING_NATDEX, GRAFT_NATDEX_OFF);
+    EXPECT(!TryGetPostgameLegendary(WILD_AREA_LAND, &species, &level));
+
+    FlagClear(FLAG_SYS_GAME_CLEAR);
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}

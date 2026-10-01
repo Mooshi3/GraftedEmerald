@@ -4,6 +4,7 @@
 #include "battle_pike.h"
 #include "battle_pyramid.h"
 #include "event_data.h"
+#include "graft_settings.h"
 #include "pokedex.h"
 #include "fieldmap.h"
 #include "fishing.h"
@@ -64,7 +65,24 @@ EWRAM_DATA bool8 gIsFishingEncounter = 0;
 EWRAM_DATA bool8 gIsSurfingEncounter = 0;
 EWRAM_DATA u8 gChainFishingDexNavStreak = 0;
 
+#undef gWildMonHeaders // the generated tables define the real arrays
 #include "data/wild_encounters.h"
+
+// GRAFT: National Dex setting. Off uses Emerald's own tables; Postgame switches to the sheet's after
+// the first Champion win.
+const struct WildPokemonHeader *GetActiveWildMonHeaders(void)
+{
+    switch (GetGraftSetting(GRAFT_SETTING_NATDEX))
+    {
+    case GRAFT_NATDEX_OFF:
+        return gWildMonHeadersVanilla;
+    case GRAFT_NATDEX_POSTGAME:
+        return FlagGet(FLAG_SYS_GAME_CLEAR) ? gWildMonHeaders : gWildMonHeadersVanilla;
+    default:
+        return gWildMonHeaders;
+    }
+}
+#define gWildMonHeaders (GetActiveWildMonHeaders())
 
 const struct WildPokemon gWildFeebas = {20, 25, SPECIES_FEEBAS};
 
@@ -548,6 +566,8 @@ bool32 TryGetPostgameLegendary(enum WildPokemonArea area, u16 *species, u8 *leve
 
     if (!FlagGet(FLAG_SYS_GAME_CLEAR) || InBattlePike() || CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
         return FALSE;
+    if (GetGraftSetting(GRAFT_SETTING_NATDEX) == GRAFT_NATDEX_OFF)
+        return FALSE;
     timeOfDay = GetTimeOfDayForEncounters(GetCurrentMapWildMonHeaderId(), area);
     for (i = 0; i < ARRAY_COUNT(sPostgameLegendaries); i++)
     {
@@ -636,6 +656,8 @@ const struct WildPokemonInfo *GetWildMonInfoForTime(u32 headerId, enum WildPokem
 // Doesn't check FLAG_SYS_GAME_CLEAR or whether it's caught.
 enum Species GetPostgameLegendaryForMap(u16 map, enum WildPokemonArea area, enum TimeOfDay timeOfDay, u8 *minLevel, u8 *maxLevel)
 {
+    if (GetGraftSetting(GRAFT_SETTING_NATDEX) == GRAFT_NATDEX_OFF)
+        return SPECIES_NONE;
     for (u32 i = 0; i < ARRAY_COUNT(sPostgameLegendaries); i++)
     {
         const struct PostgameLegendary *legend = &sPostgameLegendaries[i];
