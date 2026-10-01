@@ -21,6 +21,7 @@ HUE_SPLIT = 96     # of 1536: two hue groups this far apart are separate color g
 MIN_OWNER = 2      # of 16: a group must cover this share of the pixels to stand for a type
 SECOND_MIN = 2     # of 16: a second group must cover this share of the main group's pixels to take a type
 SPLIT = 6          # of 16: share of the main group's pixels (its shadows) a type without a group takes
+DARK_MON_LUM = 12  # a main group darker than this gives its highlights instead (dark shadows can't show a color)
 LUM_PULL = 6       # of 16: how far a region's mean brightness moves toward the type color's
 REC_DIST = 120     # a kept type's region looks like it within this hue/saturation distance
 REC_LUM = 9        # ...and this brightness difference
@@ -117,6 +118,8 @@ def shade(t, l):
 
 
 def paint(pal, out, g, t):
+    if not g:
+        return
     lt = lum5(*t)
     ls = [lum5(*pal[i]) for i in g]
     shift = cdiv((lt - sum(ls) // len(ls)) * LUM_PULL, 16)
@@ -124,10 +127,10 @@ def paint(pal, out, g, t):
         out[i] = shade(t, max(OUTLINE_LUM, min(30, l + shift)))
 
 
-def split(pal, g, counts):
-    """-> (rest, part): part is the darkest colors covering about SPLIT/16 of the pixels (shadows run along
-    edges and read as shading; highlights are local and read as spots)"""
-    g = sorted(g, key=lambda i: lum5(*pal[i]))
+def split(pal, g, counts, bright=False):
+    """-> (rest, part): part is the darkest (or brightest) colors covering about SPLIT/16 of the pixels
+    (shadows run along edges and read as shading; highlights are local and read as spots)"""
+    g = sorted(g, key=lambda i: lum5(*pal[i]), reverse=bright)
     target = sum(counts[i] for i in g) * SPLIT
     part, acc = [], 0
     for i in g:
@@ -194,7 +197,15 @@ def recolor_types(pal, species, eff, colors, ce=None):
         return out
     if regions[1] is None:
         main = regions[0]
-        regions = list(split(pal, main, counts))
+        # The shadows, unless they're too dark to show a color, or the highlights would leave the rest
+        # looking like the kept type (a hued group only: Absol's dark face stays, its pale fur takes the type)
+        bright = lum5(*mean(pal, main)) < DARK_MON_LUM
+        regions = list(split(pal, main, counts, bright))
+        if not bright and not changed[0] and not recognizable(pal, regions[0], col(eff[0])) \
+                and all(hue5(*pal[i]) is not None for i in main):
+            alt = list(split(pal, main, counts, True))
+            if recognizable(pal, alt[0], col(eff[0])):
+                regions = alt
         # the part is new either way: it shows eff[1]; the rest shows eff[0]
         paint(pal, out, regions[1], col(eff[1]))
         if changed[0] or not recognizable(pal, regions[0], col(eff[0])):

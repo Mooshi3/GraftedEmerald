@@ -30,15 +30,20 @@ def species_types():
     import glob
     for f in glob.glob(os.path.join(ROOT, 'src/data/pokemon/species_info/gen_*_families.h')):
         txt = open(f).read()
-        macros = {}
+        macros, pairs = {}, {}
         for d in re.finditer(r'#define (\w+)\s+\(?[^\n]*?TYPE_(\w+)', txt):
             macros.setdefault(d.group(1), d.group(2))  # first one: the updated types
+        for d in re.finditer(r'#define (\w+)\s+(?:MON_TYPES\(|\{)\s*TYPE_(\w+)\s*(?:,\s*TYPE_(\w+))?', txt):
+            pairs.setdefault(d.group(1), (d.group(2).lower(), (d.group(3) or d.group(2)).lower()))
         tok = lambda x: macros.get(x, x[5:] if x.startswith('TYPE_') else x).lower()
         for m in re.finditer(r'\[SPECIES_(\w+)\]\s*=\s*\{(.*?)\n    \},', txt, re.S):
             t = re.search(r'\.types = MON_TYPES\((\w+)(?:,\s*(\w+))?\)', m.group(2))
             if t:
-                a = tok(t.group(1))
-                out[m.group(1).lower()] = (a, tok(t.group(2) or t.group(1)))
+                out[m.group(1).lower()] = (tok(t.group(1)), tok(t.group(2) or t.group(1)))
+                continue
+            t = re.search(r'\.types = (\w+)', m.group(2))
+            if t and t.group(1) in pairs:
+                out[m.group(1).lower()] = pairs[t.group(1)]
     return out
 
 

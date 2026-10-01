@@ -12,6 +12,9 @@ sprites in `graphics/pokemon`, so it can be tuned without the emulator.
   ```
   python3 sheet.py out.png recolor_old,recolor_v2 "geodude:rock/fire,grass/ground mightyena:dark/fire"
   ```
+- `golden.py check approved.json`: the recolors Jacob approved (the round-2 A/B sheets, 2026-10-01) are pinned in
+  `approved.json`; this lists any that a change alters. Re-pin with `golden.py save approved.json "ITEMS"` once
+  new results are approved.
 - `native_check.py [N]`: builds `src/graft_recolor.c` for the host and checks it against `recolor_v3.py` on every
   sprite with N random type pairs each. Run it after changing either side; they must agree.
 

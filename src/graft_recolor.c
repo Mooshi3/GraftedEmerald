@@ -4,7 +4,8 @@
 //    the whites when they cover much of the sprite. Outlines stay: near-black colors, grays whose pixels mostly
 //    touch transparency, and small whites (eye whites, shine).
 // 2. Each of the species' types is matched to the group that looks most like it. A type with no group of its
-//    own takes the next biggest group, else the shadows of the main one (highlights would read as spots).
+//    own takes the next biggest group, else the shadows of the main one (highlights would read as spots; but a
+//    very dark group gives its highlights, and so does one whose highlights leave the rest looking like its type).
 //    Whites only ever stand for a whitish type (Normal, Steel, Rock, Ghost, Dark).
 // 3. A region is repainted in its type's color, keeping each color's brightness, when its type was replaced or
 //    when its colors don't look like the type (a kept type's colors stay only if they're recognizable).
@@ -43,6 +44,7 @@ typedef int bool32;
 #define MIN_OWNER       2   // of 16: a group must cover this share of the pixels to stand for a type
 #define SECOND_MIN      2   // of 16: a second group must cover this share of the main group's pixels
 #define SPLIT           6   // of 16: share of the main group's pixels (its shadows) a type without a group takes
+#define DARK_MON_LUM    12  // a main group darker than this gives its highlights instead (dark shadows can't show a color)
 #define LUM_PULL        6   // of 16: how far a region's mean brightness moves toward the type color's
 #define REC_DIST        120 // a kept type's region looks like it within this hue/saturation distance...
 #define REC_LUM         9   // ...and this brightness difference
@@ -307,18 +309,20 @@ static void Paint(const u16 *src, u16 *dst, const u8 *members, u32 n, u16 color)
     }
 }
 
-// Splits a group by brightness: part gets its darkest colors, covering about SPLIT/16 of its pixels
-static void SplitGroup(const u16 *pal, const u16 *counts, const u8 *members, u32 n, u8 *rest, u32 *nRest, u8 *part, u32 *nPart)
+// Splits a group by brightness: part gets its darkest (or brightest) colors, covering about SPLIT/16 of its pixels
+static void SplitGroup(const u16 *pal, const u16 *counts, const u8 *members, u32 n, bool32 bright,
+                       u8 *rest, u32 *nRest, u8 *part, u32 *nPart)
 {
     u8 order[PAL_SIZE];
     u32 total = 0, acc = 0, k;
     s32 target;
 
-    // Darkest first (stable)
+    // Darkest (or brightest) first, stable
     for (k = 0; k < n; k++)
     {
         s32 j = k;
-        while (j > 0 && ColorLum(pal[order[j - 1]]) > ColorLum(pal[members[k]]))
+        while (j > 0 && (bright ? ColorLum(pal[order[j - 1]]) < ColorLum(pal[members[k]])
+                                : ColorLum(pal[order[j - 1]]) > ColorLum(pal[members[k]])))
         {
             order[j] = order[j - 1];
             j--;
@@ -451,7 +455,34 @@ void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 
         // No group for the second type: it takes the main group's shadows (new either way, so painted)
         u8 rest[PAL_SIZE], part[PAL_SIZE];
         u32 nRest, nPart;
-        SplitGroup(src, counts, region[0], regionSize[0], rest, &nRest, part, &nPart);
+        s32 r, gr, b;
+        bool32 bright, hued = TRUE;
+
+        // The shadows, unless they're too dark to show a color, or the highlights would leave the rest looking
+        // like the kept type (a hued group only: Absol's dark face stays, its pale fur takes the type)
+        MeanColor(src, region[0], regionSize[0], &r, &gr, &b);
+        bright = (Lum(r, gr, b) < DARK_MON_LUM);
+        SplitGroup(src, counts, region[0], regionSize[0], bright, rest, &nRest, part, &nPart);
+        for (k = 0; k < regionSize[0]; k++)
+        {
+            if (Hue(src[region[0][k]]) < 0)
+                hued = FALSE;
+        }
+        if (!bright && !changed[0] && hued && !Recognizable(src, rest, nRest, efColor[0]))
+        {
+            u8 altRest[PAL_SIZE], altPart[PAL_SIZE];
+            u32 nAltRest, nAltPart;
+            SplitGroup(src, counts, region[0], regionSize[0], TRUE, altRest, &nAltRest, altPart, &nAltPart);
+            if (Recognizable(src, altRest, nAltRest, efColor[0]))
+            {
+                for (k = 0; k < nAltRest; k++)
+                    rest[k] = altRest[k];
+                for (k = 0; k < nAltPart; k++)
+                    part[k] = altPart[k];
+                nRest = nAltRest;
+                nPart = nAltPart;
+            }
+        }
         Paint(src, dst, part, nPart, efColor[1]);
         if (changed[0] || !Recognizable(src, rest, nRest, efColor[0]))
             Paint(src, dst, rest, nRest, efColor[0]);
