@@ -101,7 +101,8 @@ def main():
                     p = a.recolor_types(pal, spt.get(mon, (t1, t1)), (t1, t2), colors, counts)
                 else:
                     p = a.recolor(pal, colors[t1], colors[t2], t1 != t2)
-                cells.append((render(im, p), f'{t1[:4]}/{t2[:4]}' if t1 != t2 else t1[:8]))
+                tag = {'recolor_old': 'OLD ', 'recolor_v2': 'NEW '}.get(a.__name__, '') if len(algos) > 1 else ''
+                cells.append((render(im, p), tag + (f'{t1[:4]}/{t2[:4]}' if t1 != t2 else t1[:8])))
         rows.append(cells)
     S = 1 if any(':all' in it for it in items) else 2
     cw, ch = 64 * S, 64 * S + 12
