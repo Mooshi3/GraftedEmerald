@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_data.h"
 #include "battle.h"
 #include "battle_setup.h"
 #include "berry.h"
@@ -2487,12 +2488,14 @@ static void DebugAction_Trainers_TryBattle(u8 taskId)
     TRAINER_BATTLE_PARAM.opponentA = trainer1Id;
     TRAINER_BATTLE_PARAM.opponentB = 0xFFFF;
     CreateNPCTrainerPartyFromTrainer(gParties[B_TRAINER_OPPONENT_A], GetTrainerStructFromId(trainer1Id));
+    ApplyTrainerGrafts(gParties[B_TRAINER_OPPONENT_A], GetTrainerStructFromId(trainer1Id)->partySize, trainer1Id); // GRAFT: like a real battle
     if (sDebugMenuListData->data[5] || partnerId != PARTNER_NONE || trainer2Id != TRAINER_NONE)
         gBattleTypeFlags |= BATTLE_TYPE_DOUBLE;
     if (trainer2Id != TRAINER_NONE)
     {
         TRAINER_BATTLE_PARAM.opponentB = trainer2Id;
         CreateNPCTrainerPartyFromTrainer(gParties[B_TRAINER_OPPONENT_B], GetTrainerStructFromId(trainer2Id));
+        ApplyTrainerGrafts(gParties[B_TRAINER_OPPONENT_B], GetTrainerStructFromId(trainer2Id)->partySize, trainer2Id);
         gBattleTypeFlags |= BATTLE_TYPE_TWO_OPPONENTS;
     }
     if (partnerId != PARTNER_NONE)

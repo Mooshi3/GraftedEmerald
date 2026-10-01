@@ -49,7 +49,7 @@ Graft fields live on `struct BoxPokemon`, outside the encrypted `secure` union (
 
 ### Enemy trainer grafts
 
-Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2 + badges grafts per mon, drawn from a donor pool: the current map's wild table, then connected maps, then a manual fallback table for gyms and hideouts. Stat grafts must be strict improvements; moves replace the weakest slot; at most one ability (never hidden); no natures. Enemies follow the husk rule. The first rival battle (Route 103) is never grafted (`IsUngraftedTrainer`). During battle, R in move select shows the opponent's grafts.
+Rolled at party creation (`ApplyTrainerGrafts`, `src/graft_data.c`). There are 2 + badges grafts per mon, drawn from a donor pool (`BuildNearbyGraftPool`): the current map's wild table and its connected maps, else a manual fallback table (gyms, hideout entrances, the Elite Four and Champion rooms -> Victory Road), else the other maps of the same map section (cave and hideout floors), else the outdoor map the player came in from (`escapeWarp`) and its neighbors. The debug menu's Try Battle rolls them too. Stat grafts must be strict improvements; moves replace the weakest slot; at most one ability (never hidden); no natures. Enemies follow the husk rule. The first rival battle (Route 103) is never grafted (`IsUngraftedTrainer`). During battle, R in move select shows the opponent's grafts.
 
 ## Encounters
 

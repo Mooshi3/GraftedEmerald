@@ -32,7 +32,8 @@ give_item() { echo -n "press R+START 3;wait 30;$(R 3 DOWN)press A;wait 20;press 
 give_bp() { echo -n "press R+START 3;wait 30;$(R 3 DOWN)press A;wait 20;$(R 7 DOWN)press A;wait 60;press B;wait 20;press B;wait 30;"; }
 # Debug -> Utilities -> Warp to map warp: warp GROUP NUM WARPID (see include/constants/map_groups.h)
 warp() { echo -n "press R+START 3;wait 30;press A;wait 20;press DOWN;wait 3;press A;wait 20;$(N 0 "$1");press A;wait 20;$(N 0 "$2");press A;wait 20;$(N 0 "$3");press A;wait 300;"; }
-# Debug -> Trainers -> set Trainer 1 and Try Battle: trainer_battle TRAINER_ID (include/constants/opponents.h)
+# Debug -> Trainers -> set Trainer 1 and Try Battle: trainer_battle TRAINER_ID (include/constants/opponents.h).
+# Enemy grafts roll from the map the player is on, as in a real battle (warp to the trainer's map first).
 trainer_battle() { echo -n "press R+START 3;wait 30;$(R 6 DOWN)press A;wait 20;press DOWN;wait 3;press A;wait 20;$(N 0 "$1");press A;wait 20;$(R 5 DOWN)press A;wait 400;mash B 8 30;"; }
 # Debug -> Flags & Vars toggles. Debug gifts don't set story flags; Nuzlocke rules start with the Pokedex.
 flag_toggle() { echo -n "press R+START 3;wait 30;$(R 8 DOWN)press A;wait 20;$(R "$1" DOWN)press A;wait 30;press B;wait 20;press B;wait 30;"; }

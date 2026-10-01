@@ -20,6 +20,7 @@
 #include "pokedex.h"
 #include "shop_criteria.h"
 #include "graft_bag.h"
+#include "overworld.h"
 #include "string_util.h"
 #include "wild_encounter.h"
 #include "constants/items.h"
@@ -935,4 +936,27 @@ TEST("National Dex setting: Off uses Emerald's own tables, Postgame switches aft
     FlagClear(FLAG_SYS_GAME_CLEAR);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+}
+
+static u32 DonorPoolSizeAt(u32 map, u32 escapeMap)
+{
+    gSaveBlock1Ptr->location.mapGroup = map >> 8;
+    gSaveBlock1Ptr->location.mapNum = map & 0xFF;
+    gMapHeader = *Overworld_GetMapHeaderByGroupAndId(map >> 8, map & 0xFF);
+    gSaveBlock1Ptr->escapeWarp.mapGroup = escapeMap >> 8;
+    gSaveBlock1Ptr->escapeWarp.mapNum = escapeMap & 0xFF;
+    BuildNearbyGraftPool();
+    return GetGraftDonorPoolSize();
+}
+
+TEST("Boss rooms with no wild Pokémon still get an enemy graft donor pool")
+{
+    VarSet(VAR_GRAFTED_SETTINGS, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_EVER_GRANDE_CITY_SIDNEYS_ROOM, MAP_EVER_GRANDE_CITY), 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_EVER_GRANDE_CITY_CHAMPIONS_ROOM, MAP_EVER_GRANDE_CITY), 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_AQUA_HIDEOUT_B2F, MAP_LILYCOVE_CITY), 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_MAGMA_HIDEOUT_4F, MAP_JAGGED_PASS), 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F, MAP_MOSSDEEP_CITY), 0);
+    EXPECT_NE(DonorPoolSizeAt(MAP_RUSTBORO_CITY_GYM, MAP_RUSTBORO_CITY), 0);
 }

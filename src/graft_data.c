@@ -2,6 +2,7 @@
 #include "constants/opponents.h"
 #include "pokemon.h"
 #include "graft_data.h"
+#include "overworld.h"
 #include "graft_menu.h"
 #include "graft_settings.h"
 #include "move.h"
@@ -486,17 +487,28 @@ static void AddMapEncountersToPool(u8 mapGroup, u8 mapNum)
     }
 }
 
-// Walk one level of connections from current map
-static void AddConnectedMapEncounters(void)
+// Walk one level of connections from a map
+static void AddConnectedMapEncounters(const struct MapHeader *header)
 {
-    if (gMapHeader.connections == NULL)
+    if (header->connections == NULL)
         return;
-    for (s32 i = 0; i < gMapHeader.connections->count; i++)
+    for (s32 i = 0; i < header->connections->count; i++)
     {
         AddMapEncountersToPool(
-            gMapHeader.connections->connections[i].mapGroup,
-            gMapHeader.connections->connections[i].mapNum
+            header->connections->connections[i].mapGroup,
+            header->connections->connections[i].mapNum
         );
+    }
+}
+
+// Every map in the same map section (the other floors of a cave or hideout)
+static void AddMapsecEncountersToPool(u32 mapsec)
+{
+    for (u32 i = 0; gWildMonHeaders[i].mapGroup != 0xFF; i++)
+    {
+        const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(gWildMonHeaders[i].mapGroup, gWildMonHeaders[i].mapNum);
+        if (header->regionMapSectionId == mapsec)
+            AddMapEncountersToPool(gWildMonHeaders[i].mapGroup, gWildMonHeaders[i].mapNum);
     }
 }
 
@@ -516,6 +528,12 @@ static const struct {
     // Hideouts - pull from nearest route
     { MAP_GROUP(MAP_AQUA_HIDEOUT_1F), MAP_NUM(MAP_AQUA_HIDEOUT_1F), MAP_GROUP(MAP_ROUTE124), MAP_NUM(MAP_ROUTE124) },
     { MAP_GROUP(MAP_MAGMA_HIDEOUT_1F), MAP_NUM(MAP_MAGMA_HIDEOUT_1F), MAP_GROUP(MAP_ROUTE112), MAP_NUM(MAP_ROUTE112) },
+    // The League: Victory Road
+    { MAP_GROUP(MAP_EVER_GRANDE_CITY_SIDNEYS_ROOM), MAP_NUM(MAP_EVER_GRANDE_CITY_SIDNEYS_ROOM), MAP_GROUP(MAP_VICTORY_ROAD_B1F), MAP_NUM(MAP_VICTORY_ROAD_B1F) },
+    { MAP_GROUP(MAP_EVER_GRANDE_CITY_PHOEBES_ROOM), MAP_NUM(MAP_EVER_GRANDE_CITY_PHOEBES_ROOM), MAP_GROUP(MAP_VICTORY_ROAD_B1F), MAP_NUM(MAP_VICTORY_ROAD_B1F) },
+    { MAP_GROUP(MAP_EVER_GRANDE_CITY_GLACIAS_ROOM), MAP_NUM(MAP_EVER_GRANDE_CITY_GLACIAS_ROOM), MAP_GROUP(MAP_VICTORY_ROAD_B1F), MAP_NUM(MAP_VICTORY_ROAD_B1F) },
+    { MAP_GROUP(MAP_EVER_GRANDE_CITY_DRAKES_ROOM), MAP_NUM(MAP_EVER_GRANDE_CITY_DRAKES_ROOM), MAP_GROUP(MAP_VICTORY_ROAD_B1F), MAP_NUM(MAP_VICTORY_ROAD_B1F) },
+    { MAP_GROUP(MAP_EVER_GRANDE_CITY_CHAMPIONS_ROOM), MAP_NUM(MAP_EVER_GRANDE_CITY_CHAMPIONS_ROOM), MAP_GROUP(MAP_VICTORY_ROAD_B1F), MAP_NUM(MAP_VICTORY_ROAD_B1F) },
     // Special interiors
     { MAP_GROUP(MAP_CAVE_OF_ORIGIN_1F), MAP_NUM(MAP_CAVE_OF_ORIGIN_1F), MAP_GROUP(MAP_ROUTE126), MAP_NUM(MAP_ROUTE126) },
     { MAP_GROUP(MAP_SEAFLOOR_CAVERN_ENTRANCE), MAP_NUM(MAP_SEAFLOOR_CAVERN_ENTRANCE), MAP_GROUP(MAP_ROUTE128), MAP_NUM(MAP_ROUTE128) },
@@ -535,16 +553,30 @@ static void ApplyGraftPoolFallback(void)
     }
 }
 
+u32 GetGraftDonorPoolSize(void)
+{
+    return sGraftDonorCount;
+}
+
 void BuildNearbyGraftPool(void)
 {
     sGraftDonorCount = 0;
     // Tier 1: current map
     AddMapEncountersToPool(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     // Tier 2: connected maps
-    AddConnectedMapEncounters();
-    // Tier 3: manual fallback
+    AddConnectedMapEncounters(&gMapHeader);
+    // Tier 3: manual fallback (gyms, the League, ...)
     if (sGraftDonorCount == 0)
         ApplyGraftPoolFallback();
+    // Tier 4: the rest of this map section (other floors of a cave or hideout)
+    if (sGraftDonorCount == 0)
+        AddMapsecEncountersToPool(gMapHeader.regionMapSectionId);
+    // Tier 5: the outdoor map the player came in from (the Escape Rope destination) and its neighbors
+    if (sGraftDonorCount == 0 && gSaveBlock1Ptr->escapeWarp.mapGroup != MAP_GROUP(MAP_UNDEFINED))
+    {
+        AddMapEncountersToPool(gSaveBlock1Ptr->escapeWarp.mapGroup, gSaveBlock1Ptr->escapeWarp.mapNum);
+        AddConnectedMapEncounters(Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->escapeWarp.mapGroup, gSaveBlock1Ptr->escapeWarp.mapNum));
+    }
 }
 
 // ============================================================
@@ -918,6 +950,7 @@ void ApplyTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 
 #include "global.h"
 #include "graft_data.h"
+#include "overworld.h"
 #include "palette.h"
 #include "constants/rgb.h"
 

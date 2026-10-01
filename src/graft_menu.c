@@ -58,12 +58,10 @@ void ShowEnemyGrafts(enum BattlerId battler)
 {
     struct BoxPokemon *boxMon;
     u8 graftFlags;
-    u8 partySlot;
     enum BattlerId enemyBattler;
     u16 species;
 
     enemyBattler = GetOppositeBattler(battler);
-    partySlot = gBattlerPartyIndexes[enemyBattler];
     boxMon = &GetBattlerMon(enemyBattler)->box;
     graftFlags = boxMon->graftFlags;
     species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
