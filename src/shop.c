@@ -164,6 +164,8 @@ static u8 GetItemBadgeRequirement(u16 itemId)
     case ITEM_GRAFT_SPLICER:
     case ITEM_GRAFT_KNOT:
         return 3;
+    case ITEM_ABILITY_CAPSULE: // GRAFT: hidden abilities stay past the halfway point
+        return 5;
     default:
         return 0;
     }

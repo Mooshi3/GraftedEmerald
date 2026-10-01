@@ -22,6 +22,7 @@ static const u16 sGraftMartItems[] =
     ITEM_GRAFT_SPLICER,
     ITEM_GRAFT_KNOT,
     ITEM_UNGRAFTER,
+    ITEM_ABILITY_CAPSULE, // picks any natural ability, hidden included (5 badges)
 };
 
 static bool32 ListHasItem(const u16 *list, u32 count, u16 item)

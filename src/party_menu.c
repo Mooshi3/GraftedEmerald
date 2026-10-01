@@ -4971,18 +4971,64 @@ void ItemUseCB_Medicine(u8 taskId, TaskFunc task)
 #define tMonId      data[3]
 #define tOldFunc    4
 
+// GRAFT: the Ability Capsule picks any of the species' natural abilities, hidden included (Up/Down,
+// A to choose), minus the one it has now. It replaces a grafted ability too, so a Splicer can then
+// take the chosen one as a piece.
+#define tChoice0    6 // data[6..8]: ability slots offered
+#define tChoiceCount data[9]
+#define tCursor      data[10]
+
+static const u8 sText_CapsuleAsk[] = _("Change {STR_VAR_1}'s Ability\nto {STR_VAR_2}?");
+static const u8 sText_CapsuleHidden[] = _(" (hidden)");
+static const u8 sText_CapsuleArrows[] = _("  {UP_ARROW}{DOWN_ARROW}");
+
+static void PrintPartyMenuMessageInstant(const u8 *text)
+{
+    FillWindowPixelBuffer(WIN_MSG, PIXEL_FILL(1));
+    AddTextPrinterParameterized2(WIN_MSG, FONT_NORMAL, text, TEXT_SKIP_DRAW, 0, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_WHITE, TEXT_COLOR_LIGHT_GRAY);
+    CopyWindowToVram(WIN_MSG, COPYWIN_GFX);
+}
+
+static void BufferAbilityCapsuleChoice(u8 taskId)
+{
+    s16 *data = gTasks[taskId].data;
+    u32 slot = data[tChoice0 + tCursor];
+    GetMonNickname(&gParties[B_TRAINER_PLAYER][tMonId], gStringVar1);
+    StringCopy(gStringVar2, gAbilitiesInfo[GetSpeciesAbility(tSpecies, slot)].name);
+    if (slot == 2)
+        StringAppend(gStringVar2, sText_CapsuleHidden);
+    StringExpandPlaceholders(gStringVar4, sText_CapsuleAsk);
+    if (tChoiceCount > 1)
+        StringAppend(gStringVar4, sText_CapsuleArrows);
+}
+
 void Task_AbilityCapsule(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][tMonId];
 
     switch (tState)
     {
     case 0:
-        // Can't use.
-        if (GetSpeciesAbility(tSpecies, 0) == GetSpeciesAbility(tSpecies, 1)
-            || GetSpeciesAbility(tSpecies, 1) == 0
-            || tAbilityNum > 1
-            || !tSpecies)
+    {
+        u32 slot, i, current = GetMonAbility(mon);
+        tChoiceCount = 0;
+        tCursor = 0;
+        for (slot = 0; slot < NUM_ABILITY_SLOTS && tSpecies && !GetMonData(mon, MON_DATA_IS_EGG); slot++)
+        {
+            u32 ability = GetSpeciesAbility(tSpecies, slot);
+            bool32 duplicate = FALSE;
+            if (ability == ABILITY_NONE || ability == current)
+                continue;
+            for (i = 0; i < tChoiceCount; i++)
+            {
+                if (GetSpeciesAbility(tSpecies, data[tChoice0 + i]) == ability)
+                    duplicate = TRUE;
+            }
+            if (!duplicate)
+                data[tChoice0 + tChoiceCount++] = slot;
+        }
+        if (tChoiceCount == 0)
         {
             gPartyMenuUseExitCallback = FALSE;
             PlaySE(SE_SELECT);
@@ -4992,58 +5038,63 @@ void Task_AbilityCapsule(u8 taskId)
             return;
         }
         gPartyMenuUseExitCallback = TRUE;
-        GetMonNickname(&gParties[B_TRAINER_PLAYER][tMonId], gStringVar1);
-        StringCopy(gStringVar2, gAbilitiesInfo[GetAbilityBySpecies(tSpecies, tAbilityNum)].name);
-        StringExpandPlaceholders(gStringVar4, sText_askText);
+        BufferAbilityCapsuleChoice(taskId);
         PlaySE(SE_SELECT);
         DisplayPartyMenuMessage(gStringVar4, 1);
         ScheduleBgCopyTilemapToVram(2);
         tState++;
         break;
+    }
     case 1:
-        if (!IsPartyMenuTextPrinterActive())
+        if (IsPartyMenuTextPrinterActive())
+            break;
+        if (JOY_NEW(DPAD_UP | DPAD_DOWN) && tChoiceCount > 1)
         {
-            PartyMenuDisplayYesNoMenu();
+            PlaySE(SE_SELECT);
+            if (JOY_NEW(DPAD_DOWN))
+                tCursor = (tCursor + 1) % tChoiceCount;
+            else
+                tCursor = (tCursor + tChoiceCount - 1) % tChoiceCount;
+            BufferAbilityCapsuleChoice(taskId);
+            PrintPartyMenuMessageInstant(gStringVar4);
+        }
+        else if (JOY_NEW(A_BUTTON))
+        {
+            u8 abilityNum = data[tChoice0 + tCursor];
+            SetMonData(mon, MON_DATA_ABILITY_NUM, &abilityNum);
+            mon->box.graftAbility = GRAFT_ABILITY_NONE; // the chosen ability replaces a grafted one
+            mon->box.graftFlags &= ~GRAFT_FLAG_ABILITY;
+            CalculateMonStats(mon); // leaving a Wonder Guard graft restores HP
+            RemoveBagItem(gSpecialVar_ItemId, 1);
+            PlaySE(SE_USE_ITEM);
+            GetMonNickname(mon, gStringVar1);
+            StringCopy(gStringVar2, gAbilitiesInfo[GetSpeciesAbility(tSpecies, abilityNum)].name);
+            StringExpandPlaceholders(gStringVar4, sText_doneText);
+            DisplayPartyMenuMessage(gStringVar4, 1);
+            ScheduleBgCopyTilemapToVram(2);
             tState++;
+        }
+        else if (JOY_NEW(B_BUTTON))
+        {
+            gPartyMenuUseExitCallback = FALSE;
+            PlaySE(SE_SELECT);
+            // Don't exit party selections screen, return to choosing a mon.
+            ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+            ClearWindowTilemap(WIN_MSG);
+            DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+            gTasks[taskId].func = (void *)GetWordTaskArg(taskId, tOldFunc);
         }
         break;
     case 2:
-        switch (Menu_ProcessInputNoWrapClearOnChoose())
-        {
-        case 0:
-            tState++;
-            break;
-        case 1:
-        case MENU_B_PRESSED:
-            gPartyMenuUseExitCallback = FALSE;
-            PlaySE(SE_SELECT);
-            ScheduleBgCopyTilemapToVram(2);
-            // Don't exit party selections screen, return to choosing a mon.
-            ClearStdWindowAndFrameToTransparent(6, 0);
-            ClearWindowTilemap(6);
-            DisplayPartyMenuStdMessage(5);
-            gTasks[taskId].func = (void *)GetWordTaskArg(taskId, tOldFunc);
-            return;
-        }
-        break;
-    case 3:
-        PlaySE(SE_USE_ITEM);
-        StringExpandPlaceholders(gStringVar4, sText_doneText);
-        DisplayPartyMenuMessage(gStringVar4, 1);
-        ScheduleBgCopyTilemapToVram(2);
-        tState++;
-        break;
-    case 4:
         if (!IsPartyMenuTextPrinterActive())
-            tState++;
-        break;
-    case 5:
-        SetMonData(&gParties[B_TRAINER_PLAYER][tMonId], MON_DATA_ABILITY_NUM, &tAbilityNum);
-        RemoveBagItem(gSpecialVar_ItemId, 1);
-        gTasks[taskId].func = Task_ClosePartyMenu;
+            gTasks[taskId].func = Task_ClosePartyMenu;
         break;
     }
 }
+
+#undef tChoice0
+#undef tChoiceCount
+#undef tCursor
 
 void ItemUseCB_AbilityCapsule(u8 taskId, TaskFunc task)
 {
@@ -5052,7 +5103,6 @@ void ItemUseCB_AbilityCapsule(u8 taskId, TaskFunc task)
     tState = 0;
     tMonId = gPartyMenu.slotId;
     tSpecies = GetMonData(&gParties[B_TRAINER_PLAYER][tMonId], MON_DATA_SPECIES);
-    tAbilityNum = GetMonData(&gParties[B_TRAINER_PLAYER][tMonId], MON_DATA_ABILITY_NUM) ^ 1;
     SetWordTaskArg(taskId, tOldFunc, (uintptr_t)(gTasks[taskId].func));
     gTasks[taskId].func = Task_AbilityCapsule;
 }
@@ -8947,9 +8997,7 @@ static void BufferTypeSlotPrompt(u8 slot, bool32 instant)
     StringExpandPlaceholders(gStringVar4, slot == 0 ? sText_PieceTypeSlot1 : sText_PieceTypeSlot2);
     if (instant)
     {
-        FillWindowPixelBuffer(WIN_MSG, PIXEL_FILL(1));
-        AddTextPrinterParameterized2(WIN_MSG, FONT_NORMAL, gStringVar4, TEXT_SKIP_DRAW, 0, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_WHITE, TEXT_COLOR_LIGHT_GRAY);
-        CopyWindowToVram(WIN_MSG, COPYWIN_GFX);
+        PrintPartyMenuMessageInstant(gStringVar4);
         return;
     }
     DisplayPartyMenuMessage(gStringVar4, TRUE);
