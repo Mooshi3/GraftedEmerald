@@ -8642,8 +8642,8 @@ enum SplicerState
 };
 
 static const u8 sText_SplicerSacrifice[] = _("{STR_VAR_1} will be broken down\ninto graft pieces. OK?");
-static const u8 sText_SplicerOnlyOneMon[] = _("You only have one\nPokémon!");
-static const u8 sText_SplicerEgg[] = _("Eggs can't be\nsacrificed.");
+static const u8 sText_SplicerOnlyOneMon[] = _("You only have one\nPokémon!{PAUSE_UNTIL_PRESS}");
+static const u8 sText_SplicerEgg[] = _("Eggs can't be broken\ndown into pieces.{PAUSE_UNTIL_PRESS}");
 static const u8 sText_SplicerBrokenDown[] = _("{STR_VAR_1} was broken down\ninto {STR_VAR_2} pieces!");
 static const u8 sText_AutoSpliceBrokenDown[] = _("{STR_VAR_1} has fallen. It was\nbroken down into {STR_VAR_2} pieces!");
 static const u8 sText_GraftBagFullAfter[] = _("\pThe Graft Bag is full.");
@@ -8819,7 +8819,7 @@ void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
         PlaySE(SE_FAILURE);
         DisplayPartyMenuMessage(sText_SplicerOnlyOneMon, TRUE);
         ScheduleBgCopyTilemapToVram(2);
-        gTasks[taskId].func = Task_ClosePartyMenu;
+        gTasks[taskId].func = Task_ClosePartyMenuAfterText;
         return;
     }
     if (GetMonData(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], MON_DATA_IS_EGG))
@@ -8827,7 +8827,7 @@ void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
         PlaySE(SE_FAILURE);
         DisplayPartyMenuMessage(sText_SplicerEgg, TRUE);
         ScheduleBgCopyTilemapToVram(2);
-        gTasks[taskId].func = Task_ClosePartyMenu;
+        gTasks[taskId].func = Task_ClosePartyMenuAfterText;
         return;
     }
     gPartyMenu.slotId2 = gPartyMenu.slotId;
