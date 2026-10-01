@@ -310,6 +310,19 @@ static const union AnimCmd sSpriteAnim_MenuText[] =
     ANIMCMD_END
 };
 
+// GRAFT: "R AREAS" (the encounter screen), in the START/SELECT labels' style
+static const union AnimCmd sSpriteAnim_RButton[] =
+{
+    ANIMCMD_FRAME(200, 30),
+    ANIMCMD_END
+};
+
+static const union AnimCmd sSpriteAnim_AreasText[] =
+{
+    ANIMCMD_FRAME(208, 30),
+    ANIMCMD_END
+};
+
 static const union AnimCmd sSpriteAnim_SeenText[] =
 {
     ANIMCMD_FRAME(64, 30),
@@ -480,7 +493,9 @@ static const union AnimCmd *const sSpriteAnimTable_InterfaceText[] =
     sSpriteAnim_StartButton,
     sSpriteAnim_SearchText,
     sSpriteAnim_SelectButton,
-    sSpriteAnim_MenuText
+    sSpriteAnim_MenuText,
+    sSpriteAnim_RButton,
+    sSpriteAnim_AreasText,
 };
 
 static const union AnimCmd *const sSpriteAnimTable_SeenOwnText[] =
@@ -2766,6 +2781,11 @@ static void CreateInterfaceSprites(u8 page)
     // Search text
     spriteId = CreateSprite(&sInterfaceTextSpriteTemplate, 48, DISPLAY_HEIGHT - 16, 0);
     StartSpriteAnim(&gSprites[spriteId], 1);
+    // GRAFT: R button and "AREAS" (R opens the encounter screen)
+    spriteId = CreateSprite(&sInterfaceTextSpriteTemplate, 16, 104, 0);
+    StartSpriteAnim(&gSprites[spriteId], 4);
+    spriteId = CreateSprite(&sInterfaceTextSpriteTemplate, 48, 104, 0);
+    StartSpriteAnim(&gSprites[spriteId], 5);
 
     spriteId = CreateSprite(&sRotatingPokeBallSpriteTemplate, 0, DISPLAY_HEIGHT / 2, 2);
     gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_NORMAL;
