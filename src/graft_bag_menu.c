@@ -2,6 +2,7 @@
 #include "battle_main.h"
 #include "bg.h"
 #include "graft_bag.h"
+#include "graft_menu.h"
 #include "gpu_regs.h"
 #include "item_menu.h"
 #include "main.h"
@@ -52,7 +53,7 @@ enum
     ACTION_COUNT,
 };
 
-#define VISIBLE_ROWS 5
+#define VISIBLE_ROWS 4
 #define MAX_LIST     (NUM_STATS * 256) // the biggest tab's possible pieces
 
 struct GraftBagMenu
@@ -107,8 +108,8 @@ static const u8 *const sCategoryNames[] =
 static const struct WindowTemplate sWinTemplates[] =
 {
     [WIN_HEADER] = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 1, .width = 26, .height = 2, .paletteNum = 1, .baseBlock = 2 },
-    [WIN_LIST]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 5, .width = 26, .height = 10, .paletteNum = 1, .baseBlock = 0x36 },
-    [WIN_DESC]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 16, .width = 26, .height = 4, .paletteNum = 1, .baseBlock = 0x13A },
+    [WIN_LIST]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 5, .width = 26, .height = 8, .paletteNum = 1, .baseBlock = 0x36 },
+    [WIN_DESC]   = { .bg = 1, .tilemapLeft = 2, .tilemapTop = 15, .width = 26, .height = 4, .paletteNum = 1, .baseBlock = 0x106 },
     DUMMY_WIN_TEMPLATE
 };
 
@@ -320,9 +321,9 @@ static void DrawFrame(u32 top, u32 height)
 
 static void DrawFrames(void)
 {
-    DrawFrame(0, 2);
-    DrawFrame(4, 10);
-    DrawFrame(15, 4);
+    DrawFrame(0, 2);  // rows 0-3
+    DrawFrame(4, 8);  // rows 4-13
+    DrawFrame(14, 4); // rows 14-19
     CopyBgTilemapBufferToVram(1);
 }
 
@@ -401,6 +402,7 @@ void OpenGraftBag(MainCallback exitCallback)
 
 static void CB2_ReturnToGraftBag(void)
 {
+    gGraftLearnMovePending = FALSE; // every exit from the piece's party menu comes here
     gMain.state = 0;
     SetMainCallback2(CB2_InitGraftBag);
 }

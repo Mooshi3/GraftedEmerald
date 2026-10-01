@@ -8894,8 +8894,6 @@ enum GraftPieceState
     PIECE_CONFIRM,
     PIECE_CONFIRM_YESNO,
     PIECE_TYPE_SLOT,
-    PIECE_FORGET_TEXT,
-    PIECE_FORGET_YESNO,
     PIECE_FINISH,
 };
 
@@ -8905,8 +8903,8 @@ static const u8 sText_PieceLearnedMove[] = _("{STR_VAR_1} learned\n{STR_VAR_2}!"
 static const u8 sText_PieceGiveAbility[] = _("Replace {STR_VAR_1}'s {STR_VAR_3}\nwith {STR_VAR_2}?");
 static const u8 sText_PieceGiveNature[] = _("Change {STR_VAR_1}'s nature\nfrom {STR_VAR_3} to {STR_VAR_2}?");
 static const u8 sText_PieceGiveStat[] = _("{STR_VAR_1}'s base {STR_VAR_3}\nbecomes {STR_VAR_2}. OK?");
-static const u8 sText_PieceTypeSlot1[] = _("Replace type1 ({STR_VAR_1})\nwith {STR_VAR_2}?");
-static const u8 sText_PieceTypeSlot2[] = _("Replace type2 ({STR_VAR_1})\nwith {STR_VAR_2}?");
+static const u8 sText_PieceTypeSlot1[] = _("Replace type 1 ({STR_VAR_1})\nwith {STR_VAR_2}?   {DOWN_ARROW}type 2");
+static const u8 sText_PieceTypeSlot2[] = _("Replace type 2 ({STR_VAR_1})\nwith {STR_VAR_2}?   {UP_ARROW}type 1");
 static const u8 sText_PieceGrafted[] = _("{STR_VAR_1} received\n{STR_VAR_2}!");
 
 static const u8 *const sStatNamesLong[NUM_STATS] =
@@ -8940,13 +8938,20 @@ static void ShowPieceMessage(const u8 *text)
     ScheduleBgCopyTilemapToVram(2);
 }
 
-static void BufferTypeSlotPrompt(u8 slot)
+// The first prompt prints normally; switching slots redraws it at once
+static void BufferTypeSlotPrompt(u8 slot, bool32 instant)
 {
     struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][gPartyMenu.slotId];
     StringCopy(gStringVar1, gTypesInfo[GetEffectiveTypeFromMon(mon, slot)].name);
     StringCopy(gStringVar2, gTypesInfo[gGraftPieceInUse.value].name);
     StringExpandPlaceholders(gStringVar4, slot == 0 ? sText_PieceTypeSlot1 : sText_PieceTypeSlot2);
-    StringAppend(gStringVar4, slot == 0 ? COMPOUND_STRING("\n{DOWN_ARROW} 1/2") : COMPOUND_STRING("\n{UP_ARROW} 2/2"));
+    if (instant)
+    {
+        FillWindowPixelBuffer(WIN_MSG, PIXEL_FILL(1));
+        AddTextPrinterParameterized2(WIN_MSG, FONT_NORMAL, gStringVar4, TEXT_SKIP_DRAW, 0, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_WHITE, TEXT_COLOR_LIGHT_GRAY);
+        CopyWindowToVram(WIN_MSG, COPYWIN_GFX);
+        return;
+    }
     DisplayPartyMenuMessage(gStringVar4, TRUE);
     ScheduleBgCopyTilemapToVram(2);
 }
@@ -9046,7 +9051,7 @@ static void Task_GraftPiece(u8 taskId)
         }
         case GRAFT_PIECE_TYPE:
             sPartyMenuInternal->data[1] = 0;
-            BufferTypeSlotPrompt(0);
+            BufferTypeSlotPrompt(0, FALSE);
             sPartyMenuInternal->data[0] = PIECE_TYPE_SLOT;
             return;
         }
@@ -9088,13 +9093,13 @@ static void Task_GraftPiece(u8 taskId)
             }
             else
             {
-                // Knows 4 moves: the standard forget-a-move flow; Task_LearnNextMoveOrClosePartyMenu
-                // records the move and uses up the piece if one was forgotten
+                // Knows 4 moves: hand over to the standard forget-a-move flow (it closes the party
+                // menu before the summary screen). Task_LearnNextMoveOrClosePartyMenu records the
+                // move and uses up the piece only if a move was replaced.
                 PlaySE(SE_SELECT);
-                gPartyMenu.data1 = gGraftPieceInUse.value;
-                StringCopy(gStringVar2, GetMoveName(gGraftPieceInUse.value));
-                DisplayLearnMoveMessage(gText_PkmnNeedsToReplaceMove);
-                sPartyMenuInternal->data[0] = PIECE_FORGET_TEXT;
+                gGraftLearnMovePending = TRUE;
+                gMoveToLearn = gGraftPieceInUse.value;
+                DisplayMonNeedsToReplaceMove(taskId);
             }
             break;
         case 1:
@@ -9112,13 +9117,13 @@ static void Task_GraftPiece(u8 taskId)
         {
             PlaySE(SE_SELECT);
             sPartyMenuInternal->data[1] = 1;
-            BufferTypeSlotPrompt(1);
+            BufferTypeSlotPrompt(1, TRUE);
         }
         else if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] == 1)
         {
             PlaySE(SE_SELECT);
             sPartyMenuInternal->data[1] = 0;
-            BufferTypeSlotPrompt(0);
+            BufferTypeSlotPrompt(0, TRUE);
         }
         else if (JOY_NEW(A_BUTTON))
         {
@@ -9129,29 +9134,6 @@ static void Task_GraftPiece(u8 taskId)
         {
             PlaySE(SE_SELECT);
             ReturnToPieceTargetPick(taskId);
-        }
-        break;
-
-    case PIECE_FORGET_TEXT:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        PartyMenuDisplayYesNoMenu();
-        sPartyMenuInternal->data[0] = PIECE_FORGET_YESNO;
-        break;
-
-    case PIECE_FORGET_YESNO:
-        switch (Menu_ProcessInputNoWrapClearOnChoose())
-        {
-        case 0:
-            PlaySE(SE_SELECT);
-            gGraftLearnMovePending = TRUE;
-            CB2_ShowSummaryScreenToForgetMove();
-            break;
-        case 1:
-        case MENU_B_PRESSED:
-            PlaySE(SE_SELECT);
-            ReturnToPieceTargetPick(taskId);
-            break;
         }
         break;
 
