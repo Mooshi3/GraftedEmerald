@@ -721,11 +721,12 @@ TEST("Marts that sell Poké Balls also sell the grafting items")
     u16 count = 3;
 
     TryBuildDynamicShopItemList(&list, &count);
-    EXPECT_EQ(count, 8); // 3 + the 5 grafting items it didn't list
+    EXPECT_EQ(count, 9); // 3 + the 6 grafting items it didn't list
     EXPECT_EQ(list[2], ITEM_GRAFT_BALL);
     EXPECT_EQ(list[3], ITEM_PATCH_BALL);
     EXPECT_EQ(list[7], ITEM_UNGRAFTER);
-    EXPECT_EQ(list[8], ITEM_NONE);
+    EXPECT_EQ(list[8], ITEM_ABILITY_CAPSULE);
+    EXPECT_EQ(list[9], ITEM_NONE);
     TryFreeDynamicShopItemList(&list);
     EXPECT(list == ballMart);
 
