@@ -16,6 +16,7 @@
 #include "caps.h"
 #include "text.h"
 #include "test/test.h"
+#include "constants/rgb.h"
 #include "event_data.h"
 #include "pokedex.h"
 #include "shop_criteria.h"
@@ -1096,4 +1097,43 @@ TEST("Bosses keep their specialty type and bring a wrong-type ace with it grafte
         EXPECT_EQ(GetMonData(&party[i], MON_DATA_SPECIES), SPECIES_WAILORD);
     for (i = FLAG_BADGE01_GET; i <= FLAG_BADGE08_GET; i++)
         FlagClear(i);
+}
+
+// Recolor: outlines and whites stay, a kept type's colors stay, a replaced type's colors take the new color
+TEST("Graft recolor repaints only the replaced type's colors")
+{
+    // 0 transparent, 1 black outline, 2 gray outline, 3-5 orange body, 6-8 blue wings, 9 gray belly, 10 white
+    const u16 src[16] = {
+        RGB(19, 26, 20), RGB(2, 2, 2), RGB(10, 10, 10), RGB(31, 16, 6), RGB(26, 11, 3), RGB(18, 7, 2),
+        RGB(10, 18, 27), RGB(6, 12, 20), RGB(14, 22, 30), RGB(18, 18, 18), RGB(31, 31, 31),
+    };
+    static const u16 counts[16] = { 3000, 300, 100, 300, 200, 100, 150, 100, 50, 60, 20 };
+    static const u16 edges[16] = { 0, 200, 60, 10, 10, 10, 10, 10, 10, 0, 0 };
+    u8 species[2] = { TYPE_FIRE, TYPE_WATER };
+    u8 eff[2] = { TYPE_FIRE, TYPE_GRASS };
+    u16 spColor[2], efColor[2], dst[16];
+    u32 i;
+
+    spColor[0] = efColor[0] = gTypesInfo[TYPE_FIRE].graftPaletteRGBValue;
+    spColor[1] = gTypesInfo[TYPE_WATER].graftPaletteRGBValue;
+    efColor[1] = gTypesInfo[TYPE_GRASS].graftPaletteRGBValue;
+
+    GraftRecolorPalette(src, dst, counts, edges, species, eff, spColor, efColor);
+    EXPECT_EQ(dst[0], src[0]);
+    EXPECT_EQ(dst[1], src[1]);   // black outline
+    EXPECT_EQ(dst[2], src[2]);   // gray outline (mostly next to transparency)
+    EXPECT_EQ(dst[10], src[10]); // white
+    for (i = 3; i <= 5; i++)
+        EXPECT_EQ(dst[i], src[i]); // Fire is kept: the orange body stays
+    for (i = 6; i <= 8; i++)
+    {
+        u16 c = dst[i];
+        EXPECT_NE(c, src[i]); // Water -> Grass: the blue wings turn green
+        EXPECT_GT((c >> 5) & 31, c & 31);
+        EXPECT_GT((c >> 5) & 31, (c >> 10) & 31);
+    }
+    // No type change: nothing changes
+    GraftRecolorPalette(src, dst, counts, edges, species, species, spColor, spColor);
+    for (i = 0; i < 16; i++)
+        EXPECT_EQ(dst[i], src[i]);
 }

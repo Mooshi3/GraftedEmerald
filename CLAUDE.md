@@ -39,7 +39,7 @@ Graft fields live on `struct BoxPokemon`, outside the encrypted `secure` union (
 - BoxPokemon is 100 bytes (80 in vanilla). The PC has **11 boxes**, the most that fits in the vanilla 9 storage sectors. Don't add save sectors: the slots end right before the Hall of Fame sectors, and `src/save.c` asserts that.
 - Stat grafts feed `CalculateMonStats`. Ability grafts are read by `GetMonAbility`. In battle, `ApplyBattlerGraftOverrides()` sets types and ability on intro, switch-in and faint, for both sides. Use that one function; don't copy-paste override blocks.
 - Move grafts: a move piece asks which move to forget when the mon knows 4. Every grafted move is recorded with `RecordGraftMove()` into `graftMoves[]` (the relearner history), which dedupes and, when its 4 entries are full, evicts a move the species can relearn by level-up first, otherwise the oldest.
-- Type grafts recolor the sprite (`ApplyGraftTypePaletteSwap`). The recolor algorithm is a hue-cluster plus luminance shade approach that still needs work. Jacob's reference tooling (`recolor.py`, `palette_lab.py`) lives outside the repo.
+- Type grafts recolor the sprite (`ApplyGraftTypePalette`, `src/graft_recolor.c`; battle and summary screen, form changes included, not Transform copies): the parts of the sprite that show a replaced type take the new type's color, the rest keeps its design. Colors are grouped by hue (plus the grays), each species type is matched to its group, and pixel counts from the decompressed sprite weigh the groups and find outlines (grays mostly next to transparency stay, so gray mons like Geodude still recolor). `tools/recolor/` has the Python reference, A/B contact sheets and a native check that the C matches it (see its README). Jacob's older palette_lab.py lives outside the repo.
 
 ### Rules
 
@@ -105,7 +105,7 @@ Done (2026-10-01): the Graft Bag (see Grafting): pieces instead of in-battle gra
 Next:
 1. GraftedDex (the out-of-game companion that reads the encounter sheet) needs UI polish.
 2. **Trainer rosters:** every trainer and Gym Leader party is still vanilla Emerald; the expanded roster only reaches them through enemy grafts. Rebuilding parties around the new encounters is its own design job (with Jacob). `tools/encounters/roster_reference.py OUT.html` lists each boss's team and the same-type lines catchable by that fight.
-3. **Type recolor:** a dedicated session, with Jacob's palette_lab.py (it can export sprites in bulk, so a subagent can hunt edge cases). Only 15 colors per palette limit what's possible.
+3. **Type recolor:** rewritten 2026-10-01 (see Data model); tune with Jacob from the A/B sheets. Only 15 colors per palette limit what's possible.
 4. **Story checkpoint smoke tests:** Wally's tutorial, Steven's multi battle, Tate & Liza, the Elite Four, with enemy grafts on.
 5. **Ironmon:** left as a self-imposed challenge (one usable mon, a committed pivot catch is allowed, HM users are fine), so the engine can't enforce it well). The game-side parts already exist as settings: Battle Items banned, Poké Centers closed. Revisit if a rule turns out to need enforcing.
 

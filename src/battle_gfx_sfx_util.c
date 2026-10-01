@@ -668,6 +668,10 @@ void BattleLoadMonSpriteGfx(struct Pokemon *mon, enum BattlerId battler)
     LoadPalette(paletteData, paletteOffset, PLTT_SIZE_4BPP);
     LoadPalette(paletteData, BG_PLTT_ID(8) + BG_PLTT_ID(battler), PLTT_SIZE_4BPP);
 
+    // Grafted types recolor the sprite, under the gimmick tints below (not on a Transform copy)
+    if (!gBattleMons[battler].volatiles.transformed)
+        ApplyGraftTypePalette(paletteOffset, mon, gMonSpritesGfxPtr->spritesGfx[position]);
+
     // transform's pink color
     if (gBattleMons[battler].volatiles.transformed)
     {
@@ -693,21 +697,6 @@ void BattleLoadMonSpriteGfx(struct Pokemon *mon, enum BattlerId battler)
         BlendPalette(paletteOffset, 16, 8, GetTeraTypeRGB(GetBattlerTeraType(battler)));
         CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
     }
-        // Graft type tint: recolor sprite to show grafted types
-        // If any type differs from species default, tint with both
-        // effective type colors (highlights→type1, shadows→type2)
-        // Don't apply if terastallized (tera tint takes priority)
-        if (GetActiveGimmick(battler) != GIMMICK_TERA)
-        {
-            u8 effType1, effType2;
-            if (GetBattlerGraftedTypeInfo(battler, &effType1, &effType2))
-            {
-                u16 type1Color = gTypesInfo[effType1].graftPaletteRGBValue;
-                u16 type2Color = gTypesInfo[effType2].graftPaletteRGBValue;
-                ApplyGraftTypePaletteSwap(paletteOffset, 16, type1Color, type2Color, (effType1 != effType2));
-                CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, PLTT_SIZEOF(16));
-            }
-        }
 }
 
 void BattleGfxSfxDummy2(enum Species species)
@@ -967,6 +956,9 @@ void HandleSpeciesGfxDataChange(enum BattlerId battlerAtk, enum BattlerId battle
     paletteOffset = OBJ_PLTT_ID(battlerAtk);
     paletteData = GetMonSpritePalFromSpeciesAndPersonality(targetSpecies, isShiny, personalityValue);
     LoadPalette(paletteData, paletteOffset, PLTT_SIZE_4BPP);
+    // A form change keeps the grafted colors (a Transform copy has none)
+    if (!IsContest() && changeType != SPECIES_GFX_CHANGE_TRANSFORM)
+        ApplyGraftTypePalette(paletteOffset, monAtk, src);
 
     if (changeType == SPECIES_GFX_CHANGE_GHOST_UNVEIL)
     {
