@@ -155,5 +155,6 @@ s8 Test_UpdatePartySelectionSingleLayout(s8 slotId, s8 movementDir, bool8 choose
 #endif
 
 bool32 StartAutoSplice(MainCallback next);
+void OpenPartyMenuForGraftPiece(MainCallback exitCallback);
 
 #endif // GUARD_PARTY_MENU_H

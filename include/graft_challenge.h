@@ -20,8 +20,6 @@ void Nuzlocke_OnBattleEnd(void);
 u32 Nuzlocke_GetEncounterState(void);
 const u8 *GetChallengeBallBlockReason(u16 ball);
 void OnWildHarvest(void);
-const u8 *GetHarvestTargetRejectReason(struct Pokemon *mon);
-void OnHarvestTargetChosen(struct Pokemon *mon);
 bool32 AreBattleItemsBanned(void);
 bool32 IsForceSetMode(void);
 

@@ -48,6 +48,7 @@
 #include "palette.h"
 #include "party_menu.h"
 #include "graft_challenge.h"
+#include "graft_bag.h"
 #include "player_pc.h"
 #include "pokemon.h"
 #include "pokemon_icon.h"
@@ -111,7 +112,6 @@ enum {
     MENU_CATALOG_MOWER,
     MENU_CHANGE_FORM,
     MENU_CHANGE_ABILITY,
-    MENU_APPLY_GRAFT,
     MENU_FIELD_MOVES
 };
 
@@ -133,7 +133,6 @@ enum {
     ACTIONS_TAKEITEM_TOSS,
     ACTIONS_ROTOM_CATALOG,
     ACTIONS_ZYGARDE_CUBE,
-    ACTIONS_GRAFT,
 };
 
 enum {
@@ -299,7 +298,6 @@ static void Task_ClosePartyMenuAndSetCB2(u8);
 static void UpdatePartyToFieldOrder(void);
 static void MoveCursorToConfirm(void);
 // GRAFT: Splicer / Auto-splice state
-static EWRAM_DATA u8 sSplicerDonorName[POKEMON_NAME_BUFFER_SIZE] = {0};
 static EWRAM_DATA MainCallback sAutoSpliceNext = NULL;
 static EWRAM_DATA bool8 sAutoSpliceActive = FALSE;
 
@@ -482,10 +480,10 @@ static void CursorCb_Trade1(u8);
 static void CursorCb_Trade2(u8);
 static void CursorCb_Toss(u8);
 static void CursorCb_FieldMove(u8);
-static void CursorCb_ApplyGraft(u8);
 void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task);
 void Task_GraftSplicer(u8 taskId);
-static void CursorCb_GraftSplicerTarget(u8 taskId);
+static void Task_GraftPiece(u8 taskId);
+static void CursorCb_GraftPieceTarget(u8 taskId);
 static void CursorCb_CatalogBulb(u8);
 static void CursorCb_CatalogOven(u8);
 static void CursorCb_CatalogWashing(u8);
@@ -1535,27 +1533,6 @@ static s8 *GetCurrentPartySlotPtr(void)
         return &gPartyMenu.slotId;
 }
 
-// GRAFT: refuse a graft target that breaks the graft rules (husk, gates, limits),
-// with the reason, and stay in the party menu. Returns TRUE if refused.
-static bool8 TryRejectGraftTarget(u8 taskId, u8 slot)
-{
-    const u8 *reason = GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][slot].box, GetSelectedGraftType(), GetSelectedGraftStatIndex());
-    if (reason == NULL)
-        reason = GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][slot]);
-    if (reason == NULL)
-    {
-        OnHarvestTargetChosen(&gParties[B_TRAINER_PLAYER][slot]);
-        return FALSE;
-    }
-    PlaySE(SE_FAILURE);
-    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
-    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-    DisplayPartyMenuMessage(reason, FALSE);
-    ScheduleBgCopyTilemapToVram(2);
-    gTasks[taskId].func = Task_ReturnToChooseMonAfterText;
-    return TRUE;
-}
-
 static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
 {
     if (*slotPtr == PARTY_SIZE)
@@ -1670,23 +1647,9 @@ static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
             }
             break;
         }
-case PARTY_ACTION_GRAFT:
-            if (TryRejectGraftTarget(taskId, (u8)*slotPtr))
-                break;
-            {
-                PlaySE(SE_SELECT);
-                gGraftSelectedPartySlot = (u8)*slotPtr;
-                gGraftSelectedPartyPersonality = GetMonData(&gParties[B_TRAINER_PLAYER][(u8)*slotPtr], MON_DATA_PERSONALITY);
-                PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-                Task_ClosePartyMenu(taskId);
-            }
+        case PARTY_ACTION_GRAFT_PIECE:
+            CursorCb_GraftPieceTarget(taskId);
             break;
-        case PARTY_ACTION_SPLICER:
-        {
-            PlaySE(SE_SELECT);
-            CursorCb_GraftSplicerTarget(taskId);
-        }
-        break;
         default:
         case PARTY_ACTION_ABILITY_PREVENTS:
         case PARTY_ACTION_SWITCHING:
@@ -3496,15 +3459,6 @@ static void FinishTwoMonAction(u8 taskId)
 static void CursorCb_Cancel1(u8 taskId)
 {
     PlaySE(SE_SELECT);
-    // If in graft action, exit party menu and go back to category selection
-    if (gPartyMenu.action == PARTY_ACTION_GRAFT)
-    {
-        gGraftSelectedPartySlot = 0xFF; // sentinel: cancelled
-        PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
-        PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-        Task_ExitPartyMenu(taskId);
-        return;
-    }
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
     PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
     if (gPartyMenu.menuType == PARTY_MENU_TYPE_DAYCARE)
@@ -5670,8 +5624,8 @@ static void Task_LearnedMove(u8 taskId)
     if (gPartyMenu.learnMoveState == 0)
     {
         AdjustFriendship(mon, FRIENDSHIP_EVENT_LEARN_TMHM);
-        // GRAFT: a Splicer graft consumes its item itself (and Auto-splice consumes nothing);
-        // gSpecialVar_ItemId may be the Splicer or a stale item here, so don't treat it as a TM
+        // GRAFT: a Graft Bag piece uses up the piece, not an item;
+        // gSpecialVar_ItemId may be a stale item here, so don't treat it as a TM
         if (!GetItemImportance(item) && !gGraftLearnMovePending)
             RemoveBagItem(item, 1);
     }
@@ -5704,13 +5658,12 @@ static void Task_LearnNextMoveOrClosePartyMenu(u8 taskId)
         {
             if (gPartyMenu.learnMoveState == 2) // never occurs
                 gSpecialVar_Result = TRUE;
-            // GRAFT: If we came from the Graft Splicer move-forget flow,
-            // record the graft move and consume the item before closing.
+            // GRAFT: a move piece from the Graft Bag that needed a move forgotten:
+            // record the graft move and use up the piece before closing.
             if (gGraftLearnMovePending)
             {
                 RecordGraftMove(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId].box, gPartyMenu.data1);
-                if (!sAutoSpliceActive) // Auto-splice is free
-                    RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
+                RemoveGraftPiece(&gGraftPieceInUse);
                 gGraftLearnMovePending = FALSE;
             }
             Task_ClosePartyMenu(taskId);
@@ -7591,8 +7544,6 @@ void ChooseMonForInBattleItem(void)
 
 static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *mon)
 {
-    if (gPartyMenu.action == PARTY_ACTION_GRAFT)
-        return ACTIONS_GRAFT;
     if (GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_SPECIES) != SPECIES_NONE
      && GetMonData(mon, MON_DATA_IS_EGG) == FALSE
      && gPartyMenu.layout != PARTY_LAYOUT_MULTI_FULL_PARTNER)
@@ -7603,17 +7554,6 @@ static u8 GetPartyMenuActionsTypeInBattle(struct Pokemon *mon)
             return ACTIONS_SHIFT;
     }
     return ACTIONS_SUMMARY_ONLY;
-}
-
-static void CursorCb_ApplyGraft(u8 taskId)
-{
-    u8 slot = GetCursorSelectionMonId();
-    if (TryRejectGraftTarget(taskId, slot))
-        return;
-    // Store selected slot — ALL graft application happens in Cmd_graftmenu sub-states
-    gGraftSelectedPartySlot = slot;
-    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
-    Task_ExitPartyMenu(taskId);
 }
 
 static bool8 TrySwitchInPokemon(void)
@@ -8689,48 +8629,51 @@ static void Task_FirstBattleEnterParty_WaitFadeNormal(u8 taskId)
 
 
 // ============================================================
-// Graft Splicer — 5-category pick system
+// Graft Splicer: sacrifice a party mon; it's broken down into Graft Bag pieces.
+// Auto-splice (Fainting setting) does the same to each fallen mon after a battle.
 // ============================================================
 
 enum SplicerState
 {
     SPLICER_CONFIRM_SACRIFICE,
     SPLICER_YES_NO,
-    SPLICER_SCROLL_CATEGORIES,
-    SPLICER_SUBMENU_MOVE,
-    SPLICER_SUBMENU_TYPE,
-    SPLICER_SUBMENU_STAT,
-    SPLICER_PICK_TARGET,
-    SPLICER_VALIDATE_TARGET,
-    SPLICER_APPLY,
+    SPLICER_FINISH,
     SPLICER_DONE,
-    SPLICER_CANCEL_TARGET,
-    SPLICER_MOVE_CONFIRM,
-    SPLICER_MOVE_REPLACE_YESNO,
-    SPLICER_TYPE_SLOT,
-    SPLICER_APPLY_FINISH,
-    SPLICER_AUTO_INTRO,      // Auto-splice: "X has fallen", then the categories
-    SPLICER_AUTO_SKIP,       // Auto-splice: B on the categories asks to let it go instead
-    SPLICER_AUTO_SKIP_YESNO,
 };
 
-static const u8 sText_SplicerSacrifice[] = _("{STR_VAR_1} will be lost.\nAre you sure?");
+static const u8 sText_SplicerSacrifice[] = _("{STR_VAR_1} will be broken down\ninto graft pieces. OK?");
 static const u8 sText_SplicerOnlyOneMon[] = _("You only have one\nPokémon!");
 static const u8 sText_SplicerEgg[] = _("Eggs can't be\nsacrificed.");
-static const u8 sText_SplicerSameMon[] = _("Can't graft onto\nthe same Pokémon.");
-static const u8 sText_SplicerTeachMove[] = _("Teach {STR_VAR_2}\nto {STR_VAR_1}?");
-static const u8 sText_SplicerMoveReplaced[] = _("{STR_VAR_1} learned\n{STR_VAR_2}!");
-static const u8 sText_SplicerTypeSlot1[] = _("Replace type1 ({STR_VAR_1})\nwith {STR_VAR_2}?");
-static const u8 sText_SplicerTypeSlot2[] = _("Replace type2 ({STR_VAR_1})\nwith {STR_VAR_2}?");
-static const u8 sText_SplicerApplied[] = _("Graft applied!\n{STR_VAR_1} was released.");
-static const u8 sText_AutoSpliceIntro[] = _("{STR_VAR_1} has fallen.\nPick a graft to pass on.");
-static const u8 sText_AutoSpliceSkip[] = _("Let {STR_VAR_1} go without\npassing anything on?");
-static const u8 sText_AutoSpliceReleased[] = _("{STR_VAR_1} was released.");
+static const u8 sText_SplicerBrokenDown[] = _("{STR_VAR_1} was broken down\ninto {STR_VAR_2} pieces!");
+static const u8 sText_AutoSpliceBrokenDown[] = _("{STR_VAR_1} has fallen. It was\nbroken down into {STR_VAR_2} pieces!");
+static const u8 sText_GraftBagFullAfter[] = _("\pThe Graft Bag is full.");
 
-// ============================================================
-// Auto-splice (Fainting setting): after a battle, each fallen party mon is the Splicer donor
-// for a free graft onto a teammate, or is let go. Reuses Task_GraftSplicer.
-// ============================================================
+static void ReleaseSplicerDonor(void)
+{
+    u8 sacrificeSlot = gPartyMenu.slotId2;
+    u16 item = GetMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot], MON_DATA_HELD_ITEM);
+    if (item != ITEM_NONE)
+        AddBagItem(item, 1);
+    ZeroMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot]);
+    CompactPartySlots();
+    CalculatePlayerPartyCount();
+}
+
+// Breaks the mon in gPartyMenu.slotId2 down into pieces and releases it; the message goes in gStringVar4
+static void BreakDownSplicerDonor(const u8 *text)
+{
+    struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
+    u32 lost, got;
+
+    GiveGraftBagIfMissing();
+    got = HarvestGraftPieces(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], FALSE, GRAFT_HARVEST_ALL, pieces, &lost);
+    GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
+    ConvertIntToDecimalStringN(gStringVar2, got, STR_CONV_MODE_LEFT_ALIGN, 2);
+    StringExpandPlaceholders(gStringVar4, text);
+    if (lost != 0)
+        StringAppend(gStringVar4, sText_GraftBagFullAfter);
+    ReleaseSplicerDonor();
+}
 
 // The battle's script may read these after the battle; the party menu can overwrite them
 static EWRAM_DATA u16 sAutoSpliceSavedResult = 0;
@@ -8740,19 +8683,13 @@ static void CB2_AutoSpliceContinue(void);
 
 static void Task_AutoSpliceBegin(u8 taskId)
 {
-    u32 donor;
     if (gPaletteFade.active)
         return;
-    donor = GetNextAutoSpliceDonor();
-    gPartyMenu.slotId = donor;
-    gPartyMenu.slotId2 = donor;
-    GatherGraftSourceDataPartyMon(donor);
-    GetMonNickname(&gParties[B_TRAINER_PLAYER][donor], gStringVar1);
-    StringExpandPlaceholders(gStringVar4, sText_AutoSpliceIntro);
+    gPartyMenu.slotId2 = GetNextAutoSpliceDonor();
+    BreakDownSplicerDonor(sText_AutoSpliceBrokenDown);
     DisplayPartyMenuMessage(gStringVar4, TRUE);
     ScheduleBgCopyTilemapToVram(2);
-    sPartyMenuInternal->data[0] = SPLICER_AUTO_INTRO;
-    sPartyMenuInternal->data[1] = 0;
+    sPartyMenuInternal->data[0] = SPLICER_DONE;
     gTasks[taskId].func = Task_GraftSplicer;
 }
 
@@ -8783,46 +8720,6 @@ static void CB2_AutoSpliceContinue(void)
         gSpecialVar_0x8004 = sAutoSpliceSaved8004;
         SetMainCallback2(sAutoSpliceNext);
     }
-}
-
-// Splicer: the donor is released only once the graft is committed (after the type slot or
-// "Teach X?" answer), so backing out keeps it. Returns the target's slot after the party shifts.
-static u8 ReleaseSplicerDonorForGraft(void)
-{
-    u8 targetSlot = gPartyMenu.slotId;
-    u8 sacrificeSlot = gPartyMenu.slotId2;
-    u8 partyCount = CalculatePlayerPartyCount();
-    u8 i;
-
-    // Keep its name for the "was released" message
-    GetMonNickname(&gParties[B_TRAINER_PLAYER][sacrificeSlot], sSplicerDonorName);
-    if (targetSlot > sacrificeSlot)
-        targetSlot--;
-    for (i = sacrificeSlot; i < partyCount - 1; i++)
-        CopyMon(&gParties[B_TRAINER_PLAYER][i], &gParties[B_TRAINER_PLAYER][i + 1], sizeof(struct Pokemon));
-    ZeroMonData(&gParties[B_TRAINER_PLAYER][partyCount - 1]);
-    gPartyMenu.slotId = targetSlot;
-    return targetSlot;
-}
-
-static void ReturnToSplicerTargetPick(u8 taskId)
-{
-    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-    ClearWindowTilemap(WIN_MSG);
-    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-    gTasks[taskId].func = Task_HandleChooseMonInput;
-    sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-}
-
-static void ReleaseSplicerDonor(void)
-{
-    u8 sacrificeSlot = gPartyMenu.slotId2;
-    u16 item = GetMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot], MON_DATA_HELD_ITEM);
-    if (item != ITEM_NONE)
-        AddBagItem(item, 1);
-    ZeroMonData(&gParties[B_TRAINER_PLAYER][sacrificeSlot]);
-    CompactPartySlots();
-    CalculatePlayerPartyCount();
 }
 
 // ============================================================
@@ -8934,13 +8831,11 @@ void ItemUseCB_GraftSplicer(u8 taskId, TaskFunc task)
         return;
     }
     gPartyMenu.slotId2 = gPartyMenu.slotId;
-    GatherGraftSourceDataPartyMon(gPartyMenu.slotId2);
     GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
     StringExpandPlaceholders(gStringVar4, sText_SplicerSacrifice);
     DisplayPartyMenuMessage(gStringVar4, TRUE);
     ScheduleBgCopyTilemapToVram(2);
     sPartyMenuInternal->data[0] = SPLICER_CONFIRM_SACRIFICE;
-    sPartyMenuInternal->data[1] = 0;
     gTasks[taskId].func = Task_GraftSplicer;
 }
 
@@ -8958,15 +8853,13 @@ void Task_GraftSplicer(u8 taskId)
     case SPLICER_YES_NO:
         switch (Menu_ProcessInputNoWrapClearOnChoose())
         {
-        case 0: // YES - sacrifice
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1] = 0;
-            SetSelectedGraftCategory(0);
-            SetGraftMenuSubCursor(0);
-            UpdateGraftMenuCursorOverworld(0);
+        case 0: // YES - break it down
+            PlaySE(SE_USE_ITEM);
+            BreakDownSplicerDonor(sText_SplicerBrokenDown);
+            RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
             DisplayPartyMenuMessage(gStringVar4, TRUE);
             ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
+            sPartyMenuInternal->data[0] = SPLICER_DONE;
             break;
         case 1: // NO
         case MENU_B_PRESSED:
@@ -8977,649 +8870,307 @@ void Task_GraftSplicer(u8 taskId)
         }
         break;
 
-    case SPLICER_SCROLL_CATEGORIES:
+    case SPLICER_DONE:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
-        if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] > 0)
+        if (!JOY_NEW(A_BUTTON | B_BUTTON))
+            return;
+        gPartyMenuUseExitCallback = TRUE;
+        gTasks[taskId].func = Task_ClosePartyMenu;
+        break;
+    }
+}
+
+// ============================================================
+// Grafting a piece from the Graft Bag: pick a party mon, confirm, apply. The piece is used up
+// only when the graft is committed; backing out at any point keeps it.
+// ============================================================
+
+enum GraftPieceState
+{
+    PIECE_PICK_TARGET,
+    PIECE_VALIDATE,
+    PIECE_CANCEL_TARGET,
+    PIECE_CONFIRM,
+    PIECE_CONFIRM_YESNO,
+    PIECE_TYPE_SLOT,
+    PIECE_FORGET_TEXT,
+    PIECE_FORGET_YESNO,
+    PIECE_FINISH,
+};
+
+static const u8 sText_PieceTeachMove[] = _("Teach {STR_VAR_2}\nto {STR_VAR_1}?");
+static const u8 sText_PieceKnowsMove[] = _("{STR_VAR_1} already\nknows {STR_VAR_2}.");
+static const u8 sText_PieceLearnedMove[] = _("{STR_VAR_1} learned\n{STR_VAR_2}!");
+static const u8 sText_PieceGiveAbility[] = _("Replace {STR_VAR_1}'s {STR_VAR_3}\nwith {STR_VAR_2}?");
+static const u8 sText_PieceGiveNature[] = _("Change {STR_VAR_1}'s nature\nfrom {STR_VAR_3} to {STR_VAR_2}?");
+static const u8 sText_PieceGiveStat[] = _("{STR_VAR_1}'s base {STR_VAR_3}\nbecomes {STR_VAR_2}. OK?");
+static const u8 sText_PieceTypeSlot1[] = _("Replace type1 ({STR_VAR_1})\nwith {STR_VAR_2}?");
+static const u8 sText_PieceTypeSlot2[] = _("Replace type2 ({STR_VAR_1})\nwith {STR_VAR_2}?");
+static const u8 sText_PieceGrafted[] = _("{STR_VAR_1} received\n{STR_VAR_2}!");
+
+static const u8 *const sStatNamesLong[NUM_STATS] =
+{
+    COMPOUND_STRING("HP"), COMPOUND_STRING("Attack"), COMPOUND_STRING("Defense"),
+    COMPOUND_STRING("Speed"), COMPOUND_STRING("Sp. Atk"), COMPOUND_STRING("Sp. Def"),
+};
+
+static u8 GraftPieceMenuType(void)
+{
+    switch (gGraftPieceInUse.kind)
+    {
+    case GRAFT_PIECE_MOVE:    return GRAFT_MENU_MOVE;
+    case GRAFT_PIECE_ABILITY: return GRAFT_MENU_ABILITY;
+    case GRAFT_PIECE_TYPE:    return GRAFT_MENU_TYPE;
+    case GRAFT_PIECE_NATURE:  return GRAFT_MENU_NATURE;
+    default:                  return GRAFT_MENU_STAT;
+    }
+}
+
+void OpenPartyMenuForGraftPiece(MainCallback exitCallback)
+{
+    gGraftLearnMovePending = FALSE;
+    InitPartyMenu(PARTY_MENU_TYPE_FIELD, PARTY_LAYOUT_SINGLE, PARTY_ACTION_GRAFT_PIECE, FALSE, PARTY_MSG_USE_ON_WHICH_MON, Task_HandleChooseMonInput, exitCallback);
+}
+
+static void ShowPieceMessage(const u8 *text)
+{
+    StringExpandPlaceholders(gStringVar4, text);
+    DisplayPartyMenuMessage(gStringVar4, TRUE);
+    ScheduleBgCopyTilemapToVram(2);
+}
+
+static void BufferTypeSlotPrompt(u8 slot)
+{
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][gPartyMenu.slotId];
+    StringCopy(gStringVar1, gTypesInfo[GetEffectiveTypeFromMon(mon, slot)].name);
+    StringCopy(gStringVar2, gTypesInfo[gGraftPieceInUse.value].name);
+    StringExpandPlaceholders(gStringVar4, slot == 0 ? sText_PieceTypeSlot1 : sText_PieceTypeSlot2);
+    StringAppend(gStringVar4, slot == 0 ? COMPOUND_STRING("\n{DOWN_ARROW} 1/2") : COMPOUND_STRING("\n{UP_ARROW} 2/2"));
+    DisplayPartyMenuMessage(gStringVar4, TRUE);
+    ScheduleBgCopyTilemapToVram(2);
+}
+
+static void ReturnToPieceTargetPick(u8 taskId)
+{
+    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
+    ClearWindowTilemap(WIN_MSG);
+    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
+    gTasks[taskId].func = Task_HandleChooseMonInput;
+    sPartyMenuInternal->data[0] = PIECE_PICK_TARGET;
+}
+
+// The graft is committed: apply it, use up the piece, and say so
+static void CommitGraftPiece(void)
+{
+    u8 slot = gPartyMenu.slotId;
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][slot];
+
+    switch (gGraftPieceInUse.kind)
+    {
+    case GRAFT_PIECE_ABILITY:
+        SetGraftedAbility(slot, gGraftPieceInUse.value);
+        break;
+    case GRAFT_PIECE_NATURE:
+        SetGraftedNature(slot, gGraftPieceInUse.value);
+        break;
+    case GRAFT_PIECE_STAT:
+        SetGraftedStat(slot, gGraftPieceInUse.stat, gGraftPieceInUse.value);
+        break;
+    case GRAFT_PIECE_TYPE:
+        SetGraftedType(slot, sPartyMenuInternal->data[1], gGraftPieceInUse.value);
+        break;
+    }
+    RemoveGraftPiece(&gGraftPieceInUse);
+    PlaySE(SE_USE_ITEM);
+    GetMonNickname(mon, gStringVar1);
+    GetGraftPieceName(gStringVar2, &gGraftPieceInUse);
+    ShowPieceMessage(sText_PieceGrafted);
+}
+
+static void Task_GraftPiece(u8 taskId)
+{
+    u8 slot = gPartyMenu.slotId;
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][slot];
+
+    switch (sPartyMenuInternal->data[0])
+    {
+    case PIECE_PICK_TARGET:
+        break;
+
+    case PIECE_VALIDATE:
+    {
+        const u8 *rejectReason = NULL;
+        if (GetMonData(mon, MON_DATA_IS_EGG))
+            rejectReason = gText_EggCantBattle;
+        else
+            rejectReason = GetGraftRejectReason(&mon->box, GraftPieceMenuType(), gGraftPieceInUse.stat);
+        GetMonNickname(mon, gStringVar1);
+        GetGraftPieceName(gStringVar2, &gGraftPieceInUse);
+        if (rejectReason == NULL && gGraftPieceInUse.kind == GRAFT_PIECE_MOVE && MonKnowsMove(mon, gGraftPieceInUse.value))
+            rejectReason = sText_PieceKnowsMove;
+        if (rejectReason != NULL)
         {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1]--;
-            SetSelectedGraftCategory(sPartyMenuInternal->data[1]);
-            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
+            PlaySE(SE_FAILURE);
+            ShowPieceMessage(rejectReason);
+            sPartyMenuInternal->data[0] = PIECE_CANCEL_TARGET;
+            break;
         }
-        if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] < 4)
+        PlaySE(SE_SELECT);
+        switch (gGraftPieceInUse.kind)
         {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1]++;
-            SetSelectedGraftCategory(sPartyMenuInternal->data[1]);
-            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
+        case GRAFT_PIECE_MOVE:
+            ShowPieceMessage(sText_PieceTeachMove);
+            break;
+        case GRAFT_PIECE_ABILITY:
+            StringCopy(gStringVar3, gAbilitiesInfo[GetMonAbility(mon)].name);
+            ShowPieceMessage(sText_PieceGiveAbility);
+            break;
+        case GRAFT_PIECE_NATURE:
+            StringCopy(gStringVar2, gNaturesInfo[gGraftPieceInUse.value].name);
+            StringCopy(gStringVar3, gNaturesInfo[GetMonData(mon, MON_DATA_HIDDEN_NATURE)].name);
+            ShowPieceMessage(sText_PieceGiveNature);
+            break;
+        case GRAFT_PIECE_STAT:
+        {
+            u32 current = mon->box.graftStatOverrides[gGraftPieceInUse.stat];
+            u8 *str;
+            if (current == 0)
+                current = GetSpeciesBaseStat(GetMonData(mon, MON_DATA_SPECIES), gGraftPieceInUse.stat);
+            StringCopy(gStringVar3, sStatNamesLong[gGraftPieceInUse.stat]);
+            str = ConvertIntToDecimalStringN(gStringVar2, current, STR_CONV_MODE_LEFT_ALIGN, 3);
+            str = StringCopy(str, COMPOUND_STRING(" {RIGHT_ARROW} "));
+            ConvertIntToDecimalStringN(str, gGraftPieceInUse.value, STR_CONV_MODE_LEFT_ALIGN, 3);
+            ShowPieceMessage(sText_PieceGiveStat);
+            break;
         }
-        if (JOY_NEW(A_BUTTON))
+        case GRAFT_PIECE_TYPE:
+            sPartyMenuInternal->data[1] = 0;
+            BufferTypeSlotPrompt(0);
+            sPartyMenuInternal->data[0] = PIECE_TYPE_SLOT;
+            return;
+        }
+        sPartyMenuInternal->data[0] = PIECE_CONFIRM;
+        break;
+    }
+
+    case PIECE_CANCEL_TARGET:
+        if (IsPartyMenuTextPrinterActive() == TRUE)
+            return;
+        if (!JOY_NEW(A_BUTTON | B_BUTTON))
+            return;
+        ReturnToPieceTargetPick(taskId);
+        break;
+
+    case PIECE_CONFIRM:
+        if (IsPartyMenuTextPrinterActive() == TRUE)
+            return;
+        PartyMenuDisplayYesNoMenu();
+        sPartyMenuInternal->data[0] = PIECE_CONFIRM_YESNO;
+        break;
+
+    case PIECE_CONFIRM_YESNO:
+        switch (Menu_ProcessInputNoWrapClearOnChoose())
         {
-            PlaySE(SE_SELECT);
-            SetSelectedGraftCategory(sPartyMenuInternal->data[1]);
-            SetGraftMenuSubCursor(0);
+        case 0:
+            if (gGraftPieceInUse.kind != GRAFT_PIECE_MOVE)
             {
-                u8 cat = GetSelectedGraftCategory();
-                if (cat == GRAFT_CATEGORY_MOVE)
-                {
-                    u8 mc = 0, mi;
-                    for (mi = 0; mi < 4; mi++)
-                        if (GetGraftSourceMove(mi) != MOVE_NONE) mc++;
-                    sPartyMenuInternal->data[1] = 0;
-                    sPartyMenuInternal->data[0] = SPLICER_SUBMENU_MOVE;
-                    StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(0)].name);
-                    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-                    ConvertIntToDecimalStringN(gStringVar2, 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-                    StringAppend(gStringVar4, gStringVar2);
-                    StringAppend(gStringVar4, COMPOUND_STRING("/"));
-                    ConvertIntToDecimalStringN(gStringVar2, mc, STR_CONV_MODE_LEFT_ALIGN, 1);
-                    StringAppend(gStringVar4, gStringVar2);
-                    if (mc > 1)
-                        StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-                    DisplayPartyMenuMessage(gStringVar4, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
-                }
-            else if (cat == GRAFT_CATEGORY_TYPE)
+                CommitGraftPiece();
+                sPartyMenuInternal->data[0] = PIECE_FINISH;
+            }
+            else if (GiveMoveToMon(mon, gGraftPieceInUse.value) != MON_HAS_MAX_MOVES)
             {
-                // Skip submenu if mono-type (both types are the same)
-                if (GetGraftSourceType(0) == GetGraftSourceType(1))
-                {
-                    SetGraftMenuSubCursor(0);
-                    SetSelectedGraftFromCategory();
-                    sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-                    gPartyMenu.action = PARTY_ACTION_SPLICER;
-                    AnimatePartySlot(gPartyMenu.slotId2, 1);
-                    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-                    ClearWindowTilemap(WIN_MSG);
-                    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-                    gTasks[taskId].func = Task_HandleChooseMonInput;
-                }
-                else
-                {
-                    sPartyMenuInternal->data[1] = 0;
-                    sPartyMenuInternal->data[0] = SPLICER_SUBMENU_TYPE;
-                    StringCopy(gStringVar1, gTypesInfo[GetGraftSourceType(0)].name);
-                    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type1: {STR_VAR_1}"));
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
-                    DisplayPartyMenuMessage(gStringVar4, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
-                }
+                RecordGraftMove(&mon->box, gGraftPieceInUse.value);
+                RemoveGraftPiece(&gGraftPieceInUse);
+                PlaySE(SE_USE_ITEM);
+                ShowPieceMessage(sText_PieceLearnedMove);
+                sPartyMenuInternal->data[0] = PIECE_FINISH;
             }
-                else if (cat == GRAFT_CATEGORY_STAT)
-                {
-                    sPartyMenuInternal->data[1] = 0;
-                    sPartyMenuInternal->data[0] = SPLICER_SUBMENU_STAT;
-                    StringCopy(gStringVar1, GetStatNameString(0));
-                    ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(0), STR_CONV_MODE_LEFT_ALIGN, 3);
-                    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/6"));
-                    DisplayPartyMenuMessage(gStringVar4, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
-                }
-                else
-                {
-                    // Ability or Nature - no submenu
-                    SetSelectedGraftFromCategory();
-                    gPartyMenu.action = PARTY_ACTION_SPLICER;
-                    AnimatePartySlot(gPartyMenu.slotId2, 1);
-                    ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-                    ClearWindowTilemap(WIN_MSG);
-                    DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-                    gTasks[taskId].func = Task_HandleChooseMonInput;
-                    sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-                }
+            else
+            {
+                // Knows 4 moves: the standard forget-a-move flow; Task_LearnNextMoveOrClosePartyMenu
+                // records the move and uses up the piece if one was forgotten
+                PlaySE(SE_SELECT);
+                gPartyMenu.data1 = gGraftPieceInUse.value;
+                StringCopy(gStringVar2, GetMoveName(gGraftPieceInUse.value));
+                DisplayLearnMoveMessage(gText_PkmnNeedsToReplaceMove);
+                sPartyMenuInternal->data[0] = PIECE_FORGET_TEXT;
             }
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
+            break;
+        case 1:
+        case MENU_B_PRESSED:
             PlaySE(SE_SELECT);
-            GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
-            StringExpandPlaceholders(gStringVar4, sAutoSpliceActive ? sText_AutoSpliceSkip : sText_SplicerSacrifice);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = sAutoSpliceActive ? SPLICER_AUTO_SKIP : SPLICER_CONFIRM_SACRIFICE;
+            ReturnToPieceTargetPick(taskId);
+            break;
         }
         break;
 
-    case SPLICER_SUBMENU_MOVE:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        {
-            u8 moveCount = 0, mi;
-            for (mi = 0; mi < 4; mi++)
-                if (GetGraftSourceMove(mi) != MOVE_NONE) moveCount++;
-            if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] < moveCount - 1)
-            {
-                PlaySE(SE_SELECT);
-                sPartyMenuInternal->data[1]++;
-                SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-                StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(sPartyMenuInternal->data[1])].name);
-                StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-                StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-                if (sPartyMenuInternal->data[1] > 0)
-                    StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW}"));
-                ConvertIntToDecimalStringN(gStringVar2, sPartyMenuInternal->data[1] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-                StringAppend(gStringVar4, gStringVar2);
-                StringAppend(gStringVar4, COMPOUND_STRING("/"));
-                ConvertIntToDecimalStringN(gStringVar2, moveCount, STR_CONV_MODE_LEFT_ALIGN, 1);
-                StringAppend(gStringVar4, gStringVar2);
-                if (sPartyMenuInternal->data[1] < moveCount - 1)
-                    StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-            }
-            if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] > 0)
-            {
-                PlaySE(SE_SELECT);
-                sPartyMenuInternal->data[1]--;
-                SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-                StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(sPartyMenuInternal->data[1])].name);
-                StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-                StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-                if (sPartyMenuInternal->data[1] > 0)
-                    StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW}"));
-                ConvertIntToDecimalStringN(gStringVar2, sPartyMenuInternal->data[1] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-                StringAppend(gStringVar4, gStringVar2);
-                StringAppend(gStringVar4, COMPOUND_STRING("/"));
-                ConvertIntToDecimalStringN(gStringVar2, moveCount, STR_CONV_MODE_LEFT_ALIGN, 1);
-                StringAppend(gStringVar4, gStringVar2);
-                if (sPartyMenuInternal->data[1] < moveCount - 1)
-                    StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-            }
-            if (JOY_NEW(A_BUTTON))
-            {
-                PlaySE(SE_SELECT);
-                SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-                SetSelectedGraftFromCategory();
-                gPartyMenu.action = PARTY_ACTION_SPLICER;
-                AnimatePartySlot(gPartyMenu.slotId2, 1);
-                ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-                ClearWindowTilemap(WIN_MSG);
-                DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-                gTasks[taskId].func = Task_HandleChooseMonInput;
-                sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-            }
-            if (JOY_NEW(B_BUTTON))
-            {
-                PlaySE(SE_SELECT);
-                sPartyMenuInternal->data[1] = GetSelectedGraftCategory();
-                UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-                sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
-            }
-        }
-        break;
-
-    case SPLICER_SUBMENU_TYPE:
+    case PIECE_TYPE_SLOT:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
         if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] == 0)
         {
             PlaySE(SE_SELECT);
             sPartyMenuInternal->data[1] = 1;
-            SetGraftMenuSubCursor(1);
-            StringCopy(gStringVar1, gTypesInfo[GetGraftSourceType(1)].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type2: {STR_VAR_1}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{UP_ARROW} 2/2"));
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
+            BufferTypeSlotPrompt(1);
         }
-        if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] == 1)
+        else if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] == 1)
         {
             PlaySE(SE_SELECT);
             sPartyMenuInternal->data[1] = 0;
-            SetGraftMenuSubCursor(0);
-            StringCopy(gStringVar1, gTypesInfo[GetGraftSourceType(0)].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type1: {STR_VAR_1}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
+            BufferTypeSlotPrompt(0);
         }
-        if (JOY_NEW(A_BUTTON))
+        else if (JOY_NEW(A_BUTTON))
+        {
+            CommitGraftPiece();
+            sPartyMenuInternal->data[0] = PIECE_FINISH;
+        }
+        else if (JOY_NEW(B_BUTTON))
         {
             PlaySE(SE_SELECT);
-            SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-            SetSelectedGraftFromCategory();
-            gPartyMenu.action = PARTY_ACTION_SPLICER;
-            AnimatePartySlot(gPartyMenu.slotId2, 1);
-            ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-            ClearWindowTilemap(WIN_MSG);
-            DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-            gTasks[taskId].func = Task_HandleChooseMonInput;
-            sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1] = GetSelectedGraftCategory();
-            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
+            ReturnToPieceTargetPick(taskId);
         }
         break;
 
-    case SPLICER_SUBMENU_STAT:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] < 5)
-        {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1]++;
-            SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-            StringCopy(gStringVar1, GetStatNameString(sPartyMenuInternal->data[1]));
-            ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(sPartyMenuInternal->data[1]), STR_CONV_MODE_LEFT_ALIGN, 3);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (sPartyMenuInternal->data[1] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW} "));
-            ConvertIntToDecimalStringN(gStringVar2, sPartyMenuInternal->data[1] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/6"));
-            if (sPartyMenuInternal->data[1] < 5)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-        }
-        if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] > 0)
-        {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1]--;
-            SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-            StringCopy(gStringVar1, GetStatNameString(sPartyMenuInternal->data[1]));
-            ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(sPartyMenuInternal->data[1]), STR_CONV_MODE_LEFT_ALIGN, 3);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (sPartyMenuInternal->data[1] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW} "));
-            ConvertIntToDecimalStringN(gStringVar2, sPartyMenuInternal->data[1] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/6"));
-            if (sPartyMenuInternal->data[1] < 5)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-        }
-        if (JOY_NEW(A_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            SetGraftMenuSubCursor(sPartyMenuInternal->data[1]);
-            SetSelectedGraftFromCategory();
-            gPartyMenu.action = PARTY_ACTION_SPLICER;
-            AnimatePartySlot(gPartyMenu.slotId2, 1);
-            ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-            ClearWindowTilemap(WIN_MSG);
-            DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-            gTasks[taskId].func = Task_HandleChooseMonInput;
-            sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[1] = GetSelectedGraftCategory();
-            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
-        }
-        break;
-
-    case SPLICER_PICK_TARGET:
-        // Waiting for target selection via HandleChooseMonSelection
-        break;
-
-    case SPLICER_VALIDATE_TARGET:
-    {
-        u8 targetSlot = gPartyMenu.slotId;
-        const u8 *rejectReason = GetGraftRejectReason(&gParties[B_TRAINER_PLAYER][targetSlot].box, GetSelectedGraftType(), GetSelectedGraftStatIndex());
-        if (targetSlot == gPartyMenu.slotId2)
-        {
-            PlaySE(SE_FAILURE);
-            DisplayPartyMenuMessage(sText_SplicerSameMon, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_CANCEL_TARGET;
-        }
-        else if (rejectReason != NULL)
-        {
-            // GRAFT: husk, gates and graft limits; checked before the donor is used up
-            PlaySE(SE_FAILURE);
-            DisplayPartyMenuMessage(rejectReason, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_CANCEL_TARGET;
-        }
-        else
-        {
-            sPartyMenuInternal->data[0] = SPLICER_APPLY;
-        }
-    }
-    break;
-
-    case SPLICER_CANCEL_TARGET:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        // Clear the refusal message first, or it stays behind the prompt
-        ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
-        ClearWindowTilemap(WIN_MSG);
-        DisplayPartyMenuStdMessage(PARTY_MSG_USE_ON_WHICH_MON);
-        gTasks[taskId].func = Task_HandleChooseMonInput;
-        sPartyMenuInternal->data[0] = SPLICER_PICK_TARGET;
-        break;
-
-    case SPLICER_APPLY:
-    {
-        u8 targetSlot = gPartyMenu.slotId;
-        u8 graftType = GetSelectedGraftType();
-        // Check stat graft cap BEFORE releasing the donor
-        if (graftType == GRAFT_MENU_STAT)
-        {
-            u8 targetSlot = gPartyMenu.slotId;
-            const u8 *rejectReason = GetStatGraftRejectReason(&gParties[B_TRAINER_PLAYER][targetSlot].box, GetSelectedGraftStatIndex());
-            if (rejectReason != NULL)
-            {
-                StringExpandPlaceholders(gStringVar4, rejectReason);
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-                sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
-                break;
-            }
-        }
-        if (graftType == GRAFT_MENU_MOVE)
-        {
-            // Move graft — show the "Teach X to Y?" confirmation.
-            u16 moveId = GetSelectedGraftValue();
-            struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][targetSlot];
- 
-            GetMonNickname(mon, gStringVar1);
-            StringCopy(gStringVar2, GetMoveName(moveId));
-            StringExpandPlaceholders(gStringVar4, sText_SplicerTeachMove);
-            PlaySE(SE_SELECT);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_MOVE_CONFIRM;
-        }
-        else if (graftType == GRAFT_MENU_TYPE)
-        {
-            // Type graft — go to the type-slot picker (slot 1 / slot 2 chooser).
-            u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][targetSlot], MON_DATA_SPECIES);
-            u8 t0 = GetGraftedType(targetSlot, 0);
-            u8 newType = (u8)GetSelectedGraftValue();
- 
-            sPartyMenuInternal->data[1] = 0; // start on slot 1
- 
-            if (t0 == GRAFT_TYPE_NONE)
-                t0 = GetSpeciesType(species, 0);
-            StringCopy(gStringVar1, gTypesInfo[t0].name);
-            StringCopy(gStringVar2, gTypesInfo[newType].name);
-            StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot1);
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
- 
-            PlaySE(SE_SELECT);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_TYPE_SLOT;
-        }
-        else
-        {
-            // Ability / Stat / Nature — no extra prompt, apply immediately.
-            bool8 graftResult;
-            targetSlot = ReleaseSplicerDonorForGraft();
-            graftResult = ApplyGraftFromMenuToSlot(targetSlot);
-                if (!graftResult && GetSelectedGraftType() == GRAFT_MENU_STAT)
-                {
-                    StringExpandPlaceholders(gStringVar4, GetStatGraftRejectReason(&gParties[B_TRAINER_PLAYER][targetSlot].box, GetSelectedGraftStatIndex()));
-                    DisplayPartyMenuMessage(gStringVar4, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
-                    sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
-                    break;
-                }
-            StringCopy(gStringVar1, sSplicerDonorName);
-            StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
-        }
-    }
-    break;
-
-    case SPLICER_TYPE_SLOT:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        {
-            u8 targetSlot = gPartyMenu.slotId;
-            u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][targetSlot], MON_DATA_SPECIES);
-            u8 newType = (u8)GetSelectedGraftValue();
-            if (JOY_NEW(DPAD_DOWN) && sPartyMenuInternal->data[1] == 0)
-            {
-                PlaySE(SE_SELECT);
-                sPartyMenuInternal->data[1] = 1;
-                {
-                    u8 t = GetGraftedType(targetSlot, 1);
-                    if (t == GRAFT_TYPE_NONE)
-                        t = GetSpeciesType(species, 1);
-                    StringCopy(gStringVar1, gTypesInfo[t].name);
-                    StringCopy(gStringVar2, gTypesInfo[newType].name);
-                    StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot2);
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n{UP_ARROW} 2/2"));
-                }
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-            }
-            if (JOY_NEW(DPAD_UP) && sPartyMenuInternal->data[1] == 1)
-            {
-                PlaySE(SE_SELECT);
-                sPartyMenuInternal->data[1] = 0;
-                {
-                    u8 t = GetGraftedType(targetSlot, 0);
-                    if (t == GRAFT_TYPE_NONE)
-                        t = GetSpeciesType(species, 0);
-                    StringCopy(gStringVar1, gTypesInfo[t].name);
-                    StringCopy(gStringVar2, gTypesInfo[newType].name);
-                    StringExpandPlaceholders(gStringVar4, sText_SplicerTypeSlot1);
-                    StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
-                }
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-            }
-            if (JOY_NEW(A_BUTTON))
-            {
-                PlaySE(SE_SELECT);
-                targetSlot = ReleaseSplicerDonorForGraft();
-                SetGraftedType(targetSlot, sPartyMenuInternal->data[1], newType);
-                StringCopy(gStringVar1, sSplicerDonorName);
-                StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
-                DisplayPartyMenuMessage(gStringVar4, TRUE);
-                ScheduleBgCopyTilemapToVram(2);
-                sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
-            }
-            if (JOY_NEW(B_BUTTON))
-            {
-                PlaySE(SE_SELECT);
-                ReturnToSplicerTargetPick(taskId); // nothing spent yet
-            }
-        }
-        break;
-
-    case SPLICER_MOVE_CONFIRM:
+    case PIECE_FORGET_TEXT:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
         PartyMenuDisplayYesNoMenu();
-        sPartyMenuInternal->data[0] = SPLICER_MOVE_REPLACE_YESNO;
+        sPartyMenuInternal->data[0] = PIECE_FORGET_YESNO;
         break;
 
-    case SPLICER_MOVE_REPLACE_YESNO:
-    {
-        u8 targetSlot;
-        u16 moveId = GetSelectedGraftValue();
-        struct Pokemon *mon;
+    case PIECE_FORGET_YESNO:
         switch (Menu_ProcessInputNoWrapClearOnChoose())
         {
-        case 0: // YES - the graft is committed: release the donor, then try to learn the move
+        case 0:
             PlaySE(SE_SELECT);
-            targetSlot = ReleaseSplicerDonorForGraft();
-            mon = &gParties[B_TRAINER_PLAYER][targetSlot];
-            {
-                u16 result = GiveMoveToMon(mon, moveId);
-                if (result != MON_HAS_MAX_MOVES)
-                {
-                    // Had empty slot
-                    RecordGraftMove(&gParties[B_TRAINER_PLAYER][targetSlot].box, moveId);
-                    GetMonNickname(mon, gStringVar1);
-                    StringCopy(gStringVar2, GetMoveName(moveId));
-                    StringExpandPlaceholders(gStringVar4, sText_SplicerMoveReplaced);
-                    DisplayPartyMenuMessage(gStringVar4, TRUE);
-                    ScheduleBgCopyTilemapToVram(2);
-                    sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
-                }
-                else
-                {
-                    // 4 moves - ask to forget one
-                    sPartyMenuInternal->data[2] = moveId;
-                    gPartyMenu.data1 = moveId;
-                    GetMonNickname(mon, gStringVar1);
-                    StringCopy(gStringVar2, GetMoveName(moveId));
-                    DisplayLearnMoveMessage(gText_PkmnNeedsToReplaceMove);
-                    sPartyMenuInternal->data[0] = 100; // wait for text, then forget
-                }
-            }
-            break;
-        case 1: // NO - back to picking a target; nothing spent yet
-        case MENU_B_PRESSED:
-            PlaySE(SE_SELECT);
-            ReturnToSplicerTargetPick(taskId);
-            break;
-        }
-    }
-    break;
-
-    case 100: // Wait for "needs to replace move" text
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        PartyMenuDisplayYesNoMenu();
-        sPartyMenuInternal->data[0] = 101;
-        break;
-
-    case 101: // Yes/no for forgetting a move
-    {
-        switch (Menu_ProcessInputNoWrapClearOnChoose())
-        {
-        case 0: // YES - open summary screen to forget
-        {
-            u8 targetSlot = gPartyMenu.slotId;
-            PlaySE(SE_SELECT);
-            gPartyMenu.data1 = sPartyMenuInternal->data[2];
-            // Store that we're in splicer forget flow
             gGraftLearnMovePending = TRUE;
             CB2_ShowSummaryScreenToForgetMove();
-            sPartyMenuInternal->data[0] = 102;
-        }
             break;
-        case 1: // NO - don't learn
+        case 1:
         case MENU_B_PRESSED:
             PlaySE(SE_SELECT);
-            sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
+            ReturnToPieceTargetPick(taskId);
             break;
-        }
-    }
-    break;
-
-    case 102: // Returning from summary screen after forgetting
-        if (gMain.callback2 == (MainCallback)CB2_InitPartyMenu)
-        {
-            if (gGraftLearnMovePending)
-            {
-                // Move was forgotten and new one learned by summary screen
-                // Record in graftMoves
-                RecordGraftMove(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId].box, sPartyMenuInternal->data[2]);
-                gGraftLearnMovePending = FALSE;
-            }
-            StringCopy(gStringVar1, sSplicerDonorName);
-            StringExpandPlaceholders(gStringVar4, sText_SplicerApplied);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_APPLY_FINISH;
         }
         break;
 
-    case SPLICER_AUTO_INTRO:
+    case PIECE_FINISH:
         if (IsPartyMenuTextPrinterActive() == TRUE)
             return;
         if (!JOY_NEW(A_BUTTON | B_BUTTON))
             return;
-        PlaySE(SE_SELECT);
-        sPartyMenuInternal->data[1] = 0;
-        SetSelectedGraftCategory(0);
-        SetGraftMenuSubCursor(0);
-        UpdateGraftMenuCursorOverworld(0);
-        DisplayPartyMenuMessage(gStringVar4, TRUE);
-        ScheduleBgCopyTilemapToVram(2);
-        sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
-        break;
-
-    case SPLICER_AUTO_SKIP:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        PartyMenuDisplayYesNoMenu();
-        sPartyMenuInternal->data[0] = SPLICER_AUTO_SKIP_YESNO;
-        break;
-
-    case SPLICER_AUTO_SKIP_YESNO:
-        switch (Menu_ProcessInputNoWrapClearOnChoose())
-        {
-        case 0: // YES - let it go
-            PlaySE(SE_SELECT);
-            GetMonNickname(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId2], gStringVar1);
-            ReleaseSplicerDonor();
-            StringExpandPlaceholders(gStringVar4, sText_AutoSpliceReleased);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_DONE;
-            break;
-        case 1: // NO - back to the categories
-        case MENU_B_PRESSED:
-            PlaySE(SE_SELECT);
-            UpdateGraftMenuCursorOverworld(sPartyMenuInternal->data[1]);
-            DisplayPartyMenuMessage(gStringVar4, TRUE);
-            ScheduleBgCopyTilemapToVram(2);
-            sPartyMenuInternal->data[0] = SPLICER_SCROLL_CATEGORIES;
-            break;
-        }
-        break;
-
-    case SPLICER_APPLY_FINISH:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        // Consume the Graft Splicer item (Auto-splice is free)
-        if (!sAutoSpliceActive)
-            RemoveBagItem(ITEM_GRAFT_SPLICER, 1);
-        gPartyMenuUseExitCallback = TRUE;
-        gTasks[taskId].func = Task_ClosePartyMenu;
-        sPartyMenuInternal->data[0] = SPLICER_DONE;
-        break;
-
-    case SPLICER_DONE:
-        if (IsPartyMenuTextPrinterActive() == TRUE)
-            return;
-        gPartyMenuUseExitCallback = TRUE;
         gTasks[taskId].func = Task_ClosePartyMenu;
         break;
     }
 }
 
-static void CursorCb_GraftSplicerTarget(u8 taskId)
+static void CursorCb_GraftPieceTarget(u8 taskId)
 {
-    sPartyMenuInternal->data[0] = SPLICER_VALIDATE_TARGET;
-    gTasks[taskId].func = Task_GraftSplicer;
-    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[1]);
+    sPartyMenuInternal->data[0] = PIECE_VALIDATE;
+    gTasks[taskId].func = Task_GraftPiece;
 }
+
 // Functions for 4-party link multi battle handling
 static u8 CombinedToIndividualPartyId(u8 index)
 {

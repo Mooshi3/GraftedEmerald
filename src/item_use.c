@@ -1,6 +1,7 @@
 #include "global.h"
 #include "item_use.h"
 #include "graft_challenge.h"
+#include "graft_bag.h"
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_stat_change.h"
@@ -717,6 +718,37 @@ void ItemUseOutOfBattle_PokeblockCase(u8 taskId)
         gFieldCallback = FieldCB_ReturnToFieldNoScript;
         FadeScreen(FADE_TO_BLACK, 0);
         gTasks[taskId].func = Task_OpenRegisteredPokeblockCase;
+    }
+}
+
+// GRAFT: the Graft Bag opens its own screen, from the Bag or registered to SELECT
+static void CB2_OpenGraftBagFromBag(void)
+{
+    OpenGraftBag(CB2_ReturnToBagMenuPocket);
+}
+
+static void Task_OpenRegisteredGraftBag(u8 taskId)
+{
+    if (!gPaletteFade.active)
+    {
+        CleanupOverworldWindowsAndTilemaps();
+        OpenGraftBag(CB2_ReturnToField);
+        DestroyTask(taskId);
+    }
+}
+
+void ItemUseOutOfBattle_GraftBag(u8 taskId)
+{
+    if (gTasks[taskId].tUsingRegisteredKeyItem != TRUE)
+    {
+        gBagMenu->newScreenCallback = CB2_OpenGraftBagFromBag;
+        Task_FadeAndCloseBagMenu(taskId);
+    }
+    else
+    {
+        gFieldCallback = FieldCB_ReturnToFieldNoScript;
+        FadeScreen(FADE_TO_BLACK, 0);
+        gTasks[taskId].func = Task_OpenRegisteredGraftBag;
     }
 }
 

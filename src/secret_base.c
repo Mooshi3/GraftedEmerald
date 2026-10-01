@@ -1732,6 +1732,9 @@ void ReceiveSecretBasesData(void *secretBases, size_t recordSize, u8 linkIdx)
     struct SecretBaseRecordMixer mixers[3];
     u16 i;
 
+    // GRAFT: other players' bases aren't stored (their save space is the Graft Bag)
+    if (TRUE)
+        return;
     if (linkIdx > 3)
         return;
 

@@ -44,6 +44,7 @@
 #include "naming_screen.h"
 #include "battle_setup.h"
 #include "graft_menu.h"
+#include "graft_bag.h"
 #include "party_menu.h"
 #include "graft_data.h"
 #include "palette.h"
@@ -455,7 +456,7 @@ static void Cmd_graftrecordmove(void)
 }
 
 static void Cmd_yesnobox(void);
-static void Cmd_graftmenu(void);
+static void Cmd_graftharvest(void);
 static void Cmd_cancelallactions(void);
 static void Cmd_setgravity(void);
 static void Cmd_removeitem(void);
@@ -784,7 +785,7 @@ void (*const gBattleScriptingCommandsTable[])(void) =
     [B_SCR_OP_TRYSTATCHANGES]                        = Cmd_trystatchanges,
     [B_SCR_OP_TRYBATTLERSTATCHANGE]                  = Cmd_trybattlerstatchange,
     [B_SCR_OP_JUMPIFTERRAIN]                         = Cmd_jumpifterrain,
-    [B_SCR_OP_GRAFT_MENU]                            = Cmd_graftmenu,
+    [B_SCR_OP_GRAFT_HARVEST]                         = Cmd_graftharvest,
     [B_SCR_OP_GRAFT_RECORD_MOVE]                     = Cmd_graftrecordmove,
     [B_SCR_OP_UNUSED_3]                              = Cmd_dummy,
     [B_SCR_OP_UNUSED_4]                              = Cmd_dummy,
@@ -4317,726 +4318,97 @@ static void Cmd_getpossiblenexttarget(void)
 }
 
 
-static void Cmd_graftmenu(void)
+// GRAFT: a grafting ball's catch breaks the wild mon down into Graft Bag pieces: Patch Ball 1 random
+// piece, Graft Ball 3 different ones, Splice Ball all of them. Then one message per piece (or a count).
+static EWRAM_DATA struct GraftPiece sHarvestedPieces[GRAFT_PIECES_PER_MON] = {0};
+static EWRAM_DATA u8 sHarvestedCount = 0;
+static EWRAM_DATA u8 sHarvestLostCount = 0;
+static EWRAM_DATA u8 sHarvestMessage = 0;
+static EWRAM_DATA bool8 sHarvestAll = FALSE;
+
+static const u8 sText_PieceAdded[] = _("{STR_VAR_1} was added\nto the Graft Bag!");
+static const u8 sText_MonBrokenDown[] = _("{STR_VAR_1} was broken down\ninto {STR_VAR_2} pieces!");
+static const u8 sText_GraftBagFull[] = _("The Graft Bag is full.");
+
+// Builds message number sHarvestMessage into gStringVar4; FALSE when there are no more
+static bool32 BufferHarvestMessage(void)
+{
+    u32 index = sHarvestMessage;
+    u32 pieceMessages = sHarvestAll ? (sHarvestedCount != 0) : sHarvestedCount;
+
+    if (index < pieceMessages)
+    {
+        if (sHarvestAll)
+        {
+            GetMonNickname(GetBattlerMon(gBattlerTarget), gStringVar1);
+            ConvertIntToDecimalStringN(gStringVar2, sHarvestedCount, STR_CONV_MODE_LEFT_ALIGN, 2);
+            StringExpandPlaceholders(gStringVar4, sText_MonBrokenDown);
+        }
+        else
+        {
+            GetGraftPieceName(gStringVar1, &sHarvestedPieces[index]);
+            StringExpandPlaceholders(gStringVar4, sText_PieceAdded);
+        }
+        return TRUE;
+    }
+    if (index == pieceMessages && sHarvestLostCount != 0)
+    {
+        StringCopy(gStringVar4, sText_GraftBagFull);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void Cmd_graftharvest(void)
 {
     CMD_ARGS();
+
     switch (gBattleCommunication[MULTIUSE_STATE])
     {
     case 0:
-        // Initialize graft menu
-        GatherGraftSourceDataBattle(); StartGraftMenu();
-        OnWildHarvest(); // GRAFT: Harvests 1 per area
-        gGraftLearnMovePending = FALSE;
+    {
+        u32 numPieces, lost;
+        switch (gLastThrownBall)
+        {
+        case ITEM_PATCH_BALL:
+            numPieces = 1;
+            break;
+        case ITEM_GRAFT_BALL:
+            numPieces = 3;
+            break;
+        default:
+            numPieces = GRAFT_HARVEST_ALL;
+            break;
+        }
+        OnWildHarvest(); // Harvests setting
+        GiveGraftBagIfMissing();
+        sHarvestAll = (numPieces == GRAFT_HARVEST_ALL);
+        sHarvestedCount = HarvestGraftPieces(GetBattlerMon(gBattlerTarget), TRUE, numPieces, sHarvestedPieces, &lost);
+        sHarvestLostCount = lost;
+        sHarvestMessage = 0;
         gBattleCommunication[MULTIUSE_STATE] = 1;
-        gBattleCommunication[CURSOR_POSITION] = 0;
         break;
-
+    }
     case 1:
-        // Handle input - scroll through graft options
-            // First frame: show category 0
-            if (gBattleCommunication[4] == 0)
-            {
-                UpdateGraftMenuCursor(0);
-                gBattleCommunication[4] = 1;
-            }
-
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0
-                && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
+        if (!BufferHarvestMessage())
         {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]--;
-            UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < GetGraftMenuNumCategories() - 1
-                && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]++;
-            UpdateGraftMenuCursor(gBattleCommunication[CURSOR_POSITION]);
-        }
-            if (JOY_NEW(B_BUTTON))
-            {
-                PlaySE(SE_SELECT);
-                BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-                gBattleCommunication[MULTIUSE_STATE] = 100;
-            }
-        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
-            {
-                PlaySE(SE_SELECT);
-                // Player picked a graft - open party menu to choose target mon
-                // Player picked a category
-                SetSelectedGraftCategory(GetGraftMenuRealCategory(gBattleCommunication[CURSOR_POSITION]));
-                SetGraftMenuSubCursor(0);
-                SetSelectedGraftFromCategory();
-                    // Route to submenu based on category
-                    {
-                        u8 cat = GetSelectedGraftCategory();
-                if (cat == GRAFT_CATEGORY_TYPE)
-                {
-                    // Skip submenu if mono-type (both types are the same)
-                    if (GetGraftSourceType(0) == GetGraftSourceType(1))
-                    {
-                        SetGraftMenuSubCursor(0);
-                        SetSelectedGraftFromCategory();
-                        BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-                        gBattleCommunication[MULTIUSE_STATE] = 2;
-                    }
-                    else
-                    {
-                        gBattleCommunication[MULTIUSE_STATE] = 20;
-                        gBattleCommunication[4] = 0;
-                    }
-                }
-                else if (cat == GRAFT_CATEGORY_MOVE)
-                {
-                    gBattleCommunication[MULTIUSE_STATE] = 21;
-                    gBattleCommunication[4] = 0;
-                }
-                else if (cat == GRAFT_CATEGORY_STAT)
-                {
-                    gBattleCommunication[MULTIUSE_STATE] = 22;
-                    gBattleCommunication[4] = 0;
-                }
-                        else
-                        {
-                            // Ability and Nature don't need submenus - go to party menu
-                            BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-                    gBattleCommunication[MULTIUSE_STATE] = 2;
-
-                        }
-                    }
-
-            }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-        break;
-
-    case 2:
-        // Wait for fade out, then open party menu
-        if (!gPaletteFade.active)
-        {
-            CloseMainBattleScreen(); // GRAFT: frees the battle gfx buffers too; the reshow reallocates them
-            // No target until one is picked: backing out (Cancel or B) must not reuse the last graft's target
-            gGraftSelectedPartySlot = 0xFF;
-            gGraftSelectedPartyPersonality = 0;
-            OpenPartyMenuInBattle(PARTY_ACTION_GRAFT);
-            gBattleCommunication[MULTIUSE_STATE] = 3;
-        }
-        break;
-
-case 3: // Wait for party menu to return to battle
-        if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2 && ResolveGraftTargetSlot() >= PARTY_SIZE)
-        {
-            // Backed out of the party menu: return to the category menu
-            gBattleCommunication[MULTIUSE_STATE] = 1;
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            gBattleCommunication[4] = 0;
-        }
-        else if (!gPaletteFade.active && gMain.callback2 == BattleMainCB2)
-        {
-            u8 graftType = GetSelectedGraftType();
-            if (graftType == GRAFT_MENU_TYPE)
-            {
-                gBattleCommunication[MULTIUSE_STATE] = 10;
-                gBattleCommunication[CURSOR_POSITION] = 0;
-                gBattleCommunication[4] = 0; // first frame flag
-            }
-            else if (graftType == GRAFT_MENU_STAT)
-            {
-                u8 partySlot = ResolveGraftTargetSlot();
-                u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_SPECIES);
-                StringCopy(gStringVar1, GetStatNameString(GetSelectedGraftStatIndex()));
-                {
-                u8 currentStat = (&gSpeciesInfo[species].baseHP)[GetSelectedGraftStatIndex()];
-                u16 graftedCurrent = GetGraftedStat(ResolveGraftTargetSlot(), GetSelectedGraftStatIndex());
-                if (graftedCurrent != GRAFT_STAT_NONE)
-                    currentStat = graftedCurrent;
-                ConvertIntToDecimalStringN(gStringVar2, currentStat, STR_CONV_MODE_LEFT_ALIGN, 3);
-            }
-                ConvertIntToDecimalStringN(gStringVar3, GetSelectedGraftStatValue(), STR_CONV_MODE_LEFT_ALIGN, 3);
-                FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-                StringExpandPlaceholders(gStringVar4, GetText_StatCompare());
-                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-                gBattleCommunication[MULTIUSE_STATE] = 12;
-                gBattleCommunication[CURSOR_POSITION] = 0;
-                gBattleCommunication[4] = 0;  // first frame flag for stat yes/no
-            }
-            else if (graftType == GRAFT_MENU_MOVE)
-            {
-                    // Apply move graft directly
-                    {
-                        u8 slot = ResolveGraftTargetSlot();
-                        u16 moveId = GetSelectedGraftValue();
-                        u8 moveCount = 0;
-                        u8 k;
-                        for (k = 0; k < MAX_MON_MOVES; k++)
-                        {
-                            if (GetMonData(&gParties[B_TRAINER_PLAYER][slot], MON_DATA_MOVE1 + k) != MOVE_NONE)
-                                moveCount++;
-                        }
-                        if (moveCount < MAX_MON_MOVES)
-                        {
-                            for (k = 0; k < MAX_MON_MOVES; k++)
-                            {
-                                if (GetMonData(&gParties[B_TRAINER_PLAYER][slot], MON_DATA_MOVE1 + k) == MOVE_NONE)
-                                {
-                                    SetMonMoveSlot(&gParties[B_TRAINER_PLAYER][slot], moveId, k);
-                                    break;
-                                }
-                            }
-                            RecordGraftMove(&gParties[B_TRAINER_PLAYER][slot].box, moveId);
-                            gBattlescriptCurrInstr = cmd->nextInstr;
-                        }
-                        else
-                        {
-                            gMoveToLearn = moveId;
-                            gBattleStruct->expGetterMonId = slot;
-                            gGraftLearnMovePending = TRUE;
-                            gBattleCommunication[MULTIUSE_STATE] = 14;
-                            gBattleCommunication[4] = 0;
-                            gBattleCommunication[CURSOR_POSITION] = 0;
-                        }
-                    }
-                gBattleCommunication[4] = 0;  // first frame flag for move confirm
-                gBattleCommunication[CURSOR_POSITION] = 0;
-            }
-            else if (graftType == GRAFT_MENU_ABILITY)
-            {
-                SetGraftedAbility(ResolveGraftTargetSlot(), GetSelectedGraftValue());
-                gBattlescriptCurrInstr = cmd->nextInstr;
-            }
-        else if (graftType == GRAFT_MENU_NATURE)
-            {
-                u8 natureId = GetSelectedGraftValue();
-                u8 partySlot = ResolveGraftTargetSlot();
-                u8 currentNature = GetNatureFromPersonality(GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_PERSONALITY));
-                u8 hiddenNature = GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_HIDDEN_NATURE);
-                if (hiddenNature != NATURE_HARDY) currentNature = hiddenNature;
-                // Build STR_VAR_1: "OldNature +STAT -STAT"
-                StringCopy(gStringVar1, gNaturesInfo[currentNature].name);
-                if (gNaturesInfo[currentNature].statUp != gNaturesInfo[currentNature].statDown)
-                {
-                    StringAppend(gStringVar1, COMPOUND_STRING(" +"));
-                    StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[currentNature].statUp));
-                    StringAppend(gStringVar1, COMPOUND_STRING(" -"));
-                    StringAppend(gStringVar1, GetStatNameString(gNaturesInfo[currentNature].statDown));
-                }
-                // Build STR_VAR_2: "NewNature +STAT -STAT"
-                StringCopy(gStringVar2, gNaturesInfo[natureId].name);
-                if (gNaturesInfo[natureId].statUp != gNaturesInfo[natureId].statDown)
-                {
-                    StringAppend(gStringVar2, COMPOUND_STRING(" +"));
-                    StringAppend(gStringVar2, GetStatNameString(gNaturesInfo[natureId].statUp));
-                    StringAppend(gStringVar2, COMPOUND_STRING(" -"));
-                    StringAppend(gStringVar2, GetStatNameString(gNaturesInfo[natureId].statDown));
-                }
-                // Display new nature then replace prompt with old nature
-                FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-                StringExpandPlaceholders(gStringVar4, GetText_NatureApply());
-                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-                gBattleCommunication[MULTIUSE_STATE] = 16;
-            gBattleCommunication[4] = 0;
-                gBattleCommunication[CURSOR_POSITION] = 0;
-            }
-            else
-            {
-                gBattlescriptCurrInstr = cmd->nextInstr;
-            }
-        }
-        break;
-    case 4:
-        gBattlescriptCurrInstr = cmd->nextInstr;
-        break;
-
-    // TYPE SUBMENU — pick which type slot (1 or 2)
-    case 20:
-    {
-        u8 newType;
-        if (gBattleCommunication[4] == 0)
-        {
-            SetGraftMenuSubCursor(0);
-            newType = GetGraftSourceType(0);
-            StringCopy(gStringVar1, gTypesInfo[newType].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type1: {STR_VAR_1}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            gBattleCommunication[4] = 1;
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION] = 1;
-            SetGraftMenuSubCursor(1);
-            newType = GetGraftSourceType(1);
-            StringCopy(gStringVar1, gTypesInfo[newType].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type2: {STR_VAR_1}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{UP_ARROW} 2/2"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] == 1 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            SetGraftMenuSubCursor(0);
-            newType = GetGraftSourceType(0);
-            StringCopy(gStringVar1, gTypesInfo[newType].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("type1: {STR_VAR_1}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/2"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
-        {
-            PlaySE(SE_SELECT);
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            SetSelectedGraftFromCategory();
-            BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-            gBattleCommunication[MULTIUSE_STATE] = 2;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-    }
-    break;
-
-    // MOVE SUBMENU — pick which move to learn
-    case 21:
-    {
-        u8 moveCount = 0;
-        u8 j;
-        for (j = 0; j < 4; j++)
-        {
-            if (GetGraftSourceMove(j) != MOVE_NONE)
-                moveCount++;
-        }
-        if (gBattleCommunication[4] == 0)
-        {
-            SetGraftMenuSubCursor(0);
-            StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(0)].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-            // Add pagination
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            ConvertIntToDecimalStringN(gStringVar2, 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/"));
-            ConvertIntToDecimalStringN(gStringVar2, moveCount, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            if (moveCount > 1)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            gBattleCommunication[4] = 1;
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < moveCount - 1 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]++;
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(gBattleCommunication[CURSOR_POSITION])].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-            // Add pagination
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (gBattleCommunication[CURSOR_POSITION] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW}"));
-            ConvertIntToDecimalStringN(gStringVar2, gBattleCommunication[CURSOR_POSITION] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/"));
-            ConvertIntToDecimalStringN(gStringVar2, moveCount, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            if (gBattleCommunication[CURSOR_POSITION] < moveCount - 1)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] > 0 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]--;
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            StringCopy(gStringVar1, gMovesInfo[GetGraftSourceMove(gBattleCommunication[CURSOR_POSITION])].name);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}?"));
-            // Add pagination
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (gBattleCommunication[CURSOR_POSITION] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW}"));
-            ConvertIntToDecimalStringN(gStringVar2, gBattleCommunication[CURSOR_POSITION] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/"));
-            ConvertIntToDecimalStringN(gStringVar2, moveCount, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            if (gBattleCommunication[CURSOR_POSITION] < moveCount - 1)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
-        {
-            PlaySE(SE_SELECT);
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            SetSelectedGraftFromCategory();
-            // Skip redundant confirm — go straight to party menu
-            BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-            gBattleCommunication[MULTIUSE_STATE] = 2;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-    }
-    break;
-
-    // STAT SUBMENU — pick which stat to graft
-    case 22:
-    {
-        if (gBattleCommunication[4] == 0)
-        {
-            SetGraftMenuSubCursor(0);
-            StringCopy(gStringVar1, GetStatNameString(0));
-            ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(0), STR_CONV_MODE_LEFT_ALIGN, 3);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n{DOWN_ARROW} 1/6"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            gBattleCommunication[4] = 1;
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] < 5 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]++;
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            StringCopy(gStringVar1, GetStatNameString(gBattleCommunication[CURSOR_POSITION]));
-            ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(gBattleCommunication[CURSOR_POSITION]), STR_CONV_MODE_LEFT_ALIGN, 3);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (gBattleCommunication[CURSOR_POSITION] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW} "));
-            ConvertIntToDecimalStringN(gStringVar2, gBattleCommunication[CURSOR_POSITION] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/6"));
-            if (gBattleCommunication[CURSOR_POSITION] < 5)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] > 0 && !IsTextPrinterActiveOnWindow(B_WIN_MSG))
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION]--;
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            StringCopy(gStringVar1, GetStatNameString(gBattleCommunication[CURSOR_POSITION]));
-            ConvertIntToDecimalStringN(gStringVar2, GetGraftSourceStatValue(gBattleCommunication[CURSOR_POSITION]), STR_CONV_MODE_LEFT_ALIGN, 3);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1}: {STR_VAR_2}"));
-            StringAppend(gStringVar4, COMPOUND_STRING("\n"));
-            if (gBattleCommunication[CURSOR_POSITION] > 0)
-                StringAppend(gStringVar4, COMPOUND_STRING("{UP_ARROW} "));
-            ConvertIntToDecimalStringN(gStringVar2, gBattleCommunication[CURSOR_POSITION] + 1, STR_CONV_MODE_LEFT_ALIGN, 1);
-            StringAppend(gStringVar4, gStringVar2);
-            StringAppend(gStringVar4, COMPOUND_STRING("/6"));
-            if (gBattleCommunication[CURSOR_POSITION] < 5)
-                StringAppend(gStringVar4, COMPOUND_STRING("{DOWN_ARROW}"));
-            FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-        }
-        if (JOY_NEW(A_BUTTON) && !IsTextPrinterActiveOnWindow(B_WIN_MSG)) // GRAFT: wait for the text, or the old text keeps drawing
-        {
-            PlaySE(SE_SELECT);
-            SetGraftMenuSubCursor(gBattleCommunication[CURSOR_POSITION]);
-            SetSelectedGraftFromCategory();
-            BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
-            gBattleCommunication[MULTIUSE_STATE] = 2;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-    }
-    break;
-
-
-    // TYPE SLOT PICKER
-    case 10:
-        // Show initial type info on first frame
-        if (gBattleCommunication[4] == 0)
-        {
-            u8 partySlot = ResolveGraftTargetSlot();
-            u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_SPECIES);
-            u8 t0 = GetGraftedType(partySlot, 0);
-            u8 t1 = GetGraftedType(partySlot, 1);
-            u8 newType = (u8)GetSelectedGraftValue();
-            if (t0 == GRAFT_TYPE_NONE) t0 = GetSpeciesType(species, 0);
-            if (t1 == GRAFT_TYPE_NONE) t1 = GetSpeciesType(species, 1);
-            StringCopy(gStringVar1, gTypesInfo[t0].name);
-            StringCopy(gStringVar2, gTypesInfo[newType].name);
-            StringExpandPlaceholders(gStringVar4, GetText_ReplaceType1());
-            BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            gBattleCommunication[4] = 1;
-        }
-        if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION] = 0;
-            {
-                u8 partySlot = ResolveGraftTargetSlot();
-                u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_SPECIES);
-                u8 t = GetGraftedType(partySlot, 0);
-                u8 newType = (u8)GetSelectedGraftValue();
-                if (t == GRAFT_TYPE_NONE) t = GetSpeciesType(species, 0);
-                StringCopy(gStringVar1, gTypesInfo[t].name);
-                StringCopy(gStringVar2, gTypesInfo[newType].name);
-                StringExpandPlaceholders(gStringVar4, GetText_ReplaceType1());
-                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            }
-        }
-        if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
-        {
-            PlaySE(SE_SELECT);
-            gBattleCommunication[CURSOR_POSITION] = 1;
-            {
-                u8 partySlot = ResolveGraftTargetSlot();
-                u16 species = GetMonData(&gParties[B_TRAINER_PLAYER][partySlot], MON_DATA_SPECIES);
-                u8 t = GetGraftedType(partySlot, 1);
-                u8 newType = (u8)GetSelectedGraftValue();
-                if (t == GRAFT_TYPE_NONE) t = GetSpeciesType(species, 1);
-                StringCopy(gStringVar1, gTypesInfo[t].name);
-                StringCopy(gStringVar2, gTypesInfo[newType].name);
-                StringExpandPlaceholders(gStringVar4, GetText_ReplaceType2());
-                BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-            }
-        }
-        if (JOY_NEW(A_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            {
-                u8 partySlot = ResolveGraftTargetSlot();
-                SetGraftedType(partySlot, gBattleCommunication[CURSOR_POSITION], (u8)GetSelectedGraftValue());
-            }
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-        if (JOY_NEW(B_BUTTON))
-        {
-            PlaySE(SE_SELECT);
-            gBattlescriptCurrInstr = cmd->nextInstr;
-        }
-        break;
-
-// STAT CONFIRMATION
-            case 12:
-                // Wait for stat comparison text to finish printing
-                if (gBattleCommunication[4] == 0)
-                {
-                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
-                    {
-                        HandleBattleWindow(YESNOBOX_X_Y, 0);
-                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
-                        gBattleCommunication[CURSOR_POSITION] = 0;
-                        BattleCreateYesNoCursorAt(0);
-                        gBattleCommunication[4] = 1;
-                    }
-                }
-                // Handle cursor
-                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 0;
-                    BattleCreateYesNoCursorAt(0);
-                }
-                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 1;
-                    BattleCreateYesNoCursorAt(1);
-                }
-                if (JOY_NEW(A_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    if (gBattleCommunication[CURSOR_POSITION] == 0)
-                    {
-                        u8 partySlot = ResolveGraftTargetSlot();
-                    const u8 *rejectReason = GetStatGraftRejectReason(&gParties[B_TRAINER_PLAYER][partySlot].box, GetSelectedGraftStatIndex());
-                    if (rejectReason == NULL)
-                    SetGraftedStat(partySlot, GetSelectedGraftStatIndex(), GetSelectedGraftStatValue());
-                    else
-                    {
-                        StringExpandPlaceholders(gStringVar4, rejectReason);
-                        FillWindowPixelBuffer(B_WIN_MSG, PIXEL_FILL(0xF));
-                        BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-                        gBattleCommunication[MULTIUSE_STATE] = 22;
-                        gBattleCommunication[4] = 0;
-                        HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                        break;
-                    }
-                    }
-                    gBattlescriptCurrInstr = cmd->nextInstr;
-                }
-                if (JOY_NEW(B_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    gBattlescriptCurrInstr = cmd->nextInstr;
-                }
-                break;
-
-// MOVE CONFIRMATION
-            case 14:
-                // Show "learn [move]?" prompt on first frame
-                if (gBattleCommunication[4] == 0)
-                {
-                    StringCopy(gStringVar1, gMovesInfo[GetSelectedGraftValue()].name);
-                    StringExpandPlaceholders(gStringVar4, GetText_MoveLearn());
-                    BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
-                    gBattleCommunication[4] = 1;
-                }
-                // Wait for text to finish printing, then show yes/no box
-                if (gBattleCommunication[4] == 1)
-                {
-                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
-                    {
-                        HandleBattleWindow(YESNOBOX_X_Y, 0);
-                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
-                        gBattleCommunication[CURSOR_POSITION] = 0;
-                        BattleCreateYesNoCursorAt(0);
-                        gBattleCommunication[4] = 2;
-                    }
-                }
-                // Handle cursor
-                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 0;
-                    BattleCreateYesNoCursorAt(0);
-                }
-                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 1;
-                    BattleCreateYesNoCursorAt(1);
-                }
-                if (JOY_NEW(A_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    if (gBattleCommunication[CURSOR_POSITION] == 0)
-                    {
-                        // YES - learn the move
-                        gMoveToLearn = GetSelectedGraftValue();
-                        gBattleStruct->expGetterMonId = ResolveGraftTargetSlot();
-                        PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, ResolveGraftTargetSlot());
-                        {
-                            u8 slot = ResolveGraftTargetSlot();
-                            u8 moveCount = 0;
-                            for (u8 i = 0; i < MAX_MON_MOVES; i++)
-                            {
-                                if (GetMonData(&gParties[B_TRAINER_PLAYER][slot], MON_DATA_MOVE1 + i) != MOVE_NONE)
-                                    moveCount++;
-                            }
-                            if (moveCount < MAX_MON_MOVES)
-                            {
-                                u8 i;
-                                for (i = 0; i < MAX_MON_MOVES; i++)
-                                {
-                                    if (GetMonData(&gParties[B_TRAINER_PLAYER][slot], MON_DATA_MOVE1 + i) == MOVE_NONE)
-                                    {
-                                        SetMonMoveSlot(&gParties[B_TRAINER_PLAYER][slot], gMoveToLearn, i);
-                                        RecordGraftMove(&gParties[B_TRAINER_PLAYER][slot].box, gMoveToLearn);
-                                        break;
-                                    }
-                                }
-                                PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBattlerAttacker, slot);
-                                BufferMoveToLearnIntoBattleTextBuff2();
-                                gGraftLearnMovePending = 2;
-                                gBattlescriptCurrInstr = cmd->nextInstr;
-                            }
-                            else
-                            {
-                                gGraftLearnMovePending = TRUE;
-                                gBattlescriptCurrInstr = cmd->nextInstr;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // NO - cancel
-                        gGraftLearnMovePending = FALSE;
-                        gBattlescriptCurrInstr = cmd->nextInstr;
-                    }
-                }
-                if (JOY_NEW(B_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    gGraftLearnMovePending = FALSE;
-                    gBattlescriptCurrInstr = cmd->nextInstr;
-                }
-                break;
-    // NATURE CONFIRMATION
-            case 16:
-                // Wait for nature text to finish printing
-                if (gBattleCommunication[4] == 0)
-                {
-                    if (!IsTextPrinterActiveOnWindow(B_WIN_MSG))
-                    {
-                        HandleBattleWindow(YESNOBOX_X_Y, 0);
-                        BattlePutTextOnWindow(gText_BattleYesNoChoice, B_WIN_YESNO);
-                        gBattleCommunication[CURSOR_POSITION] = 0;
-                        BattleCreateYesNoCursorAt(0);
-                        gBattleCommunication[4] = 1;
-                    }
-                }
-                // Handle cursor movement
-                if (JOY_NEW(DPAD_UP) && gBattleCommunication[CURSOR_POSITION] != 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 0;
-                    BattleCreateYesNoCursorAt(0);
-                }
-                if (JOY_NEW(DPAD_DOWN) && gBattleCommunication[CURSOR_POSITION] == 0)
-                {
-                    PlaySE(SE_SELECT);
-                    BattleDestroyYesNoCursorAt(gBattleCommunication[CURSOR_POSITION]);
-                    gBattleCommunication[CURSOR_POSITION] = 1;
-                    BattleCreateYesNoCursorAt(1);
-                }
-                // A button: confirm selection
-                if (JOY_NEW(A_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    if (gBattleCommunication[CURSOR_POSITION] == 0)
-                    {
-                        // YES - apply nature graft
-                        SetGraftedNature(ResolveGraftTargetSlot(), GetSelectedGraftValue());
-                    }
-                    gBattlescriptCurrInstr = cmd->nextInstr;
-                }
-                // B button: always cancel
-                if (JOY_NEW(B_BUTTON))
-                {
-                    PlaySE(SE_SELECT);
-                    HandleBattleWindow(YESNOBOX_X_Y, WINDOW_CLEAR);
-                    gBattlescriptCurrInstr = cmd->nextInstr;
-                }
-                break;
-        case 100: // B button skip
             gBattlescriptCurrInstr = cmd->nextInstr;
             break;
+        }
+        BattlePutTextOnWindow(gStringVar4, B_WIN_MSG);
+        gBattleCommunication[1] = 0;
+        gBattleCommunication[MULTIUSE_STATE] = 2;
+        break;
+    case 2:
+        // Like waitmessage B_WAIT_TIME_LONG: hold the text a moment, A/B skips the wait
+        if (IsTextPrinterActiveOnWindow(B_WIN_MSG))
+            break;
+        if (++gBattleCommunication[1] >= B_WAIT_TIME_LONG || JOY_NEW(A_BUTTON | B_BUTTON))
+        {
+            sHarvestMessage++;
+            gBattleCommunication[MULTIUSE_STATE] = 1;
+        }
+        break;
     }
 }
 

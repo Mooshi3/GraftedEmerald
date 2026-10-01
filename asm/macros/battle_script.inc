@@ -570,8 +570,8 @@
 	.endm
 
 
-.macro graftmenu
-	.byte B_SCR_OP_GRAFT_MENU
+.macro graftharvest
+	.byte B_SCR_OP_GRAFT_HARVEST
 .endm
 
 .macro graftrecordmove

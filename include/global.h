@@ -1137,6 +1137,9 @@ struct SaveBlock1
     /*0x159C*/ u32 gameStats[NUM_GAME_STATS];
     /*0x169C*/ struct BerryTree berryTrees[BERRY_TREES_COUNT];
     /*0x1A9C*/ struct SecretBase secretBases[SECRET_BASES_COUNT];
+                // GRAFT: only the player's own base is kept; the Graft Bag (graft_bag.c) takes the
+                // space the 19 record-mixed bases used, so the save layout doesn't move
+                u8 graftBag[(SECRET_BASES_SAVED_COUNT - SECRET_BASES_COUNT) * sizeof(struct SecretBase)];
     /*0x271C*/ u8 playerRoomDecorations[DECOR_MAX_PLAYERS_HOUSE];
     /*0x2728*/ u8 playerRoomDecorationPositions[DECOR_MAX_PLAYERS_HOUSE];
     /*0x2734*/ u8 decorationDesks[10];

@@ -19,6 +19,8 @@
 #include "event_data.h"
 #include "pokedex.h"
 #include "shop_criteria.h"
+#include "graft_bag.h"
+#include "string_util.h"
 #include "wild_encounter.h"
 #include "constants/items.h"
 #include "constants/map_groups.h"
@@ -462,17 +464,18 @@ TEST("Nuzlocke dupes clause: a caught family doesn't count and keeps the area op
     ResetGraftSettingsForTest();
 }
 
-TEST("Harvests per mon: each party mon takes one wild graft per area")
+TEST("Harvests per mon: an area allows one harvest per party member")
 {
     ResetGraftSettingsForTest();
     ZeroPlayerPartyMons();
     CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0);
+    CreateRandomMonWithIVs(&gParties[B_TRAINER_PLAYER][1], SPECIES_WYNAUT, 20, 0);
     SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_PER_MON);
     SetupWildEncounterForTest(SPECIES_ZIGZAGOON, MAPSEC_ROUTE_102);
     EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL);
-    EXPECT(GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][0]) == NULL);
-    OnHarvestTargetChosen(&gParties[B_TRAINER_PLAYER][0]);
-    EXPECT(GetHarvestTargetRejectReason(&gParties[B_TRAINER_PLAYER][0]) != NULL);
+    OnWildHarvest();
+    EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL); // the second party member still has one
+    OnWildHarvest();
     EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) != NULL); // nobody left to take one here
     gMapHeader.regionMapSectionId = MAPSEC_ROUTE_103;
     EXPECT(GetChallengeBallBlockReason(ITEM_GRAFT_BALL) == NULL);
@@ -731,4 +734,150 @@ TEST("Marts that sell Poké Balls also sell the grafting items")
     TryBuildDynamicShopItemList(&list, &count);
     EXPECT_EQ(count, 2);
     TryFreeDynamicShopItemList(&list);
+}
+
+TEST("Graft Bag counts pieces per piece and caps each at 15")
+{
+    struct GraftPiece tackle = { GRAFT_PIECE_MOVE, 0, MOVE_TACKLE };
+    struct GraftPiece sturdy = { GRAFT_PIECE_ABILITY, 0, ABILITY_STURDY };
+    struct GraftPiece sameNumberAbility = { GRAFT_PIECE_ABILITY, 0, MOVE_TACKLE };
+    struct GraftPiece atk65 = { GRAFT_PIECE_STAT, STAT_ATK, 65 };
+    struct GraftPiece def65 = { GRAFT_PIECE_STAT, STAT_DEF, 65 };
+    struct GraftPiece none = { GRAFT_PIECE_MOVE, 0, MOVE_NONE };
+    u32 i;
+
+    ClearGraftBag();
+    EXPECT(IsGraftBagEmpty());
+    EXPECT(AddGraftPiece(&tackle));
+    EXPECT(AddGraftPiece(&tackle));
+    EXPECT(AddGraftPiece(&sturdy));
+    EXPECT(AddGraftPiece(&atk65));
+    EXPECT_EQ(GetGraftPieceCount(&tackle), 2);
+    EXPECT_EQ(GetGraftPieceCount(&sturdy), 1);
+    EXPECT_EQ(GetGraftPieceCount(&sameNumberAbility), 0); // kinds don't share counts
+    EXPECT_EQ(GetGraftPieceCount(&atk65), 1);
+    EXPECT_EQ(GetGraftPieceCount(&def65), 0);
+    EXPECT(!AddGraftPiece(&none));
+
+    for (i = 0; i < 20; i++)
+        AddGraftPiece(&tackle);
+    EXPECT_EQ(GetGraftPieceCount(&tackle), GRAFT_PIECE_MAX_COUNT);
+    EXPECT(!AddGraftPiece(&tackle));
+
+    EXPECT(RemoveGraftPiece(&sturdy));
+    EXPECT(!RemoveGraftPiece(&sturdy));
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_ABILITY), 0);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_MOVE), 1);
+    ClearGraftBag();
+}
+
+TEST("The Graft Bag takes the record-mixed secret bases' save space without moving anything")
+{
+    EXPECT_EQ(offsetof(struct SaveBlock1, graftBag), offsetof(struct SaveBlock1, secretBases) + sizeof(struct SecretBase));
+    EXPECT_EQ(offsetof(struct SaveBlock1, graftBag) + sizeof(((struct SaveBlock1 *)0)->graftBag),
+              offsetof(struct SaveBlock1, secretBases) + SECRET_BASES_SAVED_COUNT * sizeof(struct SecretBase));
+}
+
+static void GiveFourTestMoves(struct Pokemon *mon)
+{
+    SetMonMoveSlot(mon, MOVE_COUNTER, 0);
+    SetMonMoveSlot(mon, MOVE_MIRROR_COAT, 1);
+    SetMonMoveSlot(mon, MOVE_SAFEGUARD, 2);
+    SetMonMoveSlot(mon, MOVE_DESTINY_BOND, 3);
+}
+
+TEST("A mon is made of its moves, ability, types, nature and base stats")
+{
+    struct Pokemon mon;
+    struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
+    u32 count, i, moves = 0, stats = 0, types = 0, abilities = 0, natures = 0;
+
+    CreateMonWithIVs(&mon, SPECIES_WOBBUFFET, 30, 0, OTID_STRUCT_PRESET(0), 0); // pure Psychic
+    GiveFourTestMoves(&mon);
+    SetMonData(&mon, MON_DATA_HIDDEN_NATURE, &(u8){ NATURE_ADAMANT });
+    SetGraftedStatOnMon(&mon, STAT_SPEED, 120);
+    count = GetMonGraftPieces(&mon, FALSE, pieces);
+    for (i = 0; i < count; i++)
+    {
+        switch (pieces[i].kind)
+        {
+        case GRAFT_PIECE_MOVE:    moves++; break;
+        case GRAFT_PIECE_ABILITY: abilities++; EXPECT_EQ(pieces[i].value, GetMonAbility(&mon)); break;
+        case GRAFT_PIECE_TYPE:    types++; EXPECT_EQ(pieces[i].value, TYPE_PSYCHIC); break;
+        case GRAFT_PIECE_NATURE:  natures++; EXPECT_EQ(pieces[i].value, NATURE_ADAMANT); break;
+        case GRAFT_PIECE_STAT:
+            stats++;
+            if (pieces[i].stat == STAT_SPEED)
+                EXPECT_EQ(pieces[i].value, 120); // grafts count
+            if (pieces[i].stat == STAT_HP)
+                EXPECT_EQ(pieces[i].value, 190);
+            break;
+        }
+    }
+    EXPECT_EQ(moves, 4);
+    EXPECT_EQ(abilities, 1);
+    EXPECT_EQ(types, 1); // one piece for a single type
+    EXPECT_EQ(natures, 1);
+    EXPECT_EQ(stats, NUM_STATS);
+    EXPECT_EQ(count, 4 + 1 + 1 + 1 + NUM_STATS);
+}
+
+TEST("Wild mons never give their hidden ability")
+{
+    struct Pokemon mon;
+    struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
+    u32 count, i;
+    u8 hidden = 2;
+
+    CreateMonWithIVs(&mon, SPECIES_WOBBUFFET, 30, 0, OTID_STRUCT_PRESET(0), 0);
+    SetMonData(&mon, MON_DATA_ABILITY_NUM, &hidden);
+    count = GetMonGraftPieces(&mon, TRUE, pieces);
+    for (i = 0; i < count; i++)
+        EXPECT_NE(pieces[i].kind, GRAFT_PIECE_ABILITY);
+    count = GetMonGraftPieces(&mon, FALSE, pieces); // your own mon (Splicer) does
+    for (i = 0; i < count && pieces[i].kind != GRAFT_PIECE_ABILITY; i++)
+        ;
+    EXPECT_LT(i, count);
+}
+
+TEST("Harvests: Patch Ball 1 piece, Graft Ball 3 different, Splice Ball all; a full bag loses the rest")
+{
+    struct Pokemon mon;
+    struct GraftPiece got[GRAFT_PIECES_PER_MON];
+    u32 lost, count, i, j, total;
+
+    CreateMonWithIVs(&mon, SPECIES_WOBBUFFET, 30, 0, OTID_STRUCT_PRESET(0), 0);
+    GiveFourTestMoves(&mon);
+    ClearGraftBag();
+    EXPECT_EQ(HarvestGraftPieces(&mon, TRUE, 1, got, &lost), 1);
+    EXPECT_EQ(lost, 0);
+    EXPECT_EQ(GetGraftPieceCount(&got[0]), 1);
+
+    ClearGraftBag();
+    count = HarvestGraftPieces(&mon, TRUE, 3, got, &lost);
+    EXPECT_EQ(count, 3);
+    for (i = 0; i < 3; i++)
+        for (j = i + 1; j < 3; j++)
+            EXPECT(got[i].kind != got[j].kind || got[i].stat != got[j].stat || got[i].value != got[j].value);
+
+    ClearGraftBag();
+    total = HarvestGraftPieces(&mon, TRUE, GRAFT_HARVEST_ALL, got, &lost);
+    EXPECT_EQ(total, 4 + 1 + 1 + 1 + NUM_STATS);
+    for (i = 0; i < GRAFT_PIECE_MAX_COUNT - 1; i++)
+        HarvestGraftPieces(&mon, TRUE, GRAFT_HARVEST_ALL, got, &lost);
+    count = HarvestGraftPieces(&mon, TRUE, GRAFT_HARVEST_ALL, got, &lost);
+    EXPECT_EQ(count, 0);
+    EXPECT_EQ(lost, total);
+    ClearGraftBag();
+}
+
+TEST("Graft piece names")
+{
+    u8 buffer[32];
+    struct GraftPiece atk = { GRAFT_PIECE_STAT, STAT_ATK, 65 };
+    struct GraftPiece rock = { GRAFT_PIECE_TYPE, 0, TYPE_ROCK };
+    GetGraftPieceName(buffer, &atk);
+    EXPECT_EQ(StringCompare(buffer, COMPOUND_STRING("ATK 65")), 0);
+    GetGraftPieceName(buffer, &rock);
+    EXPECT_EQ(StringCompare(buffer, COMPOUND_STRING("Rock type")), 0);
 }

@@ -1059,6 +1059,7 @@ enum __attribute__((packed)) Item
     ITEM_SPLICE_BALL = 878,
     ITEM_GRAFT_KNOT = 879,
     ITEM_UNGRAFTER = 880,
+    ITEM_GRAFT_BAG = 881,
     ITEMS_COUNT,
 };
 

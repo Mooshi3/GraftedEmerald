@@ -174,26 +174,27 @@ const u8 *GetChallengeBallBlockReason(u16 ball)
     }
 }
 
-// A grafting ball caught its target and the graft menu is opening.
+// A grafting ball caught its target, which is being broken down into Graft Bag pieces.
+// 1 per area uses up the area; 1 per mon uses up the first party member that still had one here
+// (so an area allows one harvest per party member).
 void OnWildHarvest(void)
 {
-    if (GetGraftSetting(GRAFT_SETTING_HARVESTS) == GRAFT_HARVESTS_ONE)
+    switch (GetGraftSetting(GRAFT_SETTING_HARVESTS))
+    {
+    case GRAFT_HARVESTS_ONE:
         SetAreaBit(gSaveBlock1Ptr->graftHarvestAreas, GetCurrentArea());
-}
-
-static const u8 sText_HarvestMonUsed[] = _("It already took a graft\nin this area.");
-
-// Harvests per mon: the party member picked to receive a wild graft.
-const u8 *GetHarvestTargetRejectReason(struct Pokemon *mon)
-{
-    if (GetGraftSetting(GRAFT_SETTING_HARVESTS) == GRAFT_HARVESTS_PER_MON && !CanMonTakeHarvestHere(mon))
-        return sText_HarvestMonUsed;
-    return NULL;
-}
-
-void OnHarvestTargetChosen(struct Pokemon *mon)
-{
-    mon->box.graftHarvestArea = GetCurrentArea();
+        break;
+    case GRAFT_HARVESTS_PER_MON:
+        for (u32 i = 0; i < PARTY_SIZE; i++)
+        {
+            if (CanMonTakeHarvestHere(&gParties[B_TRAINER_PLAYER][i]))
+            {
+                gParties[B_TRAINER_PLAYER][i].box.graftHarvestArea = GetCurrentArea();
+                break;
+            }
+        }
+        break;
+    }
 }
 
 bool32 AreBattleItemsBanned(void)

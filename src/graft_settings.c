@@ -95,10 +95,10 @@ static const u8 *const sHarvestChoices[GRAFT_HARVESTS_COUNT] =
 
 static const u8 *const sHarvestDescriptions[GRAFT_HARVESTS_COUNT] =
 {
-    [GRAFT_HARVESTS_NONE] = COMPOUND_STRING("Balls can't graft from wild Pokémon.\nOnly the Splicer grafts."),
-    [GRAFT_HARVESTS_ONE] = COMPOUND_STRING("You can graft from one wild\nPokémon in each area."),
-    [GRAFT_HARVESTS_PER_MON] = COMPOUND_STRING("Each party Pokémon can take one\nwild graft in each area."),
-    [GRAFT_HARVESTS_ANY] = COMPOUND_STRING("No limit on grafting from wild\nPokémon."),
+    [GRAFT_HARVESTS_NONE] = COMPOUND_STRING("Graft balls can't be used. Only\nthe Splicer makes graft pieces."),
+    [GRAFT_HARVESTS_ONE] = COMPOUND_STRING("You can break down one wild\nPokémon in each area."),
+    [GRAFT_HARVESTS_PER_MON] = COMPOUND_STRING("Each area allows one wild Pokémon\nper party member to be broken down."),
+    [GRAFT_HARVESTS_ANY] = COMPOUND_STRING("No limit on breaking down wild\nPokémon."),
 };
 
 static const u8 *const sEnemyGraftChoices[GRAFT_ENEMY_GRAFTS_COUNT] =
@@ -122,7 +122,7 @@ static const u8 *const sFaintingDescriptions[GRAFT_FAINTING_COUNT] =
     [GRAFT_FAINTING_NORMAL] = COMPOUND_STRING("Fainted Pokémon can be revived\nand healed as usual."),
     [GRAFT_FAINTING_RELEASE] = COMPOUND_STRING("Pokémon that faint are released\nafter the battle."),
     [GRAFT_FAINTING_GRAVEYARD] = COMPOUND_STRING("Fainted Pokémon can't be healed,\nbut the Splicer can still use them."),
-    [GRAFT_FAINTING_AUTO_SPLICE] = COMPOUND_STRING("After battle, each fainted Pokémon\nis spliced into a party member."),
+    [GRAFT_FAINTING_AUTO_SPLICE] = COMPOUND_STRING("After battle, fainted Pokémon are\nbroken down into graft pieces."),
 };
 
 static const u8 *const sExpShareChoices[] = { COMPOUND_STRING("Item"), COMPOUND_STRING("Party") };

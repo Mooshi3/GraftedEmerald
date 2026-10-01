@@ -497,9 +497,9 @@ const struct ItemInfo gItemsInfo[] =
     .name = ITEM_NAME("Graft Ball"),
     .price = 400,
     .description = COMPOUND_STRING(
-        "Consumes a caught\n"
-        "Pokémon to offer\n"
-        "3 graft categories."),
+        "Breaks a caught\n"
+        "Pokémon down into 3\n"
+        "random graft pieces."),
     .pocket = POCKET_POKE_BALLS,
     .type = ITEM_USE_BAG_MENU,
     .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -512,8 +512,8 @@ const struct ItemInfo gItemsInfo[] =
         .price = 200,
         .description = COMPOUND_STRING(
             "A cheap Ball. Its\n"
-            "catch offers one\n"
-            "graft category."),
+            "catch becomes one\n"
+            "random graft piece."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -526,8 +526,8 @@ const struct ItemInfo gItemsInfo[] =
         .price = 800,
         .description = COMPOUND_STRING(
             "A premium Ball. Its\n"
-            "catch offers all\n"
-            "5 graft categories."),
+            "catch becomes every\n"
+            "graft piece it has."),
         .pocket = POCKET_POKE_BALLS,
         .type = ITEM_USE_BAG_MENU,
         .battleUsage = EFFECT_ITEM_THROW_BALL,
@@ -570,16 +570,31 @@ const struct ItemInfo gItemsInfo[] =
     .iconPalette = gItemIconPalette_CleanseTag,
 },
 
+[ITEM_GRAFT_BAG] =
+{
+    .name = ITEM_NAME("Graft Bag"),
+    .price = 0,
+    .description = COMPOUND_STRING(
+        "Holds graft pieces.\n"
+        "Graft them onto your\n"
+        "Pokémon at any time."),
+    .importance = 1,
+    .pocket = POCKET_KEY_ITEMS,
+    .type = ITEM_USE_FIELD,
+    .fieldUseFunc = ItemUseOutOfBattle_GraftBag,
+    .iconPic = gItemIcon_SootSack,
+    .iconPalette = gItemIconPalette_SootSack,
+},
+
 // Graft Splicer
 [ITEM_GRAFT_SPLICER] = {
     .name = ITEM_NAME("Graft Splicer"),
     .price = 1000,
     .holdEffectParam = 0,
     .description = COMPOUND_STRING(
-        "Sacrifice one\n"
-        "Pokémon to graft\n"
-        "its traits onto\n"
-        "a teammate."),
+        "Breaks a party\n"
+        "Pokémon down into\n"
+        "all its graft pieces."),
     .pocket = POCKET_ITEMS,
     .sortType = ITEM_TYPE_FIELD_USE,
     .type = ITEM_USE_PARTY_MENU,
