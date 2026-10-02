@@ -8,7 +8,7 @@ R() { for i in $(seq "$1"); do echo -n "press $2;wait 4;"; done; } # press key $
 # Title screen -> New Game -> Birch intro -> GAME SETTINGS screen (cursor on row 0)
 intro() { echo -n "wait 900;press START;wait 120;press A;wait 200;$(for i in $(seq 35); do echo -n 'mash A 15 8;'; done)wait 60;"; }
 
-# On the settings screen: settings "ROW:RIGHTS ..." e.g. settings 5:2 7:1 (rows ascending), then start the game.
+# On the settings screen (main game only: the Rogue branch has none): settings "ROW:RIGHTS ...", then start the game.
 # Rows (Rogue branch): 0 unlocks, 1 shiny, 2 exp share, 3 enemy grafts, 4 wild grafts, 5 battle items,
 # 6 force set, 7 monotype, 8 sleep clause, 9 inverse, 10 smart wilds. (The main game's scenarios use the
 # full list; they don't apply on this branch.)

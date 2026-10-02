@@ -108,6 +108,9 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
 
 Not done yet: bosses from other generations (sprites, waiting on assets), more events, room types and
 floor themes (planned).
-- The settings screen shows only what applies to a run (`sRows`, `src/graft_settings.c`): Unlocks, Shiny
-  Odds, EXP Share, Enemy/Wild Grafts, Battle Items, Force Set, Monotype (the starter gets the type),
-  Sleep Clause, Inverse, Smart Wilds. A run forces the rest.
+- No settings screen (Jacob 2026-10-02). A new save's start room asks once: meta-progression yes/no
+  (no = everything unlocked). A run sets the rest: shiny odds 1/512, EXP Share Item (Party with the Team
+  training unlock), Enemy Grafts Normal (More on Hard), Wild Grafts Off, battle items allowed, Set style
+  (Shift with the Switch style unlock), no Sleep Clause, Smart Wilds on Hard only.
+- Challenges, picked at the start door for one run: Inverse battles or Monotype (choose the type; the
+  starter gets it grafted). Bosses pay half again in BP.

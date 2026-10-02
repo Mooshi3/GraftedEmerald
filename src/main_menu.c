@@ -1815,9 +1815,9 @@ static void Task_NewGameBirchSpeech_Cleanup(u8 taskId)
         FreeAllWindowBuffers();
         FreeAndDestroyMonPicSprite(gTasks[taskId].tLotadSpriteId);
         ResetAllPicSprites();
-        // GRAFT: pick new-game settings before the save is initialized
-        gMain.savedCallback = CB2_NewGame;
-        SetMainCallback2(CB2_InitGraftSettingsMenu);
+        // ROGUE: no settings screen; a run sets what it needs, and the start room asks about
+        // meta-progression (Rogue_SetMetaProgression)
+        SetMainCallback2(CB2_NewGame);
         DestroyTask(taskId);
     }
 }

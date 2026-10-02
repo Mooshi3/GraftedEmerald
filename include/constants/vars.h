@@ -273,7 +273,7 @@
 #define VAR_ROGUE_SEED_LO                                0x40FB // Rogue
 #define VAR_ROGUE_SEED_HI                                0x40FC // Rogue
 #define VAR_ROGUE_TEAM_SLOTS                             0x40FD // Rogue
-#define VAR_UNUSED_0x40FE                                0x40FE // Unused Var
+#define VAR_ROGUE_INTRO                                  0x40FE // Rogue: 1 once the meta-progression question is answered
 #define VAR_UNUSED_0x40FF                                0x40FF // Unused Var
 
 #define VARS_END                                         0x40FF

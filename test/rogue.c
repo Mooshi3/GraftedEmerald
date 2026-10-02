@@ -7,6 +7,7 @@
 #include "constants/rogue.h"
 #include "graft_settings.h"
 #include "graft_bag.h"
+#include "graft_challenge.h"
 #include "item.h"
 #include "battle.h"
 
@@ -116,6 +117,7 @@ TEST("A Rogue run starts with a weak unevolved starter")
         VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
         VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
         gSpecialVar_0x8004 = 1; // the start room's only door is the middle one
+        gSpecialVar_0x8006 = ROGUE_CHALLENGE_NONE;
         Rogue_TakeDoor();
         EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_STARTED_RUN);
         EXPECT_EQ(CalculatePlayerPartyCount(), 1);
@@ -183,6 +185,10 @@ TEST("Rogue unlocks cost BP and apply from the next run")
     VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
     gSpecialVar_0x8004 = 1;
     gSpecialVar_0x8005 = 0;
+    gSpecialVar_0x8006 = 0;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_ASK_CHALLENGE);
+    gSpecialVar_0x8006 = ROGUE_CHALLENGE_NONE;
     Rogue_TakeDoor();
     EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_STARTED_RUN);
     EXPECT_EQ(VarGet(VAR_ROGUE_TEAM_SLOTS), 4);
@@ -200,6 +206,10 @@ TEST("With Unlocks Off, a run starts with everything unlocked")
     Rogue_TakeDoor();
     EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_ASK_MODE); // Hard mode is open too
     gSpecialVar_0x8005 = 2;
+    gSpecialVar_0x8006 = 0;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_ASK_CHALLENGE);
+    gSpecialVar_0x8006 = ROGUE_CHALLENGE_NONE;
     Rogue_TakeDoor();
     EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_CHOOSE_STARTER);
     EXPECT_EQ(CalculatePlayerPartyCount(), 0);
@@ -317,4 +327,31 @@ TEST("Rogue: last rites break a fainted Pokemon down, a few times a floor")
     Rogue_ResolveFainted();
     EXPECT(!IsGraftBagEmpty());
     VarSet(VAR_ROGUE_UNLOCKS, 0);
+}
+
+TEST("Rogue: challenges last one run and pay more BP")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
+    VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+    gSpecialVar_0x8004 = 1;
+    gSpecialVar_0x8005 = 1;
+    gSpecialVar_0x8006 = ROGUE_CHALLENGE_MONOTYPE;
+    gSpecialVar_0x8007 = TYPE_GHOST;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_STARTED_RUN);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_MONOTYPE), TYPE_GHOST);
+    EXPECT(IsMonotypeLegal(&gParties[B_TRAINER_PLAYER][0])); // the starter got Ghost grafted on
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SET_MODE), TRUE); // no Switch style yet
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_EXP_SHARE), 0);
+
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+    SetRoom(GetGraftSetting(GRAFT_SETTING_MONOTYPE), 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 1 << 2);
+    Rogue_OnBossDefeated();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 7); // 5 and half again
+
+    Rogue_OnWhiteOut();
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_MONOTYPE), TYPE_NONE);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_INVERSE), FALSE);
 }

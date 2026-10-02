@@ -19,9 +19,25 @@ Rogue_Room_OnLoad:
 Rogue_Room_OnFrame:
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_LOST, Rogue_Room_EventScript_RunLost
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_WON, Rogue_Room_EventScript_RunWon
+	map_script_2 VAR_ROGUE_INTRO, 0, Rogue_Room_EventScript_AskMeta
 	map_script_2 VAR_TEMP_2, 0, Rogue_Room_EventScript_EnterRoom
 	map_script_2 VAR_TEMP_4, 1, Rogue_Room_EventScript_AskFainted
 	.2byte 0
+
+@ A new save's first question
+Rogue_Room_EventScript_AskMeta::
+	lockall
+	msgbox Rogue_Room_Text_AskMeta, MSGBOX_YESNO
+	copyvar VAR_0x8004, VAR_RESULT
+	special Rogue_SetMetaProgression
+	goto_if_eq VAR_0x8004, NO, Rogue_Room_EventScript_MetaOff
+	msgbox Rogue_Room_Text_MetaOn, MSGBOX_DEFAULT
+	releaseall
+	end
+Rogue_Room_EventScript_MetaOff:
+	msgbox Rogue_Room_Text_MetaOff, MSGBOX_DEFAULT
+	releaseall
+	end
 
 Rogue_Room_EventScript_EnterRoom::
 	setvar VAR_TEMP_2, 1
@@ -89,9 +105,12 @@ Rogue_Room_EventScript_Door::
 	special Rogue_CanLeaveRoom
 	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_DoorBlocked
 	setvar VAR_0x8005, 0
+	setvar VAR_0x8006, 0
+	setvar VAR_0x8007, 0
 Rogue_Room_EventScript_TakeDoor::
 	special Rogue_TakeDoor
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_ASK_MODE, Rogue_Room_EventScript_AskMode
+	goto_if_eq VAR_RESULT, ROGUE_DOOR_ASK_CHALLENGE, Rogue_Room_EventScript_AskChallenge
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_CHOOSE_STARTER, Rogue_Room_EventScript_ChooseStarter
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_STARTED_RUN, Rogue_Room_EventScript_StartedRun
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_WON_RUN, Rogue_Room_EventScript_WonRun
@@ -103,6 +122,22 @@ Rogue_Room_EventScript_AskMode::
 	setvar VAR_0x8005, 1
 	goto_if_eq VAR_RESULT, NO, Rogue_Room_EventScript_TakeDoor
 	setvar VAR_0x8005, 2
+	goto Rogue_Room_EventScript_TakeDoor
+	end
+
+Rogue_Room_EventScript_AskChallenge::
+	message Rogue_Room_Text_AskChallenge
+	waitmessage
+	special Rogue_PushChallengeChoices
+	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	copyvar VAR_0x8006, VAR_RESULT
+	goto_if_ne VAR_0x8006, ROGUE_CHALLENGE_MONOTYPE, Rogue_Room_EventScript_TakeDoor
+	message Rogue_Room_Text_AskMonotype
+	waitmessage
+	special Rogue_PushTypeChoices
+	dynmultistack 0, 0, FALSE, 6, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	goto_if_eq VAR_RESULT, MULTI_B_PRESSED, Rogue_Room_EventScript_AskChallenge
+	copyvar VAR_0x8007, VAR_RESULT
 	goto Rogue_Room_EventScript_TakeDoor
 	end
 
@@ -311,6 +346,32 @@ Rogue_Room_MerchantMart:
 Rogue_Room_EventScript_Guide::
 	msgbox Rogue_Room_Text_Guide, MSGBOX_NPC
 	end
+
+Rogue_Room_Text_AskMeta:
+	.string "Before you start: do you want\n"
+	.string "meta-progression?\p"
+	.string "Bosses pay BP you can spend on\n"
+	.string "unlocks that carry over to every\l"
+	.string "run after.\p"
+	.string "Without it, everything is unlocked\n"
+	.string "from the start. This can't be\l"
+	.string "changed later. Use meta-progression?$"
+
+Rogue_Room_Text_MetaOn:
+	.string "Meta-progression is on. The scientist\n"
+	.string "here trades BP for unlocks.$"
+
+Rogue_Room_Text_MetaOff:
+	.string "Meta-progression is off. Everything\n"
+	.string "is unlocked. Good luck!$"
+
+Rogue_Room_Text_AskChallenge:
+	.string "Take on a challenge?\n"
+	.string "Bosses pay half again in BP.$"
+
+Rogue_Room_Text_AskMonotype:
+	.string "Which type? Only Pokémon of it can\n"
+	.string "battle. Your starter gets it grafted.$"
 
 Rogue_Room_Text_AskHardMode:
 	.string "Take on HARD mode?\n"

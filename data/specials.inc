@@ -667,3 +667,6 @@ def_special Rogue_GiveGiftPieces
 def_special Rogue_FindFainted
 def_special Rogue_PushFaintedChoices
 def_special Rogue_ResolveFainted
+def_special Rogue_SetMetaProgression
+def_special Rogue_PushChallengeChoices
+def_special Rogue_PushTypeChoices

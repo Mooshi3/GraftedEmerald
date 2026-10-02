@@ -47,5 +47,8 @@ void Rogue_OnBattleEnd(void);
 void Rogue_FindFainted(void);
 void Rogue_PushFaintedChoices(void);
 void Rogue_ResolveFainted(void);
+void Rogue_SetMetaProgression(void);
+void Rogue_PushChallengeChoices(void);
+void Rogue_PushTypeChoices(void);
 
 #endif // GUARD_ROGUE_H

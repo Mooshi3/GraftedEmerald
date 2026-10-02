@@ -26,6 +26,12 @@
 #define ROGUE_DOOR_WON_RUN     2
 #define ROGUE_DOOR_ASK_MODE    3 // Hard mode is open: ask Normal or Hard (VAR_0x8005), then take the door again
 #define ROGUE_DOOR_CHOOSE_STARTER 4 // the run started; the player picks the starter
+#define ROGUE_DOOR_ASK_CHALLENGE  5 // ask for a challenge (VAR_0x8006, VAR_0x8007), then take the door again
+
+// Challenges, chosen when a run starts (VAR_0x8006); a challenge run pays half again in BP
+#define ROGUE_CHALLENGE_NONE     1
+#define ROGUE_CHALLENGE_INVERSE  2
+#define ROGUE_CHALLENGE_MONOTYPE 3
 
 // Rogue_ResolveFainted's choices
 #define ROGUE_FAINTED_KEEP    0

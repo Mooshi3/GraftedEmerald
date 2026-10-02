@@ -209,6 +209,8 @@ enum
     UNLOCK_START_PIECE,
     UNLOCK_LAST_RITES_2,
     UNLOCK_LAST_RITES_3,
+    UNLOCK_EXP_PARTY,
+    UNLOCK_SWITCH_STYLE,
     UNLOCK_SHOP_COUNT,
     UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
 };
@@ -230,10 +232,15 @@ static const struct
     [UNLOCK_LAST_RITES_1] = {COMPOUND_STRING("Last rites I"), COMPOUND_STRING("Once a floor, a fainted Pokémon can\nbe broken down into graft pieces."), 60, -1},
     [UNLOCK_LAST_RITES_2] = {COMPOUND_STRING("Last rites II"), COMPOUND_STRING("Last rites twice a floor."), 90, UNLOCK_LAST_RITES_1},
     [UNLOCK_LAST_RITES_3] = {COMPOUND_STRING("Last rites III"), COMPOUND_STRING("Last rites three times a floor."), 120, UNLOCK_LAST_RITES_2},
+    [UNLOCK_EXP_PARTY] = {COMPOUND_STRING("Team training"), COMPOUND_STRING("The whole team gets EXP from\nevery battle."), 40, -1},
+    [UNLOCK_SWITCH_STYLE] = {COMPOUND_STRING("Switch style"), COMPOUND_STRING("You may switch Pokémon when a\nfoe faints (Shift battle style)."), 20, -1},
     [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
 };
 
-#define RUN_FLAG_HARD (1 << 0)
+#define RUN_FLAG_HARD     (1 << 0)
+#define RUN_FLAG_INVERSE  (1 << 1) // challenge: Inverse battles
+#define RUN_FLAG_MONOTYPE (1 << 2) // challenge: Monotype (the type is in the Monotype setting)
+#define RUN_FLAG_CHALLENGE (RUN_FLAG_INVERSE | RUN_FLAG_MONOTYPE)
 
 // Last rites used this floor: VAR_ROGUE_RUN_FLAGS bits 8-11
 #define RUN_FLAG_RITES_SHIFT 8
@@ -1071,6 +1078,19 @@ static void SetForcedSettings(void)
     SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_NORMAL); // fainted Pokémon: Rogue_OnBattleEnd
     SetGraftSetting(GRAFT_SETTING_WILD_SPAWNS, GRAFT_WILD_SPAWNS_HIDDEN);
     SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_OFF);
+    // Set by the run, not chosen on a settings screen (decided with Jacob 2026-10-02)
+    SetGraftSetting(GRAFT_SETTING_SHINY_ODDS, GRAFT_SHINY_ODDS_BOOSTED);
+    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, HasUnlock(UNLOCK_EXP_PARTY));
+    SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, IsHardMode() ? GRAFT_ENEMY_GRAFTS_MORE : GRAFT_ENEMY_GRAFTS_NORMAL);
+    SetGraftSetting(GRAFT_SETTING_WILD_GRAFTS, GRAFT_WILD_GRAFTS_OFF);
+    SetGraftSetting(GRAFT_SETTING_BATTLE_ITEMS, FALSE);
+    SetGraftSetting(GRAFT_SETTING_SET_MODE, !HasUnlock(UNLOCK_SWITCH_STYLE));
+    SetGraftSetting(GRAFT_SETTING_SLEEP_CLAUSE, FALSE);
+    SetGraftSetting(GRAFT_SETTING_SMART_WILDS, IsHardMode());
+    SetGraftSetting(GRAFT_SETTING_DOUBLE_WILDS, GRAFT_DOUBLE_WILDS_OFF);
+    SetGraftSetting(GRAFT_SETTING_INVERSE, (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_INVERSE) != 0);
+    if (!(VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_MONOTYPE))
+        SetGraftSetting(GRAFT_SETTING_MONOTYPE, TYPE_NONE);
 }
 
 static void ClearRunProgress(void)
@@ -1085,6 +1105,9 @@ static void ClearRunProgress(void)
     VarSet(VAR_ROGUE_FLOOR, 0);
     VarSet(VAR_ROGUE_ROOM, 0);
     VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+    // Challenges last one run
+    SetGraftSetting(GRAFT_SETTING_INVERSE, FALSE);
+    SetGraftSetting(GRAFT_SETTING_MONOTYPE, TYPE_NONE);
 }
 
 // The starter candidates of a run: one, or three with the Starter choice unlock
@@ -1110,7 +1133,7 @@ static void GiveStarter(enum Species species)
     StringCopy(gStringVar1, GetSpeciesName(species));
 }
 
-static void StartRun(bool32 hard)
+static void StartRun(bool32 hard, u32 challenge, u32 monotype)
 {
     u32 seed = Random32();
     enum Species starters[3];
@@ -1123,7 +1146,11 @@ static void StartRun(bool32 hard)
     VarSet(VAR_ROGUE_ROOM, 1);
     VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD);
     VarSet(VAR_ROGUE_TEAM_SLOTS, GetStartingTeamSlots());
-    VarSet(VAR_ROGUE_RUN_FLAGS, hard ? RUN_FLAG_HARD : 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, (hard ? RUN_FLAG_HARD : 0)
+                              | (challenge == ROGUE_CHALLENGE_INVERSE ? RUN_FLAG_INVERSE : 0)
+                              | (challenge == ROGUE_CHALLENGE_MONOTYPE ? RUN_FLAG_MONOTYPE : 0));
+    if (challenge == ROGUE_CHALLENGE_MONOTYPE)
+        SetGraftSetting(GRAFT_SETTING_MONOTYPE, monotype);
     SetForcedSettings();
 
     if (!HasUnlock(UNLOCK_STARTER_CHOICE))
@@ -1164,12 +1191,18 @@ void Rogue_TakeDoor(void)
     if (door == ROGUE_ROOM_START)
     {
         // VAR_0x8005: 0 = not asked yet, 1 = Normal, 2 = Hard
+        // VAR_0x8006: 0 = not asked yet, else ROGUE_CHALLENGE_*; VAR_0x8007: Monotype's type
         if (gSpecialVar_0x8005 == 0 && HasUnlock(UNLOCK_HARD_MODE))
         {
             gSpecialVar_Result = ROGUE_DOOR_ASK_MODE;
             return;
         }
-        StartRun(gSpecialVar_0x8005 == 2);
+        if (gSpecialVar_0x8006 == 0)
+        {
+            gSpecialVar_Result = ROGUE_DOOR_ASK_CHALLENGE;
+            return;
+        }
+        StartRun(gSpecialVar_0x8005 == 2, gSpecialVar_0x8006, gSpecialVar_0x8007);
         gSpecialVar_Result = HasUnlock(UNLOCK_STARTER_CHOICE) ? ROGUE_DOOR_CHOOSE_STARTER : ROGUE_DOOR_STARTED_RUN;
         return;
     }
@@ -1267,7 +1300,11 @@ static u32 GetBossBP(void)
     u32 bp = IsFinale(GetFloor()) ? 10 : 5;
     if (IsFinale(GetFloor()) && GetRoom() >= GetFinaleLength())
         bp += 10; // the run is won
-    return IsHardMode() ? bp * 2 : bp;
+    if (IsHardMode())
+        bp *= 2;
+    if (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_CHALLENGE)
+        bp += bp / 2; // a challenge run pays half again
+    return bp;
 }
 
 void Rogue_OnBossDefeated(void)
@@ -1498,6 +1535,31 @@ void Rogue_ResolveFainted(void)
     CompactPartySlots();
     CalculatePlayerPartyCount();
     UpdateFollowingPokemon();
+}
+
+// The start room's first question (VAR_0x8004: YES/NO)
+void Rogue_SetMetaProgression(void)
+{
+    SetGraftSetting(GRAFT_SETTING_ROGUE_META, gSpecialVar_0x8004 == 1); // YES
+    VarSet(VAR_ROGUE_INTRO, 1);
+}
+
+void Rogue_PushChallengeChoices(void)
+{
+    PushChoice(COMPOUND_STRING("No challenge"), ROGUE_CHALLENGE_NONE);
+    PushChoice(COMPOUND_STRING("Inverse battles"), ROGUE_CHALLENGE_INVERSE);
+    PushChoice(COMPOUND_STRING("Monotype"), ROGUE_CHALLENGE_MONOTYPE);
+}
+
+void Rogue_PushTypeChoices(void)
+{
+    u32 type;
+    for (type = TYPE_NORMAL; type < NUMBER_OF_MON_TYPES; type++)
+    {
+        if (type == TYPE_MYSTERY || type == TYPE_STELLAR)
+            continue;
+        PushChoice(gTypesInfo[type].name, type);
+    }
 }
 
 void Rogue_BufferBP(void)
