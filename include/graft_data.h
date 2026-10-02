@@ -30,10 +30,12 @@ void InitGraftData(void);
 // Recolors a mon's sprite palette (already loaded at palOffset) for its grafted types (graft_recolor.c).
 // gfx: the sprite's decompressed 4bpp 64x64 frame, used to weigh colors by area and find outlines (or NULL).
 void ApplyGraftTypePalette(u32 palOffset, struct Pokemon *mon, const u8 *gfx);
+void ApplyGraftTypePaletteSized(u32 palOffset, struct Pokemon *mon, const u8 *gfx, u32 widthTiles, u32 heightTiles);
 // The recolor itself, on plain arrays (16 RGB555 colors; per-color pixel counts and how many touch transparency)
 void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 *edges,
                          const u8 *speciesTypes, const u8 *effTypes, const u16 *speciesColors, const u16 *effColors);
 void GraftCountSpritePixels(const u8 *gfx, u16 *counts, u16 *edges);
+void GraftCountSpritePixelsSized(const u8 *gfx, u32 widthTiles, u32 heightTiles, u16 *counts, u16 *edges);
 void ApplyBattlerGraftOverrides(u32 battler);
 void InheritGrafts(struct BoxPokemon *egg, struct BoxPokemon *parentA, struct BoxPokemon *parentB);
 void RecordGraftMove(struct BoxPokemon *boxMon, u16 move);

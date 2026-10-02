@@ -502,19 +502,22 @@ void GraftRecolorPalette(const u16 *src, u16 *dst, const u16 *counts, const u16 
 }
 
 // Pixel counts per palette color in a 4bpp 64x64 frame, and how many of them touch transparency
-void GraftCountSpritePixels(const u8 *gfx, u16 *counts, u16 *edges)
+// Pixel counts and outline counts per palette index, from 4bpp tiles laid out row by row
+// (widthTiles x heightTiles, as a 1D-mapped sprite frame is in VRAM)
+void GraftCountSpritePixelsSized(const u8 *gfx, u32 widthTiles, u32 heightTiles, u16 *counts, u16 *edges)
 {
+    s32 w = widthTiles * 8, h = heightTiles * 8;
     for (u32 i = 0; i < PAL_SIZE; i++)
         counts[i] = edges[i] = 0;
-    for (s32 y = 0; y < SPRITE_DIM; y++)
+    for (s32 y = 0; y < h; y++)
     {
-        for (s32 x = 0; x < SPRITE_DIM; x++)
+        for (s32 x = 0; x < w; x++)
         {
-#define PIXEL(px, py) ((gfx[(((py) >> 3) * 8 + ((px) >> 3)) * 32 + ((py) & 7) * 4 + (((px) & 7) >> 1)] >> ((((px) & 1)) * 4)) & 15)
+#define PIXEL(px, py) ((gfx[(((py) >> 3) * widthTiles + ((px) >> 3)) * 32 + ((py) & 7) * 4 + (((px) & 7) >> 1)] >> ((((px) & 1)) * 4)) & 15)
             u32 i = PIXEL(x, y);
             counts[i]++;
             if (i != 0
-             && (x == 0 || x == SPRITE_DIM - 1 || y == 0 || y == SPRITE_DIM - 1
+             && (x == 0 || x == w - 1 || y == 0 || y == h - 1
               || PIXEL(x - 1, y) == 0 || PIXEL(x + 1, y) == 0 || PIXEL(x, y - 1) == 0 || PIXEL(x, y + 1) == 0))
                 edges[i]++;
 #undef PIXEL
@@ -522,8 +525,19 @@ void GraftCountSpritePixels(const u8 *gfx, u16 *counts, u16 *edges)
     }
 }
 
+void GraftCountSpritePixels(const u8 *gfx, u16 *counts, u16 *edges)
+{
+    GraftCountSpritePixelsSized(gfx, SPRITE_DIM / 8, SPRITE_DIM / 8, counts, edges);
+}
+
 #ifndef GRAFT_RECOLOR_NATIVE
 void ApplyGraftTypePalette(u32 palOffset, struct Pokemon *mon, const u8 *gfx)
+{
+    ApplyGraftTypePaletteSized(palOffset, mon, gfx, SPRITE_DIM / 8, SPRITE_DIM / 8);
+}
+
+// Like ApplyGraftTypePalette, for a sprite of another size (an overworld frame)
+void ApplyGraftTypePaletteSized(u32 palOffset, struct Pokemon *mon, const u8 *gfx, u32 widthTiles, u32 heightTiles)
 {
     u16 species = GetMonData(mon, MON_DATA_SPECIES);
     bool32 isShiny = GetMonData(mon, MON_DATA_IS_SHINY);
@@ -541,7 +555,7 @@ void ApplyGraftTypePalette(u32 palOffset, struct Pokemon *mon, const u8 *gfx)
     }
     if (gfx != NULL)
     {
-        GraftCountSpritePixels(gfx, counts, edges);
+        GraftCountSpritePixelsSized(gfx, widthTiles, heightTiles, counts, edges);
     }
     else
     {

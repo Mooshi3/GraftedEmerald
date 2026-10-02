@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_data.h"
 #include "malloc.h"
 #include "battle_anim.h"
 #include "battle_pyramid.h"
@@ -202,6 +203,7 @@ static bool8 AnimateSpriteInFigure8(struct Sprite *);
 enum Direction GetDirectionToFace(s16 x1, s16 y1, s16 x2, s16 y2);
 static u32 LoadDynamicFollowerPalette(enum Species species, bool32 shiny, bool32 female);
 static void FollowerSetGraphics(struct ObjectEvent *objEvent, enum Species species, bool32 shiny, bool32 female);
+static void TryGraftFollowerPalette(struct ObjectEvent *objEvent, struct Sprite *sprite);
 static void ObjectEventSetGraphics(struct ObjectEvent *, const struct ObjectEventGraphicsInfo *);
 static void SpriteCB_VirtualObject(struct Sprite *);
 static void DoShadowFieldEffect(struct ObjectEvent *);
@@ -1866,6 +1868,7 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
         sprite->oam.paletteNum = LoadDynamicFollowerPalette(OW_SPECIES(objectEvent), OW_SHINY(objectEvent), OW_FEMALE(objectEvent));
     if (OW_GFX_COMPRESS && sprite->usingSheet)
         sprite->sheetSpan = GetSpanPerImage(sprite->oam.shape, sprite->oam.size);
+    TryGraftFollowerPalette(objectEvent, sprite);
     GetMapCoordsFromSpritePos(objectEvent->currentCoords.x + cameraX, objectEvent->currentCoords.y + cameraY, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
@@ -2225,6 +2228,53 @@ static u32 LoadDynamicFollowerPalette(enum Species species, bool32 shiny, bool32
     return paletteNum;
 }
 
+// GRAFT: a follower whose mon has type grafts gets its own copy of the species palette, recolored
+// like its battle sprite (the shared one stays for wild and NPC Pokémon of the same species).
+#define TAG_GRAFT_FOLLOWER_PAL 0x8010
+
+static void TryGraftFollowerPalette(struct ObjectEvent *objEvent, struct Sprite *sprite)
+{
+    const struct ObjectEventGraphicsInfo *info;
+    const u8 *gfx = NULL;
+    struct Pokemon *mon;
+    u16 colors[16];
+    u32 shared, slot;
+
+    if (objEvent->localId != OBJ_EVENT_ID_FOLLOWER || !OW_FOLLOWERS_ENABLED)
+        return;
+    mon = GetFirstLiveMon();
+    if (mon == NULL || GetMonData(mon, MON_DATA_SPECIES) != OW_SPECIES(objEvent))
+        return;
+    if (mon->box.graftTypes[0] == GRAFT_TYPE_NONE && mon->box.graftTypes[1] == GRAFT_TYPE_NONE)
+        return;
+
+    shared = sprite->oam.paletteNum;
+    CpuCopy16(&gPlttBufferUnfaded[OBJ_PLTT_ID(shared)], colors, sizeof(colors));
+    slot = IndexOfSpritePaletteTag(TAG_GRAFT_FOLLOWER_PAL);
+    if (slot >= 16)
+    {
+        struct SpritePalette palette = { .data = colors, .tag = TAG_GRAFT_FOLLOWER_PAL };
+        slot = LoadSpritePalette(&palette);
+        if (slot >= 16)
+            return; // no free palette: keep the species colors
+    }
+    else if (slot != shared)
+    {
+        CpuCopy16(colors, &gPlttBufferUnfaded[OBJ_PLTT_ID(slot)], sizeof(colors));
+    }
+    sprite->oam.paletteNum = slot;
+    if (shared != slot)
+        FieldEffectFreePaletteIfUnused(shared);
+
+    // Weigh the colors by the frames already in VRAM (compressed overworld sheets are loaded whole)
+    info = GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    if (OW_GFX_COMPRESS && sprite->usingSheet)
+        gfx = (const u8 *)(OBJ_VRAM0 + sprite->sheetTileStart * TILE_SIZE_4BPP);
+    ApplyGraftTypePaletteSized(OBJ_PLTT_ID(slot), mon, gfx, info->width / 8, info->height / 8);
+    if (gWeatherPtr->currWeather != WEATHER_FOG_HORIZONTAL)
+        UpdateSpritePaletteWithWeather(slot, FALSE);
+}
+
 // Set graphics & sprite for a follower object event by species & shininess.
 static void FollowerSetGraphics(struct ObjectEvent *objEvent, enum Species species, bool32 shiny, bool32 female)
 {
@@ -2239,6 +2289,7 @@ static void FollowerSetGraphics(struct ObjectEvent *objEvent, enum Species speci
         FieldEffectFreePaletteIfUnused(sprite->oam.paletteNum);
         sprite->inUse = TRUE;
         sprite->oam.paletteNum = LoadDynamicFollowerPalette(species, shiny, female);
+        TryGraftFollowerPalette(objEvent, sprite);
     }
 }
 
@@ -2279,6 +2330,7 @@ static void RefreshFollowerGraphics(struct ObjectEvent *objEvent)
         FieldEffectFreePaletteIfUnused(sprite->oam.paletteNum);
         sprite->inUse = TRUE;
         sprite->oam.paletteNum = LoadDynamicFollowerPalette(species, shiny, female);
+        TryGraftFollowerPalette(objEvent, sprite);
     }
     else if (i != 0xFF)
     {
@@ -3037,6 +3089,7 @@ static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
         sprite->coordOffsetEnabled = TRUE;
         sprite->sObjEventId = objectEventId;
         objectEvent->spriteId = i;
+        TryGraftFollowerPalette(objectEvent, sprite);
         if (!objectEvent->inanimate && objectEvent->movementType != MOVEMENT_TYPE_PLAYER)
             StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
