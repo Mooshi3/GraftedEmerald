@@ -98,5 +98,8 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
   one of three pieces: a strong ability, a 110–140 stat, a type, 50). With Unlocks Off, all of them and
   Hard mode are open from the start (my reading of "on/off"; Jacob to confirm).
 
-Not done yet: bosses from other generations (sprites), "?" events, room variety (caves, water), the
+- "?" doors: 35% an event (a stranger who gives an ability and a stat piece, one rare Pokémon from two
+  floors ahead's pool, or a merchant with Splice Balls, Rare Candy, held items), else a random room.
+
+Not done yet: bosses from other generations (sprites), more events, room variety (caves, water), the
 "team revives on floor clear" option, hiding settings that don't apply in Rogue.

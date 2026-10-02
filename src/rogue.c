@@ -45,6 +45,8 @@ extern const u8 Rogue_Room_EventScript_Shop[];
 extern const u8 Rogue_Room_EventScript_Nurse[];
 extern const u8 Rogue_Room_EventScript_Guide[];
 extern const u8 Rogue_Room_EventScript_UnlockShop[];
+extern const u8 Rogue_Room_EventScript_GiftPieces[];
+extern const u8 Rogue_Room_EventScript_Merchant[];
 
 // The room map: 22x18 tiles, trees in 2x2 blocks. The outer two blocks are forest, the inside is
 // 7x5 blocks (tiles 4..17 x 4..13). Doors are openings in the north forest at block columns 3, 5, 7.
@@ -263,6 +265,23 @@ static u32 GetRoomType(void)
 
 #define ROOM_TYPE_FROM_MYSTERY 0x100 // in VAR_ROGUE_ROOM_TYPE: this room was behind a "?" door
 
+// Events (only behind "?" doors)
+enum
+{
+    EVENT_GIFT,     // a stranger hands over graft pieces
+    EVENT_RARE,     // one wild Pokémon from a stronger pool
+    EVENT_MERCHANT, // a shop with rarer stock
+    EVENT_COUNT,
+};
+
+static u32 Mix32(u32 x);
+static u32 GetRoomSeed(void);
+
+static u32 GetEventKind(void)
+{
+    return Mix32(GetRoomSeed() ^ 0xE7E7) % EVENT_COUNT;
+}
+
 static u32 GetTeamSlots(void)
 {
     u32 slots = VarGet(VAR_ROGUE_TEAM_SLOTS);
@@ -466,6 +485,14 @@ u32 Rogue_GetFloorDonors(u16 *species, u32 count)
     return count;
 }
 
+// A rare Pokémon: from two floors ahead's pool
+static enum Species PickRareSpecies(rng_value_t *rng)
+{
+    u32 minBst, maxBst;
+    GetFloorBstRange(min(GetFloor() + 2, 6), &minBst, &maxBst);
+    return PickSpecies(rng, minBst, maxBst, FALSE, TYPE_NONE);
+}
+
 // A starter: not evolved, evolves, and no stronger than the first-stage starters
 static enum Species PickStarter(rng_value_t *rng)
 {
@@ -641,7 +668,7 @@ static void BuildRoomPlan(void)
     rng_value_t rng = LocalRandomSeed(GetRoomSeed());
     u32 type = GetRoomType();
     bool32 hasCenterObject = (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_BOSS
-                           || type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST);
+                           || type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST || type == ROGUE_ROOM_EVENT);
     u32 bx, by, x, y, i, count;
 
     memset(&sPlan, 0, sizeof(sPlan));
@@ -717,6 +744,20 @@ static void BuildRoomPlan(void)
         count = 1 + (LocalRandom(&rng) % 100 < 35);
         for (i = 0; i < count; i++)
             AddObjectAnywhere(&rng, OBJ_EVENT_MON + PickFloorSpecies(&rng, TYPE_NONE), MOVEMENT_TYPE_LOOK_AROUND, Rogue_Room_EventScript_WildMon);
+        break;
+    case ROGUE_ROOM_EVENT:
+        switch (GetEventKind())
+        {
+        case EVENT_GIFT:
+            AddObject(OBJ_EVENT_GFX_OLD_MAN, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_GiftPieces);
+            break;
+        case EVENT_RARE:
+            AddObjectAnywhere(&rng, OBJ_EVENT_MON + PickRareSpecies(&rng), MOVEMENT_TYPE_LOOK_AROUND, Rogue_Room_EventScript_WildMon);
+            break;
+        case EVENT_MERCHANT:
+            AddObject(OBJ_EVENT_GFX_GENTLEMAN, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Merchant);
+            break;
+        }
         break;
     case ROGUE_ROOM_ITEM:
         count = 2 + LocalRandom(&rng) % 2;
@@ -889,6 +930,13 @@ static const u8 *const sRoomNames[ROGUE_ROOM_TYPE_COUNT] =
     [ROGUE_ROOM_REST] = COMPOUND_STRING("a place to rest"),
 };
 
+static const u8 *const sEventNames[EVENT_COUNT] =
+{
+    [EVENT_GIFT] = COMPOUND_STRING("a generous stranger"),
+    [EVENT_RARE] = COMPOUND_STRING("a rare Pokémon"),
+    [EVENT_MERCHANT] = COMPOUND_STRING("a traveling merchant"),
+};
+
 void Rogue_GetRoomIntro(void)
 {
     u32 type = GetRoomType();
@@ -910,7 +958,7 @@ void Rogue_GetRoomIntro(void)
     }
     else if (VarGet(VAR_ROGUE_ROOM_TYPE) & ROOM_TYPE_FROM_MYSTERY)
     {
-        StringCopy(gStringVar1, sRoomNames[type]);
+        StringCopy(gStringVar1, type == ROGUE_ROOM_EVENT ? sEventNames[GetEventKind()] : sRoomNames[type]);
         StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Behind the “?” door: {STR_VAR_1}!"));
     }
     else if (GetRoom() == 1)
@@ -1081,7 +1129,10 @@ void Rogue_TakeDoor(void)
     if (door == ROGUE_ROOM_MYSTERY)
     {
         rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0x3F3F);
-        type = PickWeighted(&rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 1u << ROGUE_ROOM_MYSTERY);
+        if (LocalRandom(&rng) % 100 < 35)
+            type = ROGUE_ROOM_EVENT;
+        else
+            type = PickWeighted(&rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 1u << ROGUE_ROOM_MYSTERY);
         type |= ROOM_TYPE_FROM_MYSTERY;
     }
     VarSet(VAR_ROGUE_ROOM_TYPE, type);
@@ -1094,6 +1145,29 @@ void Rogue_PrepareWildMon(void)
 
     CreateScriptedWildMon(species, GetWildLevel(), ITEM_NONE);
     PlayCry_Script(species, CRY_MODE_ENCOUNTER);
+}
+
+// A stranger's gift: two pieces, an ability from the floor's pool and a high stat
+void Rogue_GiveGiftPieces(void)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0x61F7);
+    struct GraftPiece piece;
+    enum Species species = PickRareSpecies(&rng);
+
+    piece.kind = GRAFT_PIECE_ABILITY;
+    piece.stat = 0;
+    piece.value = GetAbilityBySpecies(species, LocalRandom(&rng) % 2);
+    if (piece.value == ABILITY_NONE)
+        piece.value = GetAbilityBySpecies(species, 0);
+    AddGraftPiece(&piece);
+    GetGraftPieceName(gStringVar1, &piece);
+
+    piece.kind = GRAFT_PIECE_STAT;
+    piece.stat = LocalRandom(&rng) % NUM_STATS;
+    piece.value = 90 + LocalRandom(&rng) % 41;
+    AddGraftPiece(&piece);
+    GetGraftPieceName(gStringVar2, &piece);
+    GiveGraftBagIfMissing();
 }
 
 void Rogue_PrepareItemBall(void)

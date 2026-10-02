@@ -248,6 +248,46 @@ Rogue_Room_EventScript_UnlockShopEnd:
 	release
 	end
 
+Rogue_Room_EventScript_GiftPieces::
+	lock
+	faceplayer
+	goto_if_eq VAR_TEMP_3, 1, Rogue_Room_EventScript_GiftPiecesDone
+	msgbox Rogue_Room_Text_GiftIntro, MSGBOX_DEFAULT
+	special Rogue_GiveGiftPieces
+	setvar VAR_TEMP_3, 1
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox Rogue_Room_Text_GiftGot, MSGBOX_DEFAULT
+	waitfanfare
+	release
+	end
+Rogue_Room_EventScript_GiftPiecesDone:
+	msgbox Rogue_Room_Text_GiftDone, MSGBOX_DEFAULT
+	release
+	end
+
+Rogue_Room_EventScript_Merchant::
+	lock
+	faceplayer
+	msgbox Rogue_Room_Text_MerchantIntro, MSGBOX_DEFAULT
+	pokemart Rogue_Room_MerchantMart
+	msgbox gText_PleaseComeAgain, MSGBOX_DEFAULT
+	release
+	end
+
+	.align 2
+Rogue_Room_MerchantMart:
+	.2byte ITEM_SPLICE_BALL
+	.2byte ITEM_ULTRA_BALL
+	.2byte ITEM_RARE_CANDY
+	.2byte ITEM_ABILITY_CAPSULE
+	.2byte ITEM_LEFTOVERS
+	.2byte ITEM_LIFE_ORB
+	.2byte ITEM_CHOICE_BAND
+	.2byte ITEM_CHOICE_SPECS
+	.2byte ITEM_FOCUS_SASH
+	.2byte ITEM_EVIOLITE
+	pokemartlistend
+
 Rogue_Room_EventScript_Guide::
 	msgbox Rogue_Room_Text_Guide, MSGBOX_NPC
 	end
@@ -273,6 +313,21 @@ Rogue_Room_Text_UnlockShopIntro:
 
 Rogue_Room_Text_UnlockShopSoldOut:
 	.string "You've unlocked everything I have!$"
+
+Rogue_Room_Text_GiftIntro:
+	.string "Ah, a traveler! I've got pieces\n"
+	.string "I'll never use. Here, take these.$"
+
+Rogue_Room_Text_GiftGot:
+	.string "{PLAYER} got {STR_VAR_1}\n"
+	.string "and {STR_VAR_2}!$"
+
+Rogue_Room_Text_GiftDone:
+	.string "Put them to good use!$"
+
+Rogue_Room_Text_MerchantIntro:
+	.string "Rare goods, for those who wander\n"
+	.string "this far. Have a look.$"
 
 Rogue_Room_Text_ReceivedStarter:
 	.string "{PLAYER} received {STR_VAR_1}!$"

@@ -42,5 +42,6 @@ void Rogue_BufferBP(void);
 void Rogue_PushUnlockChoices(void);
 void Rogue_DescribeUnlock(void);
 void Rogue_BuyUnlock(void);
+void Rogue_GiveGiftPieces(void);
 
 #endif // GUARD_ROGUE_H

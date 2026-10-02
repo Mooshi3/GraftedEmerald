@@ -247,6 +247,11 @@ Debug_EventScript_Script_8::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD
 	goto Debug_EventScript_RogueWarp
 
+@ Rogue: an event room (which one depends on the room's seed; take a door to get another)
+Debug_EventScript_RogueEvent::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_EVENT | 0x100
+	goto Debug_EventScript_RogueWarp
+
 Debug_EventScript_RogueWarp::
 	warp MAP_ROGUE_ROOM, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y
 	waitstate

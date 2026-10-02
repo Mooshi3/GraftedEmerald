@@ -17,7 +17,8 @@
 #define ROGUE_ROOM_MYSTERY 6 // a "?" door: any of the above, decided when you go through
 #define ROGUE_ROOM_BOSS    7
 #define ROGUE_ROOM_START   8 // the start room's door: begins a run
-#define ROGUE_ROOM_TYPE_COUNT 9
+#define ROGUE_ROOM_EVENT   9 // only behind "?" doors: a gift, a rare Pokémon or a merchant
+#define ROGUE_ROOM_TYPE_COUNT 10
 
 // Rogue_TakeDoor's VAR_RESULT
 #define ROGUE_DOOR_NEXT_ROOM   0
