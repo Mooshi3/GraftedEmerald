@@ -506,8 +506,25 @@ enum
     WIN_DESCRIPTION,
 };
 
-#define ROW_START    GRAFT_SETTINGS_COUNT // last row: start the game
-#define ROW_COUNT    (GRAFT_SETTINGS_COUNT + 1)
+// Rogue: the rows shown. A run forces the rest (graft limits, fainting, Nuzlocke rules...) or has no
+// use for them (encounter tables, Poké Centers), so they aren't offered (SetForcedSettings, src/rogue.c).
+static const u8 sRows[] =
+{
+    GRAFT_SETTING_ROGUE_META,
+    GRAFT_SETTING_SHINY_ODDS,
+    GRAFT_SETTING_EXP_SHARE,
+    GRAFT_SETTING_ENEMY_GRAFTS,
+    GRAFT_SETTING_WILD_GRAFTS,
+    GRAFT_SETTING_BATTLE_ITEMS,
+    GRAFT_SETTING_SET_MODE,
+    GRAFT_SETTING_MONOTYPE,
+    GRAFT_SETTING_SLEEP_CLAUSE,
+    GRAFT_SETTING_INVERSE,
+    GRAFT_SETTING_SMART_WILDS,
+};
+
+#define ROW_START    ARRAY_COUNT(sRows) // last row: start the game
+#define ROW_COUNT    (ARRAY_COUNT(sRows) + 1)
 #define VISIBLE_ROWS 5
 #define CHOICE_X     120
 #define CHOICE_WIDTH 80
@@ -584,12 +601,13 @@ static void DrawRow(u32 row, u32 visibleRow, bool32 selected)
     }
     else
     {
-        bool32 active = IsSettingActive(row);
-        const u8 *value = GetGraftSettingChoiceName(row, sPendingChoices[row]);
+        u32 setting = sRows[row];
+        bool32 active = IsSettingActive(setting);
+        const u8 *value = GetGraftSettingChoiceName(setting, sPendingChoices[setting]);
         u32 width = GetStringWidth(FONT_NORMAL, value, 0);
         u32 x = CHOICE_X + (CHOICE_WIDTH - width) / 2;
 
-        AddTextPrinterParameterized3(WIN_LIST, FONT_NORMAL, 8, y, active ? sColors_Text : sColors_Inactive, TEXT_SKIP_DRAW, sGraftSettings[row].name);
+        AddTextPrinterParameterized3(WIN_LIST, FONT_NORMAL, 8, y, active ? sColors_Text : sColors_Inactive, TEXT_SKIP_DRAW, sGraftSettings[setting].name);
         AddTextPrinterParameterized3(WIN_LIST, FONT_NORMAL, x, y, active ? sColors_Value : sColors_Inactive, TEXT_SKIP_DRAW, value);
         if (selected)
         {
@@ -616,7 +634,7 @@ static void DrawList(u8 taskId)
     FillWindowPixelBuffer(WIN_DESCRIPTION, PIXEL_FILL(1));
     FillWindowPixelRect(WIN_DESCRIPTION, PIXEL_FILL(TEXT_COLOR_LIGHT_GREEN), 4, 1, 26 * 8 - 8, 1);
     AddTextPrinterParameterized3(WIN_DESCRIPTION, FONT_NORMAL, 8, 3, sColors_Label, TEXT_SKIP_DRAW,
-                                 selection == ROW_START ? sText_StartDescription : GetGraftSettingDescription(selection, sPendingChoices[selection]));
+                                 selection == ROW_START ? sText_StartDescription : GetGraftSettingDescription(sRows[selection], sPendingChoices[sRows[selection]]));
     CopyWindowToVram(WIN_DESCRIPTION, COPYWIN_GFX);
 
     Highlight(selection - scroll);
@@ -774,9 +792,10 @@ static void Task_GraftSettingsInput(u8 taskId)
     {
         *sel = (*sel < ROW_COUNT - 1) ? *sel + 1 : 0;
     }
-    else if (*sel < GRAFT_SETTINGS_COUNT && (JOY_REPEAT(DPAD_LEFT) || JOY_REPEAT(DPAD_RIGHT)))
+    else if (*sel < ROW_START && (JOY_REPEAT(DPAD_LEFT) || JOY_REPEAT(DPAD_RIGHT)))
     {
-        sPendingChoices[*sel] = CycleChoice(*sel, sPendingChoices[*sel], JOY_REPEAT(DPAD_RIGHT));
+        u32 setting = sRows[*sel];
+        sPendingChoices[setting] = CycleChoice(setting, sPendingChoices[setting], JOY_REPEAT(DPAD_RIGHT));
         PlaySE(SE_SELECT);
     }
     else

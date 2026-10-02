@@ -102,4 +102,7 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
   floors ahead's pool, or a merchant with Splice Balls, Rare Candy, held items), else a random room.
 
 Not done yet: bosses from other generations (sprites), more events, room variety (caves, water), the
-"team revives on floor clear" option, hiding settings that don't apply in Rogue.
+"team revives on floor clear" option.
+- The settings screen shows only what applies to a run (`sRows`, `src/graft_settings.c`): Unlocks, Shiny
+  Odds, EXP Share, Enemy/Wild Grafts, Battle Items, Force Set, Monotype (the starter gets the type),
+  Sleep Clause, Inverse, Smart Wilds. A run forces the rest.

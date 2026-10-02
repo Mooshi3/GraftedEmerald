@@ -1091,6 +1091,7 @@ static void GetStarterCandidates(enum Species *out)
 static void GiveStarter(enum Species species)
 {
     ScriptGiveMon(species, 5, ITEM_NONE);
+    GraftMonotypeOntoStarter(&gParties[B_TRAINER_PLAYER][0]);
     StringCopy(gStringVar1, GetSpeciesName(species));
 }
 

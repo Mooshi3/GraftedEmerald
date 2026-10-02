@@ -9,9 +9,9 @@ R() { for i in $(seq "$1"); do echo -n "press $2;wait 4;"; done; } # press key $
 intro() { echo -n "wait 900;press START;wait 120;press A;wait 200;$(for i in $(seq 35); do echo -n 'mash A 15 8;'; done)wait 60;"; }
 
 # On the settings screen: settings "ROW:RIGHTS ..." e.g. settings 5:2 7:1 (rows ascending), then start the game.
-# Rows: 0 shiny, 1 level cap, 2 exp share, 3 graft limit, 4 gates, 5 graft items, 6 harvests, 7 enemy grafts,
-# 8 wild grafts, 9 national dex, 10 nuzlocke, 11 dupes, 12 shiny clause, 13 fainting, 14 battle items,
-# 15 poke centers, 16 force set, 17 monotype
+# Rows (Rogue branch): 0 unlocks, 1 shiny, 2 exp share, 3 enemy grafts, 4 wild grafts, 5 battle items,
+# 6 force set, 7 monotype, 8 sleep clause, 9 inverse, 10 smart wilds. (The main game's scenarios use the
+# full list; they don't apply on this branch.)
 settings() {
     local row=0 r n
     for pair in "$@"; do
