@@ -725,6 +725,7 @@ enum StringID
     STRINGID_S,
     STRINGID_LOSTSOMEOFITSHP,
     STRINGID_BELCHCANTUSE,
+    STRINGID_GOTCHAPKMNHARVESTED, // GRAFT: a grafting ball broke the wild mon down
     STRINGID_COUNT
 };
 

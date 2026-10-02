@@ -215,7 +215,7 @@ BattleScript_GiveCaughtMonEnd::
 	goto BattleScript_SuccessBallThrowEnd
 
 BattleScript_GraftBallCatch::
-	printstring STRINGID_GOTCHAPKMNCAUGHTPLAYER
+	printstring STRINGID_GOTCHAPKMNHARVESTED
 	waitmessage B_WAIT_TIME_LONG
 	setbyte gBattleCommunication, 0
 	graftharvest
