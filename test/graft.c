@@ -774,6 +774,49 @@ TEST("Marts that sell Poké Balls also sell the grafting items")
     TryFreeDynamicShopItemList(&list);
 }
 
+static void SetV0BagSlot(u32 slot, u32 count)
+{
+    u8 *byte = &gSaveBlock1Ptr->graftBag[slot / 2];
+    *byte = (slot & 1) ? ((*byte & 0x0F) | (count << 4)) : ((*byte & 0xF0) | count);
+}
+
+TEST("Graft Bag: a save in the first layout keeps its pieces")
+{
+    // Layout 0 packed the kinds by the 1.17.1 counts: 848 moves, 320 abilities, 21 types, 25 natures
+    struct GraftPiece tackle = { GRAFT_PIECE_MOVE, 0, MOVE_TACKLE };
+    struct GraftPiece sturdy = { GRAFT_PIECE_ABILITY, 0, ABILITY_STURDY };
+    struct GraftPiece fire = { GRAFT_PIECE_TYPE, 0, TYPE_FIRE };
+    struct GraftPiece adamant = { GRAFT_PIECE_NATURE, 0, NATURE_ADAMANT };
+    struct GraftPiece spe130 = { GRAFT_PIECE_STAT, STAT_SPEED, 130 };
+    struct GraftPiece hp1 = { GRAFT_PIECE_STAT, STAT_HP, 1 };
+
+    memset(gSaveBlock1Ptr->graftBag, 0, sizeof(gSaveBlock1Ptr->graftBag));
+    SetV0BagSlot(MOVE_TACKLE, 3);
+    SetV0BagSlot(848 + ABILITY_STURDY, 15);
+    SetV0BagSlot(848 + 320 + TYPE_FIRE, 1);
+    SetV0BagSlot(848 + 320 + 21 + NATURE_ADAMANT, 2);
+    SetV0BagSlot(848 + 320 + 21 + 25 + STAT_SPEED * 256 + 130, 4);
+    SetV0BagSlot(848 + 320 + 21 + 25 + STAT_HP * 256 + 1, 5);
+
+    EXPECT_EQ(GetGraftPieceCount(&tackle), 3);
+    EXPECT_EQ(GetGraftPieceCount(&sturdy), 15);
+    EXPECT_EQ(GetGraftPieceCount(&fire), 1);
+    EXPECT_EQ(GetGraftPieceCount(&adamant), 2);
+    EXPECT_EQ(GetGraftPieceCount(&spe130), 4);
+    EXPECT_EQ(GetGraftPieceCount(&hp1), 5);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_MOVE), 1);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_ABILITY), 1);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_TYPE), 1);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_NATURE), 1);
+    EXPECT_EQ(GetGraftBagKindTotal(GRAFT_PIECE_STAT), 2);
+    // Moved once: using the bag again changes nothing
+    EXPECT(RemoveGraftPiece(&sturdy));
+    EXPECT_EQ(GetGraftPieceCount(&sturdy), 14);
+    EXPECT_EQ(GetGraftPieceCount(&spe130), 4);
+    ClearGraftBag();
+    EXPECT(IsGraftBagEmpty());
+}
+
 TEST("Graft Bag counts pieces per piece and caps each at 15")
 {
     struct GraftPiece tackle = { GRAFT_PIECE_MOVE, 0, MOVE_TACKLE };

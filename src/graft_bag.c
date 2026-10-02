@@ -11,12 +11,14 @@
 #include "constants/moves.h"
 #include "constants/characters.h"
 
-// Slot layout: one 4-bit count per possible piece, kinds back to back.
+// Slot layout: one 4-bit count per possible piece, kinds back to back. Each kind starts at a fixed
+// slot with room to spare, so an upstream merge that adds moves or abilities doesn't shift the
+// pieces already in saves (the asserts below fail the build if a kind outgrows its range).
 #define STAT_VALUES 256
-#define SLOTS_MOVE     MOVES_COUNT
-#define SLOTS_ABILITY  ABILITIES_COUNT
-#define SLOTS_TYPE     NUMBER_OF_MON_TYPES
-#define SLOTS_NATURE   NUM_NATURES
+#define SLOTS_MOVE     1280
+#define SLOTS_ABILITY  512
+#define SLOTS_TYPE     32
+#define SLOTS_NATURE   32
 #define SLOTS_STAT     (NUM_STATS * STAT_VALUES)
 
 #define BASE_MOVE      0
@@ -26,10 +28,25 @@
 #define BASE_STAT      (BASE_NATURE + SLOTS_NATURE)
 #define SLOTS_TOTAL    (BASE_STAT + SLOTS_STAT)
 
-STATIC_ASSERT((SLOTS_TOTAL + 1) / 2 <= sizeof(((struct SaveBlock1 *)0)->graftBag), GraftBagDoesNotFitInTheSave);
+// The bag's last byte is its layout version. 0 is the first layout (kinds packed by the counts of
+// expansion 1.17.1), which every save made before this one has; it's moved over on first use.
+#define LAYOUT_BYTE    (sizeof(((struct SaveBlock1 *)0)->graftBag) - 1)
+#define LAYOUT_CURRENT 1
+#define V0_BASE_ABILITY 848
+#define V0_BASE_TYPE    (V0_BASE_ABILITY + 320)
+#define V0_BASE_NATURE  (V0_BASE_TYPE + 21)
+#define V0_BASE_STAT    (V0_BASE_NATURE + 25)
+#define V0_SLOTS_TOTAL  (V0_BASE_STAT + SLOTS_STAT)
+
+STATIC_ASSERT(MOVES_COUNT <= SLOTS_MOVE, GraftBagMoveRangeTooSmall);
+STATIC_ASSERT(ABILITIES_COUNT <= SLOTS_ABILITY, GraftBagAbilityRangeTooSmall);
+STATIC_ASSERT(NUMBER_OF_MON_TYPES <= SLOTS_TYPE, GraftBagTypeRangeTooSmall);
+STATIC_ASSERT(NUM_NATURES <= SLOTS_NATURE, GraftBagNatureRangeTooSmall);
+STATIC_ASSERT((SLOTS_TOTAL + 1) / 2 <= LAYOUT_BYTE, GraftBagDoesNotFitInTheSave);
 
 static const u16 sKindBase[GRAFT_PIECE_KIND_COUNT] = { BASE_MOVE, BASE_ABILITY, BASE_TYPE, BASE_NATURE, BASE_STAT };
-static const u16 sKindSlots[GRAFT_PIECE_KIND_COUNT] = { SLOTS_MOVE, SLOTS_ABILITY, SLOTS_TYPE, SLOTS_NATURE, SLOTS_STAT };
+// How many of each kind's slots are real pieces (the rest of its range is room to grow)
+static const u16 sKindSlots[GRAFT_PIECE_KIND_COUNT] = { MOVES_COUNT, ABILITIES_COUNT, NUMBER_OF_MON_TYPES, NUM_NATURES, SLOTS_STAT };
 
 // Slot of a piece, or -1 if it isn't a valid piece
 static s32 GetPieceSlot(const struct GraftPiece *piece)
@@ -84,8 +101,38 @@ static void SetSlotCount(u32 slot, u32 count)
         *byte = (*byte & 0xF0) | count;
 }
 
+// Moves a layout 0 bag to the current layout. Every piece's new slot is at or after its old one,
+// so going from the last old slot down never overwrites a piece that hasn't moved yet.
+static void UpdateGraftBagLayout(void)
+{
+    s32 slot;
+
+    if (gSaveBlock1Ptr->graftBag[LAYOUT_BYTE] == LAYOUT_CURRENT)
+        return;
+    for (slot = V0_SLOTS_TOTAL - 1; slot >= 0; slot--)
+    {
+        u32 count = GetSlotCount(slot), newSlot;
+        if (count == 0)
+            continue;
+        if (slot >= V0_BASE_STAT)
+            newSlot = BASE_STAT + (slot - V0_BASE_STAT);
+        else if (slot >= V0_BASE_NATURE)
+            newSlot = BASE_NATURE + (slot - V0_BASE_NATURE);
+        else if (slot >= V0_BASE_TYPE)
+            newSlot = BASE_TYPE + (slot - V0_BASE_TYPE);
+        else if (slot >= V0_BASE_ABILITY)
+            newSlot = BASE_ABILITY + (slot - V0_BASE_ABILITY);
+        else
+            newSlot = slot;
+        SetSlotCount(slot, 0);
+        SetSlotCount(newSlot, count);
+    }
+    gSaveBlock1Ptr->graftBag[LAYOUT_BYTE] = LAYOUT_CURRENT;
+}
+
 u32 GetGraftPieceCount(const struct GraftPiece *piece)
 {
+    UpdateGraftBagLayout();
     s32 slot = GetPieceSlot(piece);
     return slot < 0 ? 0 : GetSlotCount(slot);
 }
@@ -94,6 +141,7 @@ bool32 AddGraftPiece(const struct GraftPiece *piece)
 {
     s32 slot = GetPieceSlot(piece);
     u32 count;
+    UpdateGraftBagLayout();
     if (slot < 0)
         return FALSE;
     count = GetSlotCount(slot);
@@ -107,6 +155,7 @@ bool32 RemoveGraftPiece(const struct GraftPiece *piece)
 {
     s32 slot = GetPieceSlot(piece);
     u32 count;
+    UpdateGraftBagLayout();
     if (slot < 0)
         return FALSE;
     count = GetSlotCount(slot);
@@ -119,11 +168,13 @@ bool32 RemoveGraftPiece(const struct GraftPiece *piece)
 void ClearGraftBag(void)
 {
     memset(gSaveBlock1Ptr->graftBag, 0, sizeof(gSaveBlock1Ptr->graftBag));
+    gSaveBlock1Ptr->graftBag[LAYOUT_BYTE] = LAYOUT_CURRENT;
 }
 
 bool32 IsGraftBagEmpty(void)
 {
     u32 i;
+    UpdateGraftBagLayout();
     for (i = 0; i < (SLOTS_TOTAL + 1) / 2; i++)
     {
         if (gSaveBlock1Ptr->graftBag[i] != 0)
@@ -135,6 +186,7 @@ bool32 IsGraftBagEmpty(void)
 u32 GetGraftBagPieces(u32 kind, struct GraftPiece *out, u32 maxCount)
 {
     u32 i, n = 0;
+    UpdateGraftBagLayout();
     if (kind >= GRAFT_PIECE_KIND_COUNT)
         return 0;
     for (i = 0; i < sKindSlots[kind] && n < maxCount; i++)
@@ -148,6 +200,7 @@ u32 GetGraftBagPieces(u32 kind, struct GraftPiece *out, u32 maxCount)
 u32 GetGraftBagKindTotal(u32 kind)
 {
     u32 i, n = 0;
+    UpdateGraftBagLayout();
     if (kind >= GRAFT_PIECE_KIND_COUNT)
         return 0;
     for (i = 0; i < sKindSlots[kind]; i++)
