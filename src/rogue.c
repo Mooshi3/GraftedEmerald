@@ -211,6 +211,8 @@ enum
     UNLOCK_LAST_RITES_3,
     UNLOCK_EXP_PARTY,
     UNLOCK_SWITCH_STYLE,
+    UNLOCK_GOOD_GENES,
+    UNLOCK_PEDIGREE,
     UNLOCK_SHOP_COUNT,
     UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
 };
@@ -233,6 +235,8 @@ static const struct
     [UNLOCK_LAST_RITES_2] = {COMPOUND_STRING("Last rites II"), COMPOUND_STRING("Last rites twice a floor."), 90, UNLOCK_LAST_RITES_1},
     [UNLOCK_LAST_RITES_3] = {COMPOUND_STRING("Last rites III"), COMPOUND_STRING("Last rites three times a floor."), 120, UNLOCK_LAST_RITES_2},
     [UNLOCK_EXP_PARTY] = {COMPOUND_STRING("Team training"), COMPOUND_STRING("The whole team gets EXP from\nevery battle."), 40, -1},
+    [UNLOCK_GOOD_GENES] = {COMPOUND_STRING("Good genes"), COMPOUND_STRING("More Pokémon have an egg move to\nrelearn (35% instead of 10%)."), 40, -1},
+    [UNLOCK_PEDIGREE] = {COMPOUND_STRING("Pedigree"), COMPOUND_STRING("Every Pokémon has an egg move to\nrelearn, some have two."), 80, UNLOCK_GOOD_GENES},
     [UNLOCK_SWITCH_STYLE] = {COMPOUND_STRING("Switch style"), COMPOUND_STRING("You may switch Pokémon when a\nfoe faints (Shift battle style)."), 20, -1},
     [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
 };
@@ -1535,6 +1539,28 @@ void Rogue_ResolveFainted(void)
     CompactPartySlots();
     CalculatePlayerPartyCount();
     UpdateFollowingPokemon();
+}
+
+// Egg moves in the relearner: only a few, picked by the Pokémon's personality (so the same Pokémon
+// always has the same ones). 10% have one; Good genes makes it 35%; with Pedigree every Pokémon has
+// one and 35% have two. Returns how many of eggMoves[] were written to out.
+u32 Rogue_FilterEggMoves(struct BoxPokemon *mon, const u16 *eggMoves, u16 *out)
+{
+    u32 total, count, i, hash = Mix32(GetBoxMonData(mon, MON_DATA_PERSONALITY) ^ 0xE66);
+    u32 roll = hash % 100;
+
+    for (total = 0; eggMoves[total] != MOVE_UNAVAILABLE; total++)
+        ;
+    if (total == 0)
+        return 0;
+    if (HasUnlock(UNLOCK_PEDIGREE))
+        count = 1 + (roll < 35);
+    else
+        count = roll < (HasUnlock(UNLOCK_GOOD_GENES) ? 35 : 10);
+    count = min(count, total);
+    for (i = 0; i < count; i++)
+        out[i] = eggMoves[((hash >> 8) + i) % total];
+    return count;
 }
 
 // The start room's first question (VAR_0x8004: YES/NO)

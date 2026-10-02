@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "main.h"
 #include "battle.h"
 #include "battle_util.h"
@@ -982,12 +983,11 @@ static u32 GetRelearnerEggMoves(struct BoxPokemon *mon, u16 *moves)
     while (GetSpeciesPreEvolution(species) != SPECIES_NONE)
         species = GetSpeciesPreEvolution(species);
 
-    const u16 *eggMoves = GetSpeciesEggMoves(species);
+    // ROGUE: a Pokémon only has a few of its egg moves (Rogue_FilterEggMoves)
+    u16 eggMoves[2];
+    u32 count = Rogue_FilterEggMoves(mon, GetSpeciesEggMoves(species), eggMoves);
 
-    if (eggMoves[0] == MOVE_UNAVAILABLE)
-        return 0;
-
-    for (u32 i = 0; eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    for (u32 i = 0; i < count; i++)
     {
         if (!BoxMonKnowsMove(mon, eggMoves[i]))
             moves[numMoves++] = eggMoves[i];
@@ -1116,12 +1116,10 @@ static bool32 HasRelearnerEggMoves(struct BoxPokemon *boxMon)
     while (GetSpeciesPreEvolution(species) != SPECIES_NONE)
         species = GetSpeciesPreEvolution(species);
 
-    const u16 *eggMoves = GetSpeciesEggMoves(species);
+    u16 eggMoves[2];
+    u32 count = Rogue_FilterEggMoves(boxMon, GetSpeciesEggMoves(species), eggMoves);
 
-    if (eggMoves[0] == MOVE_UNAVAILABLE)
-        return FALSE;
-
-    for (u32 i = 0; eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    for (u32 i = 0; i < count; i++)
     {
         if (!BoxMonKnowsMove(boxMon, eggMoves[i]))
             return TRUE;

@@ -4,6 +4,7 @@
 #include "constants/opponents.h"
 
 struct Trainer;
+struct BoxPokemon;
 
 #define ROGUE_ROOMS_PER_FLOOR 6 // rooms before the floor's boss
 #define ROGUE_FLOORS_NORMAL   4
@@ -16,6 +17,7 @@ const struct Trainer *Rogue_GetTrainer(u16 trainerId);
 u32 Rogue_GetRoomDoors(u8 *doors);
 u32 Rogue_GetFloorDonors(u16 *species, u32 count);
 u16 Rogue_GetBossTrainerId(void);
+u32 Rogue_FilterEggMoves(struct BoxPokemon *mon, const u16 *eggMoves, u16 *out);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {
