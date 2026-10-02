@@ -394,6 +394,15 @@ bool32 IsGraftSettingValidChoice(enum GraftSetting setting, u32 value)
     return IsValidChoice(&sGraftSettings[setting], value);
 }
 
+// National Dex On: wild Pokémon from every region show up from Route 101, so the Pokédex has its
+// National mode from the start instead of after the League. Called at new game and when the
+// Pokédex opens (so saves from before this get it too).
+void TryEnableGraftNationalDex(void)
+{
+    if (GetGraftSetting(GRAFT_SETTING_NATDEX) == GRAFT_NATDEX_ON && !IsNationalPokedexEnabled())
+        EnableNationalPokedex();
+}
+
 // Chance that a mon the player encounters is shiny, as a threshold out of 65536.
 // Only used when a mon is created; stored shininess is measured against the fixed SHINY_ODDS,
 // so changing this can never flip an existing mon.

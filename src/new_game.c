@@ -241,6 +241,7 @@ void NewGameInitData(void)
     ResetDexNav();
     ClearFollowerNPCData();
     ApplyPendingGraftSettings(); // GRAFT: after ClearSav1 wiped the vars
+    TryEnableGraftNationalDex();
 }
 
 static void ResetMiniGamesRecords(void)

@@ -841,6 +841,9 @@ static void CreateInterfaceSprites(u8 page)
 
     CreateSprite(&sScrollBarSpriteTemplate, 6, 20, 0);
 
+    if (page == PAGE_MAIN)
+        CreateGraftAreasLabelSprites(188, -1); // GRAFT: "R AREAS", above the right column
+
     if (!IsNationalPokedexEnabled() && page == PAGE_MAIN)
     {
         // Hoenn text
@@ -1192,7 +1195,7 @@ static void CreateStatBars(struct PokedexListItem *dexMon)
 
     sPokedexView->justScrolled = FALSE;
 
-    if (dexMon->owned) // Show filed bars
+    if (dexMon->seen) // GRAFT: seen is enough (harvesting never registers a catch). Show filled bars
     {
         u8 i;
         u32 width, statValue;
@@ -1473,7 +1476,7 @@ bool32 TrySwitchScreensFromAreaScreen_HGSS(u8 taskId)
         gTasks[taskId].func = Task_LoadInfoScreen;
         break;
     case 2:
-        if (sPokedexListItem->owned)
+        if (sPokedexListItem->seen) // GRAFT: seen is enough for the stats page
             gTasks[taskId].func = Task_LoadStatsScreen;
         else
             PlaySE(SE_FAILURE);
@@ -2029,7 +2032,7 @@ static void Task_LoadStatsScreen(u8 taskId)
         PrintStatsScreen_Moves_Description(taskId);
         PrintStatsScreen_Moves_BottomText(taskId);
         PrintStatsScreen_Moves_Bottom(taskId);
-        if (!sPokedexListItem->owned)
+        if (!sPokedexListItem->seen)
             LoadPalette(gPlttBufferUnfaded + 1, BG_PLTT_ID(3) + 1, 30);
         StatsPage_PrintNavigationButtons(); //sText_Stats_Buttons
         gMain.state++;
@@ -2149,7 +2152,7 @@ static void Task_HandleStatsScreenInput(u8 taskId)
     }
     if ((JOY_NEW(DPAD_RIGHT) || (JOY_NEW(R_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR)))
     {
-        if (!sPokedexListItem->owned)
+        if (!sPokedexListItem->seen)
             PlaySE(SE_FAILURE);
         else
         {
@@ -3289,7 +3292,7 @@ static void Task_HandleEvolutionScreenInput(u8 taskId)
     }
     if ((JOY_NEW(DPAD_RIGHT) || (JOY_NEW(R_BUTTON) && gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR)))
     {
-        if (!sPokedexListItem->owned)
+        if (!sPokedexListItem->seen)
             PlaySE(SE_FAILURE);
         else
         {

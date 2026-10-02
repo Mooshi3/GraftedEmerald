@@ -223,6 +223,7 @@ extern const u8 sCaughtBall_Gfx[];
 extern const struct SpriteTemplate sScrollBarSpriteTemplate;
 extern const struct SpriteTemplate sScrollArrowSpriteTemplate;
 extern const struct SpriteTemplate sSeenOwnTextSpriteTemplate;
+void CreateGraftAreasLabelSprites(s16 x, s16 y);
 extern const struct SpriteTemplate sHoennNationalTextSpriteTemplate;
 extern const struct SpriteTemplate sHoennDexSeenOwnNumberSpriteTemplate;
 extern const struct SpriteTemplate sNationalDexSeenOwnNumberSpriteTemplate;

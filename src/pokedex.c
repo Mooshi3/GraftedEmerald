@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_settings.h"
 #include "battle_main.h"
 #include "battle_script_commands.h"
 #include "bg.h"
@@ -1463,6 +1464,7 @@ void CB2_OpenPokedex(void)
     {
     case 0:
     default:
+        TryEnableGraftNationalDex(); // GRAFT: National Dex setting
         SetVBlankCallback(NULL);
         ResetOtherVideoRegisters(0);
         DmaClearLarge16(3, (void *)VRAM, VRAM_SIZE, 0x1000);
@@ -3130,6 +3132,16 @@ static void SpriteCB_ScrollArrow(struct Sprite *sprite)
         else
             sprite->invisible = TRUE;
     }
+}
+
+// GRAFT: "R AREAS" label (R opens the encounter screen). Shared with the HGSS list screen,
+// whose interface sheet has the same frames in its own style. x, y: the label's top left.
+void CreateGraftAreasLabelSprites(s16 x, s16 y)
+{
+    u8 spriteId = CreateSprite(&sInterfaceTextSpriteTemplate, x + 16, y + 8, 0);
+    StartSpriteAnim(&gSprites[spriteId], 4);
+    spriteId = CreateSprite(&sInterfaceTextSpriteTemplate, x + 33, y + 8, 0);
+    StartSpriteAnim(&gSprites[spriteId], 5);
 }
 
 static void SpriteCB_DexListInterfaceText(struct Sprite *sprite)

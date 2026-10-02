@@ -131,6 +131,7 @@ const u8 *GetGraftSettingDescription(enum GraftSetting setting, u32 value);
 const u8 *GetGraftSettingChoiceName(enum GraftSetting setting, u32 value);
 bool32 IsMonotypeChoice(u32 value);
 u32 GetPlayerShinyOddsThreshold(void);
+void TryEnableGraftNationalDex(void);
 
 // New game: the settings screen stores choices here; NewGameInitData() applies them after vars are cleared.
 void ApplyPendingGraftSettings(void);
