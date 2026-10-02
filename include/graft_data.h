@@ -56,6 +56,7 @@ u32 CountBudgetGraftsOnBoxMon(const struct BoxPokemon *boxMon);
 bool32 BoxMonHasGrafts(const struct BoxPokemon *boxMon);
 void UngraftMon(struct Pokemon *mon);
 u32 GetGraftBudget(void);
+bool32 GetGraftLimitCount(const struct BoxPokemon *boxMon, u8 graftMenuType, u32 *used, u32 *cap);
 bool8 IsGraftHusk(const struct BoxPokemon *boxMon);
 // Pointer-based setters (work on any Pokemon, not just gPlayerParty)
 void SetGraftedStatOnMon(struct Pokemon *mon, u8 statIndex, u16 statValue);

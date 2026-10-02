@@ -9059,11 +9059,33 @@ static const u8 *GetPieceRejectReason(struct Pokemon *mon)
 static void DisplayPartyPokemonDataForGraftPiece(u8 slot)
 {
     struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][slot];
+    struct PartyMenuBox *menuBox = &sPartyMenuBoxes[slot];
     const u8 *reason = GetPieceRejectReason(mon);
+    u32 used, cap;
+
     if (reason == sText_PieceKnowsMove)
+    {
         DisplayPartyPokemonDescriptionData(slot, PARTYBOX_DESC_LEARNED);
+    }
+    else if (!GetMonData(mon, MON_DATA_IS_EGG) && GetGraftLimitCount(&mon->box, GraftPieceMenuType(), &used, &cap)
+          && (reason == NULL || used >= cap))
+    {
+        // Under a graft cap the box shows how full the mon is: "ABLE 1/3", "FULL 3/3"
+        u8 *str = StringCopy(gStringVar4, reason == NULL ? COMPOUND_STRING("ABLE ") : COMPOUND_STRING("FULL "));
+        str = ConvertIntToDecimalStringN(str, used, STR_CONV_MODE_LEFT_ALIGN, 1);
+        *str++ = CHAR_SLASH;
+        ConvertIntToDecimalStringN(str, cap, STR_CONV_MODE_LEFT_ALIGN, 1);
+        DisplayPartyPokemonDescriptionData(slot, PARTYBOX_DESC_ABLE);
+        menuBox->infoRects->blitFunc(menuBox->windowId, menuBox->infoRects->descTextLeft >> 3, menuBox->infoRects->descTextTop >> 3,
+                                     ((menuBox->infoRects->descTextLeft % 8) + menuBox->infoRects->descTextWidth + 7) / 8,
+                                     ((menuBox->infoRects->descTextTop % 8) + menuBox->infoRects->descTextHeight + 7) / 8, TRUE);
+        AddTextPrinterParameterized3(menuBox->windowId, FONT_NORMAL, menuBox->infoRects->descTextLeft, menuBox->infoRects->descTextTop,
+                                     sFontColorTable[0], 0, gStringVar4);
+    }
     else
+    {
         DisplayPartyPokemonDescriptionData(slot, reason == NULL ? PARTYBOX_DESC_ABLE : PARTYBOX_DESC_NOT_ABLE);
+    }
 }
 
 static void Task_GraftPiece(u8 taskId)

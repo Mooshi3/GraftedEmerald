@@ -34,6 +34,8 @@
 #include "pokemon_storage_system.h"
 #include "pokemon_summary_screen.h"
 #include "graft_data.h"
+#include "graft_menu.h"
+#include "graft_settings.h"
 #include "pokerus.h"
 #include "region_map.h"
 #include "scanline_effect.h"
@@ -93,6 +95,7 @@
 #define PSS_DATA_WINDOW_INFO_ID 1
 #define PSS_DATA_WINDOW_INFO_ABILITY 2
 #define PSS_DATA_WINDOW_INFO_MEMO 3
+#define PSS_DATA_WINDOW_INFO_GRAFTS 4 // GRAFT: grafts used / cap, on the PROFILE bar
 
 // Dynamic fields for the Pokémon Skills page
 #define PSS_DATA_WINDOW_SKILLS_HELD_ITEM 0
@@ -265,6 +268,7 @@ static void PrintMonAbilityName(void);
 static void PrintMonAbilityDescription(void);
 static void BufferMonTrainerMemo(void);
 static void PrintMonTrainerMemo(void);
+static void PrintMonGraftCount(void);
 static void BufferNatureString(void);
 static void GetMetLevelString(u8 *);
 static bool8 DoesMonOTMatchOwner(void);
@@ -655,6 +659,15 @@ static const struct WindowTemplate sPageInfoTemplate[] =
         .paletteNum = 6,
         .baseBlock = 575,
     },
+    [PSS_DATA_WINDOW_INFO_GRAFTS] = {
+        .bg = 0,
+        .tilemapLeft = 18,
+        .tilemapTop = 2,
+        .width = 11,
+        .height = 2,
+        .paletteNum = 6,
+        .baseBlock = 683,
+    },
 };
 static const struct WindowTemplate sPageSkillsTemplate[] =
 {
@@ -748,8 +761,14 @@ static const u8 sTextColors[][3] =
     {0, 1, 2},
     {0, 3, 4},
     {0, 5, 6},
-    {0, 7, 8}
+    {0, 7, 8},
+    {0, 15, 4}, // PSS_COLOR_GRAFTED: grafted traits (palette 6 slot 15, set green in LoadGraphics)
 };
+#define PSS_COLOR_GRAFTED 13
+static const u8 sText_StatGrafts[] = _("STAT GRAFTS ");
+static const u8 sText_Grafts[] = _("GRAFTS ");
+static const u16 sGraftedTextColor = RGB(10, 29, 10);
+static const u8 sMemoGraftedNatureTextColor[] = {EXT_CTRL_CODE_BEGIN, EXT_CTRL_CODE_COLOR, 15, EXT_CTRL_CODE_BEGIN, EXT_CTRL_CODE_SHADOW, 4, EOS};
 
 static const u8 sButtons_Gfx[][4 * TILE_SIZE_4BPP] = {
     INCGFX_U8("graphics/summary_screen/a_button.png", ".4bpp"),
@@ -1471,6 +1490,7 @@ static bool8 DecompressGraphics(void)
     case 6:
         LoadPalette(gSummaryScreen_Pal, BG_PLTT_ID(0), 8 * PLTT_SIZE_4BPP);
         LoadPalette(&gPPTextPalette, BG_PLTT_ID(8) + 1, PLTT_SIZEOF(16 - 1));
+        LoadPalette(&sGraftedTextColor, BG_PLTT_ID(6) + 15, PLTT_SIZEOF(1)); // GRAFT: PSS_COLOR_GRAFTED
         sMonSummaryScreen->switchCounter++;
         break;
     case 7:
@@ -3507,6 +3527,7 @@ static void PrintInfoPageText(void)
         PrintMonAbilityDescription();
         BufferMonTrainerMemo();
         PrintMonTrainerMemo();
+        PrintMonGraftCount();
     }
 }
 
@@ -3534,10 +3555,29 @@ static void Task_PrintInfoPage(u8 taskId)
         PrintMonTrainerMemo();
         break;
     case 7:
+        PrintMonGraftCount();
+        break;
+    case 8:
         DestroyTask(taskId);
         return;
     }
     data[0]++;
+}
+
+// GRAFT: under a Graft Limit, how many grafts the mon has against its cap, on the right of the PROFILE bar
+static void PrintMonGraftCount(void)
+{
+    u32 used, cap, x;
+    u8 *end;
+
+    if (!GetGraftLimitCount(&sMonSummaryScreen->currentMon.box, GRAFT_MENU_COUNT, &used, &cap))
+        return;
+    end = StringCopy(gStringVar4, GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT) == GRAFT_LIMIT_STANDARD ? sText_StatGrafts : sText_Grafts);
+    end = ConvertIntToDecimalStringN(end, used, STR_CONV_MODE_LEFT_ALIGN, 2);
+    *end++ = CHAR_SLASH;
+    ConvertIntToDecimalStringN(end, cap, STR_CONV_MODE_LEFT_ALIGN, 2);
+    x = GetStringRightAlignXOffset(FONT_NORMAL, gStringVar4, 86);
+    PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_GRAFTS), gStringVar4, x, 1, 0, 1);
 }
 
 static void PrintMonOTName(void)
@@ -3584,7 +3624,8 @@ static void PrintMonAbilityName(void)
         ability = (enum Ability)graftedAbility;
     else
         ability = GetAbilityBySpecies(sMonSummaryScreen->summary.species, sMonSummaryScreen->summary.abilityNum);
-    PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_ABILITY), gAbilitiesInfo[ability].name, 0, 1, 0, 1);
+    PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_ABILITY), gAbilitiesInfo[ability].name, 0, 1, 0,
+                      graftedAbility != GRAFT_ABILITY_NONE ? PSS_COLOR_GRAFTED : 1);
 }
 
 static void PrintMonAbilityDescription(void)
@@ -3662,7 +3703,16 @@ static void PrintMonTrainerMemo(void)
 static void BufferNatureString(void)
 {
     struct PokemonSummaryScreenData *sumStruct = sMonSummaryScreen;
-    DynamicPlaceholderTextUtil_SetPlaceholderPtr(2, gNaturesInfo[sumStruct->summary.nature].name);
+    // GRAFT: a grafted nature (stored as the hidden nature) shows instead of the personality one, in green
+    if (sumStruct->currentMon.box.graftFlags & GRAFT_FLAG_NATURE)
+    {
+        StringCopy(StringCopy(gStringVar3, sMemoGraftedNatureTextColor), gNaturesInfo[sumStruct->summary.mintNature].name);
+        DynamicPlaceholderTextUtil_SetPlaceholderPtr(2, gStringVar3);
+    }
+    else
+    {
+        DynamicPlaceholderTextUtil_SetPlaceholderPtr(2, gNaturesInfo[sumStruct->summary.nature].name);
+    }
     DynamicPlaceholderTextUtil_SetPlaceholderPtr(5, gText_EmptyString5);
 }
 
@@ -4103,6 +4153,18 @@ static void Task_PrintBattleMoves(u8 taskId)
     data[0]++;
 }
 
+// GRAFT: was this move grafted on (it's in the grafted-move history)?
+static bool32 IsGraftedMove(enum Move move)
+{
+    u32 i;
+    for (i = 0; i < MAX_MON_MOVES; i++)
+    {
+        if (sMonSummaryScreen->currentMon.box.graftMoves[i] == move)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static void PrintMoveNameAndPP(u8 moveIndex)
 {
     u8 pp;
@@ -4116,7 +4178,7 @@ static void PrintMoveNameAndPP(u8 moveIndex)
     if (move != 0)
     {
         pp = CalculatePPWithBonus(move, summary->ppBonuses, moveIndex);
-        PrintTextOnWindowToFit(moveNameWindowId, GetMoveName(move), 0, moveIndex * 16 + 1, 0, 1);
+        PrintTextOnWindowToFit(moveNameWindowId, GetMoveName(move), 0, moveIndex * 16 + 1, 0, IsGraftedMove(move) ? PSS_COLOR_GRAFTED : 1);
         ConvertIntToDecimalStringN(gStringVar1, summary->pp[moveIndex], STR_CONV_MODE_RIGHT_ALIGN, 2);
         ConvertIntToDecimalStringN(gStringVar2, pp, STR_CONV_MODE_RIGHT_ALIGN, 2);
         DynamicPlaceholderTextUtil_Reset();

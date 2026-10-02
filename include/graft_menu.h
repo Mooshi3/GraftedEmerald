@@ -9,6 +9,7 @@
 #define GRAFT_MENU_MOVE     2
 #define GRAFT_MENU_STAT     3
 #define GRAFT_MENU_NATURE   4
+#define GRAFT_MENU_COUNT    5 // GetGraftLimitCount: the mon's general cap, not one kind's
 
 extern bool8 gGraftLearnMovePending;
 

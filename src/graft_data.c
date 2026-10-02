@@ -326,6 +326,31 @@ u32 GetGraftBudget(void)
     }
 }
 
+// The graft cap that applies to a kind of graft under the Graft Limit setting, for counters: FALSE when none
+// does (Free; Standard for anything but stats, or from 5 badges; moves never count). graftMenuType
+// GRAFT_MENU_COUNT asks for the mon's general cap (Standard: its stat grafts).
+bool32 GetGraftLimitCount(const struct BoxPokemon *boxMon, u8 graftMenuType, u32 *used, u32 *cap)
+{
+    switch (GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT))
+    {
+    case GRAFT_LIMIT_STANDARD:
+        if ((graftMenuType != GRAFT_MENU_STAT && graftMenuType != GRAFT_MENU_COUNT) || GetStatGraftCap() == 255)
+            return FALSE;
+        *used = CountStatGraftsOnBoxMon(boxMon);
+        *cap = GetStatGraftCap();
+        return TRUE;
+    case GRAFT_LIMIT_BUDGET:
+    case GRAFT_LIMIT_STRICT:
+        if (graftMenuType == GRAFT_MENU_MOVE)
+            return FALSE;
+        *used = CountBudgetGraftsOnBoxMon(boxMon);
+        *cap = GetGraftBudget();
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
 // Would this graft take a new budget slot, or replace one the mon already has?
 static bool32 GraftTakesNewSlot(const struct BoxPokemon *boxMon, u8 graftMenuType, u8 statIndex)
 {
