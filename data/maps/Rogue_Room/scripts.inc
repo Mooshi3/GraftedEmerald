@@ -109,8 +109,29 @@ Rogue_Room_EventScript_WildMon::
 	special Rogue_PrepareWildMon
 	dowildbattle
 	removeobject VAR_LAST_TALKED
+	call Rogue_Room_EventScript_CheckTeamCap
 	release
 	end
+
+@ A catch past the team cap: choose someone to let go (the new catch included)
+Rogue_Room_EventScript_CheckTeamCap::
+	special Rogue_IsTeamOverCap
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_CheckTeamCapEnd
+	msgbox Rogue_Room_Text_TeamOverCap, MSGBOX_DEFAULT
+	closemessage
+Rogue_Room_EventScript_ChooseRelease::
+	special ChoosePartyMon
+	waitstate
+	goto_if_ge VAR_0x8004, PARTY_SIZE, Rogue_Room_EventScript_ChooseRelease
+	bufferpartymonnick STR_VAR_1, VAR_0x8004
+	msgbox Rogue_Room_Text_ConfirmRelease, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, NO, Rogue_Room_EventScript_ChooseRelease
+	special Rogue_ReleasePartyMon
+	msgbox Rogue_Room_Text_Released, MSGBOX_DEFAULT
+	closemessage
+	goto Rogue_Room_EventScript_CheckTeamCap
+Rogue_Room_EventScript_CheckTeamCapEnd:
+	return
 
 Rogue_Room_EventScript_ItemBall::
 	special Rogue_PrepareItemBall
@@ -178,6 +199,16 @@ Rogue_Room_EventScript_Guide::
 
 Rogue_Room_Text_ReceivedStarter:
 	.string "{PLAYER} received {STR_VAR_1}!$"
+
+Rogue_Room_Text_TeamOverCap:
+	.string "Your team can't take more than\n"
+	.string "this. Choose one to let go.$"
+
+Rogue_Room_Text_ConfirmRelease:
+	.string "Let {STR_VAR_1} go?$"
+
+Rogue_Room_Text_Released:
+	.string "{STR_VAR_1} went back to the wild.$"
 
 Rogue_Room_Text_RunLost:
 	.string "Your team is gone…\n"

@@ -652,3 +652,5 @@ def_special Rogue_TakeDoor
 def_special Rogue_PrepareWildMon
 def_special Rogue_PrepareItemBall
 def_special Rogue_OnBossDefeated
+def_special Rogue_IsTeamOverCap
+def_special Rogue_ReleasePartyMon

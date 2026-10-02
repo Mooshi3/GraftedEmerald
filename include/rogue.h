@@ -30,5 +30,7 @@ void Rogue_TakeDoor(void);
 void Rogue_PrepareWildMon(void);
 void Rogue_PrepareItemBall(void);
 void Rogue_OnBossDefeated(void);
+void Rogue_IsTeamOverCap(void);
+void Rogue_ReleasePartyMon(void);
 
 #endif // GUARD_ROGUE_H

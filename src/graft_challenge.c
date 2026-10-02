@@ -251,7 +251,7 @@ static bool32 DoFaintingRulesApply(void)
     return TRUE;
 }
 
-static void ReleasePartyMon(u32 slot)
+void ReleasePartyMon(u32 slot)
 {
     u16 item = GetMonData(&gParties[B_TRAINER_PLAYER][slot], MON_DATA_HELD_ITEM);
     if (item != ITEM_NONE)

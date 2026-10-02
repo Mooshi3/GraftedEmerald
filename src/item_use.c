@@ -1,5 +1,4 @@
 #include "global.h"
-#include "rogue.h"
 #include "item_use.h"
 #include "graft_challenge.h"
 #include "graft_bag.h"
@@ -1191,8 +1190,6 @@ static u32 GetBallThrowableState(void)
      && IsBattlerAlive(GetBattlerAtPosition(B_POSITION_OPPONENT_RIGHT)))
         return BALL_THROW_UNABLE_TWO_MONS;
     else if (IsPlayerPartyAndPokemonStorageFull() == TRUE)
-        return BALL_THROW_UNABLE_NO_ROOM;
-    else if (Rogue_IsTeamFull() && !IsGraftingBall(gSpecialVar_ItemId))
         return BALL_THROW_UNABLE_NO_ROOM;
     else if (GetConfig(B_SEMI_INVULNERABLE_CATCH) >= GEN_4 &&  IsSemiInvulnerable(GetCatchingBattler(), CHECK_ALL))
         return BALL_THROW_UNABLE_SEMI_INVULNERABLE;

@@ -14,6 +14,7 @@ enum NuzlockeEncounterState
 };
 
 bool32 IsGraftingBall(u16 ball);
+void ReleasePartyMon(u32 slot); // held item back to the Bag
 bool32 IsNuzlockeOn(void);
 bool32 IsFamilyCaught(enum Species species);
 void Nuzlocke_OnWildEncounter(void);

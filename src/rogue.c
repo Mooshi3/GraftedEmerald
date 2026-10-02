@@ -10,11 +10,14 @@
 #include "event_object_movement.h"
 #include "fieldmap.h"
 #include "graft_bag.h"
+#include "graft_challenge.h"
+#include "party_menu.h"
 #include "graft_settings.h"
 #include "item.h"
 #include "money.h"
 #include "overworld.h"
 #include "pokemon.h"
+#include "pokemon_storage_system.h"
 #include "random.h"
 #include "script.h"
 #include "script_pokemon_util.h"
@@ -196,6 +199,22 @@ static u32 GetTeamSlots(void)
 bool32 Rogue_IsTeamFull(void)
 {
     return Rogue_IsRunActive() && CalculatePlayerPartyCount() >= GetTeamSlots();
+}
+
+// After a catch past the team cap: someone has to go (the script asks who)
+void Rogue_IsTeamOverCap(void)
+{
+    gSpecialVar_Result = Rogue_IsRunActive() && CalculatePlayerPartyCount() > GetTeamSlots();
+}
+
+void Rogue_ReleasePartyMon(void)
+{
+    if (gSpecialVar_0x8004 >= PARTY_SIZE)
+        return;
+    ReleasePartyMon(gSpecialVar_0x8004);
+    CompactPartySlots();
+    CalculatePlayerPartyCount();
+    UpdateFollowingPokemon();
 }
 
 static u32 Mix32(u32 x)
