@@ -1,4 +1,6 @@
 #include "global.h"
+#include "rogue.h"
+#include "constants/rogue.h"
 #include "clock.h"
 #include "new_game.h"
 #include "script_pokemon_util.h"
@@ -141,8 +143,8 @@ static void WarpToTruck(void)
 {
     if (IS_FRLG)
         SetWarpDestination(MAP_GROUP(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), MAP_NUM(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), WARP_ID_NONE, 6, 6);
-    else
-        SetWarpDestination(MAP_GROUP(MAP_INSIDE_OF_TRUCK), MAP_NUM(MAP_INSIDE_OF_TRUCK), WARP_ID_NONE, -1, -1);
+    else // ROGUE: a new game starts in the start room, not the truck
+        SetWarpDestination(MAP_GROUP(MAP_ROGUE_ROOM), MAP_NUM(MAP_ROGUE_ROOM), WARP_ID_NONE, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y);
     WarpIntoMap();
 }
 
@@ -242,6 +244,7 @@ void NewGameInitData(void)
     ClearFollowerNPCData();
     ApplyPendingGraftSettings(); // GRAFT: after ClearSav1 wiped the vars
     TryEnableGraftNationalDex();
+    Rogue_InitNewGame();
 }
 
 static void ResetMiniGamesRecords(void)

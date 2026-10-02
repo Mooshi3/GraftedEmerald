@@ -13,6 +13,7 @@ enum NuzlockeEncounterState
     NUZLOCKE_ENCOUNTER_DUPE,      // dupes clause: doesn't count, can't be caught
 };
 
+bool32 IsGraftingBall(u16 ball);
 bool32 IsNuzlockeOn(void);
 bool32 IsFamilyCaught(enum Species species);
 void Nuzlocke_OnWildEncounter(void);

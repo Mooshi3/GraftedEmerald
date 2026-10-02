@@ -1,4 +1,6 @@
 #include "global.h"
+#include "rogue.h"
+#include "constants/rogue.h"
 #include "overworld.h"
 #include "graft_encounter_dex.h"
 #include "battle_pyramid.h"
@@ -393,6 +395,13 @@ static void (*const sMovementStatusHandler[])(struct LinkPlayerObjectEvent *, st
 // code
 void DoWhiteOut(void)
 {
+    if (Rogue_IsRunActive())
+    {
+        Rogue_OnWhiteOut();
+        Overworld_ResetStateAfterWhiteOut();
+        WarpIntoMap();
+        return;
+    }
     RunScriptImmediately(EventScript_WhiteOut);
     HealPlayerParty();
     Overworld_ResetStateAfterWhiteOut();
@@ -745,7 +754,7 @@ void SetWarpDestinationToHealLocation(u8 healLocationId)
 
 static bool32 IsWhiteoutCutscene(void)
 {
-    if (OW_WHITEOUT_CUTSCENE < GEN_4)
+    if (OW_WHITEOUT_CUTSCENE < GEN_4 || VarGet(VAR_ROGUE_STATE) == ROGUE_STATE_RUN_LOST)
         return FALSE;
     return GetHealNpcLocalId(GetHealLocationIndexByWarpData(&gSaveBlock1Ptr->lastHealLocation)) != LOCALID_NONE;
 }
@@ -1940,10 +1949,7 @@ void CB2_NewGame(void)
     PlayTimeCounter_Start();
     ScriptContext_Init();
     UnlockPlayerFieldControls();
-    if (IS_FRLG)
-        gFieldCallback = FieldCB_WarpExitFadeFromBlack;
-    else
-        gFieldCallback = ExecuteTruckSequence;
+    gFieldCallback = FieldCB_WarpExitFadeFromBlack; // ROGUE: no truck, the game starts in the start room
     gFieldCallback2 = NULL;
     DoMapLoadLoop(&gMain.state);
     SetFieldVBlankCallback();

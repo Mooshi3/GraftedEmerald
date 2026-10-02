@@ -644,3 +644,11 @@ def_special SleepingBagSetDay
 def_special SleepingBagSetNight
 def_special GetGraftRationSplicers
 def_special ArePokeCentersClosed
+def_special Rogue_OnTransition
+def_special Rogue_OnLoad
+def_special Rogue_GetRoomIntro
+def_special Rogue_CanLeaveRoom
+def_special Rogue_TakeDoor
+def_special Rogue_PrepareWildMon
+def_special Rogue_PrepareItemBall
+def_special Rogue_OnBossDefeated

@@ -109,7 +109,7 @@ u32 Nuzlocke_GetEncounterState(void)
     return sEncounterState;
 }
 
-static bool32 IsGraftingBall(u16 ball)
+bool32 IsGraftingBall(u16 ball)
 {
     switch (ball)
     {

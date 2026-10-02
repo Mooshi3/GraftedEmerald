@@ -9323,6 +9323,17 @@
       "border_filepath": "data/layouts/OneIsland_KindleRoad_EmberSpa_Frlg/border.bin",
       "blockdata_filepath": "data/layouts/OneIsland_KindleRoad_EmberSpa_Frlg/map.bin",
       "layout_version": "frlg"
+    },
+    {
+      "id": "LAYOUT_ROGUE_ROOM",
+      "name": "Rogue_Room_Layout",
+      "width": 22,
+      "height": 18,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Petalburg",
+      "border_filepath": "data/layouts/Rogue_Room/border.bin",
+      "blockdata_filepath": "data/layouts/Rogue_Room/map.bin",
+      "layout_version": "emerald"
     }
   ]
 }
