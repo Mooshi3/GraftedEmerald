@@ -31,6 +31,7 @@ Commands, separated by `;`:
 | `press KEYS [N]` | hold for N frames (default 2). Keys: `A B START SELECT UP DOWN LEFT RIGHT L R`, combine with `+` |
 | `mash KEYS COUNT GAP` | press COUNT times, GAP frames apart |
 | `shot NAME.png` | screenshot into `out/` |
+| `reset` | soft reset; the battery save stays. With `SMOKE_ROM` pointing at another build, a state made with one ROM boots the other on its save (save-compatibility checks) |
 | `heap ADDR` | print the game's heap: each allocated block with its size and the `file:line` that allocated it, then totals. ADDR is `gHeap`'s address in hex, from `grep " gHeap$" pokeemerald.map` (drop the `0x`). |
 
 Walking one tile is `press DIR 16`. Pressing a direction for 2-4 frames only turns the player.

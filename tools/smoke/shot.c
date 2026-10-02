@@ -98,6 +98,7 @@ int main(int argc, char **argv)
         else if (sscanf(line, "shot %63s", b) == 1) shot(b);
         else if (sscanf(line, "heap %x", (unsigned *)&n) == 1) heap((uint32_t)n);
         else if (sscanf(line, "save %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_CREAT|O_TRUNC|O_RDWR); mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
+        else if (strncmp(line, "reset", 5) == 0) core->reset(core); // the battery save stays: boots this ROM on another ROM's save
         else if (sscanf(line, "load %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_RDONLY); mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
     }
     return 0;

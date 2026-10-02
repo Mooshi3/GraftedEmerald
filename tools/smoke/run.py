@@ -10,6 +10,7 @@ Commands (one per ;):
                          UP DOWN LEFT RIGHT L R, joined with + (R+START). Walking one tile = press DIR 16
   mash KEYS COUNT GAP    press KEYS COUNT times, GAP frames apart
   shot NAME.png          screenshot into out/
+  reset                  soft reset, keeping the battery save (a state made with another ROM boots this one)
   heap ADDR              print heap blocks and totals (ADDR: gHeap from pokeemerald.map, hex)
 Env: SMOKE_ROM (default ../../pokeemerald.gba), SHOTLOG=1 prints the emulator log to stderr.
 """
