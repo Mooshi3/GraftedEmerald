@@ -664,3 +664,6 @@ def_special Rogue_PushUnlockChoices
 def_special Rogue_DescribeUnlock
 def_special Rogue_BuyUnlock
 def_special Rogue_GiveGiftPieces
+def_special Rogue_FindFainted
+def_special Rogue_PushFaintedChoices
+def_special Rogue_ResolveFainted

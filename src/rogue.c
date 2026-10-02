@@ -4,6 +4,7 @@
 // it's needed instead of being stored. See docs/rogue/DESIGN.md.
 #include "global.h"
 #include "rogue.h"
+#include "battle.h"
 #include "battle_setup.h"
 #include "data.h"
 #include "event_data.h"
@@ -204,8 +205,10 @@ enum
     UNLOCK_TEAM_6,
     UNLOCK_MORE_BALLS,
     UNLOCK_REVIVES,
-    UNLOCK_AUTO_HARVEST,
+    UNLOCK_LAST_RITES_1,
     UNLOCK_START_PIECE,
+    UNLOCK_LAST_RITES_2,
+    UNLOCK_LAST_RITES_3,
     UNLOCK_SHOP_COUNT,
     UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
 };
@@ -224,11 +227,23 @@ static const struct
     [UNLOCK_TEAM_6] = {COMPOUND_STRING("6th team slot"), COMPOUND_STRING("Your team can hold 6 Pokémon."), 100, UNLOCK_TEAM_5},
     [UNLOCK_MORE_BALLS] = {COMPOUND_STRING("Ball pouch"), COMPOUND_STRING("Start with 3 more Poké Balls\nand 2 more Patch Balls."), 20, -1},
     [UNLOCK_REVIVES] = {COMPOUND_STRING("First aid"), COMPOUND_STRING("Start with 2 Revives."), 30, -1},
-    [UNLOCK_AUTO_HARVEST] = {COMPOUND_STRING("Last rites"), COMPOUND_STRING("Fainted Pokémon are broken down\ninto graft pieces, not lost."), 60, -1},
+    [UNLOCK_LAST_RITES_1] = {COMPOUND_STRING("Last rites I"), COMPOUND_STRING("Once a floor, a fainted Pokémon can\nbe broken down into graft pieces."), 60, -1},
+    [UNLOCK_LAST_RITES_2] = {COMPOUND_STRING("Last rites II"), COMPOUND_STRING("Last rites twice a floor."), 90, UNLOCK_LAST_RITES_1},
+    [UNLOCK_LAST_RITES_3] = {COMPOUND_STRING("Last rites III"), COMPOUND_STRING("Last rites three times a floor."), 120, UNLOCK_LAST_RITES_2},
     [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
 };
 
 #define RUN_FLAG_HARD (1 << 0)
+
+// Last rites used this floor: VAR_ROGUE_RUN_FLAGS bits 8-11
+#define RUN_FLAG_RITES_SHIFT 8
+#define RUN_FLAG_RITES_MASK  (0xF << RUN_FLAG_RITES_SHIFT)
+
+// A fainted Pokémon the player chose to keep (waiting for a Revive): not asked about again
+#define GRAFT_FLAG_ROGUE_KEPT (1 << 6)
+
+static void PushChoice(const u8 *name, u32 id);
+static void SetLastRitesUsed(u32 used);
 
 static bool32 IsMetaOn(void)
 {
@@ -1053,7 +1068,7 @@ static void SetForcedSettings(void)
     SetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY, GRAFT_SUPPLY_SHOP);
     SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_ANY);
     SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, FALSE);
-    SetGraftSetting(GRAFT_SETTING_FAINTING, HasUnlock(UNLOCK_AUTO_HARVEST) ? GRAFT_FAINTING_AUTO_SPLICE : GRAFT_FAINTING_RELEASE);
+    SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_NORMAL); // fainted Pokémon: Rogue_OnBattleEnd
     SetGraftSetting(GRAFT_SETTING_WILD_SPAWNS, GRAFT_WILD_SPAWNS_HIDDEN);
     SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_OFF);
 }
@@ -1138,7 +1153,7 @@ static void EndRun(bool32 won)
 
 void Rogue_TakeDoor(void)
 {
-    u32 door, type;
+    u32 door, type, floorBefore = GetFloor();
 
     BuildRoomPlan();
     door = sPlan.doors[gSpecialVar_0x8004 % NUM_DOORS];
@@ -1177,6 +1192,8 @@ void Rogue_TakeDoor(void)
         VarSet(VAR_ROGUE_FLOOR, GetFloor() + 1);
         VarSet(VAR_ROGUE_ROOM, 1);
     }
+    if (GetFloor() != floorBefore)
+        SetLastRitesUsed(0); // last rites come back each floor
     else
     {
         VarSet(VAR_ROGUE_ROOM, GetRoom() + 1);
@@ -1375,8 +1392,117 @@ void Rogue_GiveHeirloom(void)
 // ---------------------------------------------------------------------------------------------
 // The unlock shop (start room)
 
+// ---------------------------------------------------------------------------------------------
+// Fainted Pokémon. Nothing is lost on its own: after a battle the player is asked about each newly
+// fainted Pokémon: keep it (fainted, until a Revive), let it go, or give it last rites (break it
+// down into graft pieces; a few uses a floor, from the Last rites unlocks).
+
+static u32 GetLastRitesPerFloor(void)
+{
+    return HasUnlock(UNLOCK_LAST_RITES_1) + HasUnlock(UNLOCK_LAST_RITES_2) + HasUnlock(UNLOCK_LAST_RITES_3);
+}
+
+static u32 GetLastRitesLeft(void)
+{
+    u32 used = (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_RITES_MASK) >> RUN_FLAG_RITES_SHIFT;
+    u32 total = GetLastRitesPerFloor();
+    return used < total ? total - used : 0;
+}
+
+static void SetLastRitesUsed(u32 used)
+{
+    VarSet(VAR_ROGUE_RUN_FLAGS, (VarGet(VAR_ROGUE_RUN_FLAGS) & ~RUN_FLAG_RITES_MASK) | (used << RUN_FLAG_RITES_SHIFT));
+}
+
+static bool32 IsUnansweredFainted(struct Pokemon *mon)
+{
+    return GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE && !GetMonData(mon, MON_DATA_IS_EGG)
+        && GetMonData(mon, MON_DATA_HP) == 0 && !(mon->box.graftFlags & GRAFT_FLAG_ROGUE_KEPT);
+}
+
+// After a battle the player didn't lose (a whiteout ends the run instead)
+void Rogue_OnBattleEnd(void)
+{
+    u32 i;
+    if (!Rogue_IsRunActive() || gBattleOutcome == B_OUTCOME_LOST || gBattleOutcome == B_OUTCOME_DREW)
+        return;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        if (GetMonData(mon, MON_DATA_HP) != 0)
+            mon->box.graftFlags &= ~GRAFT_FLAG_ROGUE_KEPT; // revived: ask again if it faints again
+        else if (IsUnansweredFainted(mon))
+            VarSet(VAR_TEMP_4, 1); // the room asks (Rogue_Room_OnFrame)
+    }
+}
+
+// The next fainted Pokémon to ask about: VAR_0x8004 = its slot, STR_VAR_1 its name; VAR_RESULT FALSE if none
+void Rogue_FindFainted(void)
+{
+    u32 i;
+    gSpecialVar_Result = FALSE;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (IsUnansweredFainted(&gParties[B_TRAINER_PLAYER][i]))
+        {
+            gSpecialVar_0x8004 = i;
+            GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_NICKNAME, gStringVar1);
+            StringGet_Nickname(gStringVar1);
+            gSpecialVar_Result = TRUE;
+            return;
+        }
+    }
+}
+
+void Rogue_PushFaintedChoices(void)
+{
+    u8 name[32];
+    PushChoice(COMPOUND_STRING("Keep it"), ROGUE_FAINTED_KEEP);
+    PushChoice(COMPOUND_STRING("Let it go"), ROGUE_FAINTED_RELEASE);
+    if (GetLastRitesLeft() != 0)
+    {
+        ConvertIntToDecimalStringN(gStringVar2, GetLastRitesLeft(), STR_CONV_MODE_LEFT_ALIGN, 1);
+        StringExpandPlaceholders(name, COMPOUND_STRING("Last rites ({STR_VAR_2})"));
+        PushChoice(name, ROGUE_FAINTED_RITES);
+    }
+}
+
+// VAR_0x8004 = slot, VAR_0x8005 = the choice; the message goes to gStringVar4
+void Rogue_ResolveFainted(void)
+{
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][gSpecialVar_0x8004 % PARTY_SIZE];
+
+    switch (gSpecialVar_0x8005)
+    {
+    case ROGUE_FAINTED_RITES:
+        if (GetLastRitesLeft() != 0)
+        {
+            struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
+            u32 lost;
+            HarvestGraftPieces(mon, FALSE, GRAFT_HARVEST_ALL, pieces, &lost);
+            GiveGraftBagIfMissing();
+            SetLastRitesUsed(GetLastRitesPerFloor() - GetLastRitesLeft() + 1);
+            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} was broken down\ninto graft pieces."));
+            break;
+        }
+        // fall through
+    case ROGUE_FAINTED_RELEASE:
+        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} is gone for good."));
+        break;
+    default:
+        mon->box.graftFlags |= GRAFT_FLAG_ROGUE_KEPT;
+        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} stays with the team,\nwaiting for a Revive."));
+        return;
+    }
+    ReleasePartyMon(gSpecialVar_0x8004 % PARTY_SIZE);
+    CompactPartySlots();
+    CalculatePlayerPartyCount();
+    UpdateFollowingPokemon();
+}
+
 void Rogue_BufferBP(void)
 {
+    gSpecialVar_Result = IsMetaOn();
     ConvertIntToDecimalStringN(gStringVar1, gSaveBlock2Ptr->frontier.battlePoints, STR_CONV_MODE_LEFT_ALIGN, 4);
 }
 

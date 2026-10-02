@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "battle.h"
 #include "graft_data.h"
 #include "battle_anim.h"
@@ -5449,6 +5450,7 @@ static void ReturnFromBattleToOverworld(void)
 
     m4aSongNumStop(SE_LOW_HEALTH);
     Nuzlocke_OnBattleEnd();
+    Rogue_OnBattleEnd(); // ROGUE: fainted Pokémon with no Revive to save them are lost
     // GRAFT: Fainting rules (release / mark fallen); Auto-splice runs its menu, then continues itself
     if (ApplyFaintingRulesAfterBattle(gMain.savedCallback))
         return;

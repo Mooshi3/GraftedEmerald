@@ -27,6 +27,11 @@
 #define ROGUE_DOOR_ASK_MODE    3 // Hard mode is open: ask Normal or Hard (VAR_0x8005), then take the door again
 #define ROGUE_DOOR_CHOOSE_STARTER 4 // the run started; the player picks the starter
 
+// Rogue_ResolveFainted's choices
+#define ROGUE_FAINTED_KEEP    0
+#define ROGUE_FAINTED_RELEASE 1
+#define ROGUE_FAINTED_RITES   2
+
 // Where the player arrives in every room
 #define ROGUE_ENTRANCE_X 10
 #define ROGUE_ENTRANCE_Y 13

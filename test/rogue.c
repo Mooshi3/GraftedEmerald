@@ -6,6 +6,9 @@
 #include "test/test.h"
 #include "constants/rogue.h"
 #include "graft_settings.h"
+#include "graft_bag.h"
+#include "item.h"
+#include "battle.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
 
@@ -223,5 +226,95 @@ TEST("Beating the Champion pays BP and opens Hard mode")
     Rogue_OnBossDefeated();
     EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5 + 20);
     EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS), 1 << 15);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+}
+
+static void SetUpFaintedTeam(void)
+{
+    u32 hp = 0;
+    ZeroPlayerPartyMons();
+    CreateMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_WOBBUFFET, 20, 0, OTID_STRUCT_PLAYER_ID);
+    CreateMon(&gParties[B_TRAINER_PLAYER][1], SPECIES_PIKACHU, 20, 0, OTID_STRUCT_PLAYER_ID);
+    CalculateMonStats(&gParties[B_TRAINER_PLAYER][0]);
+    CalculateMonStats(&gParties[B_TRAINER_PLAYER][1]);
+    SetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP, &hp);
+    hp = GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_MAX_HP);
+    SetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_HP, &hp);
+    CalculatePlayerPartyCount();
+    ClearGraftBag();
+    ClearBag();
+}
+
+TEST("Rogue: nothing is lost on its own; the player is asked about each fainted Pokemon")
+{
+    SetRoom(99, 1, 2, ROGUE_ROOM_WILD);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    VarSet(VAR_TEMP_4, 0);
+    SetUpFaintedTeam();
+    gBattleOutcome = B_OUTCOME_WON;
+    Rogue_OnBattleEnd();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 2);
+    EXPECT_EQ(VarGet(VAR_TEMP_4), 1);
+
+    Rogue_FindFainted();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    EXPECT_EQ(gSpecialVar_0x8004, 1);
+    gSpecialVar_0x8005 = ROGUE_FAINTED_KEEP;
+    Rogue_ResolveFainted();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 2);
+    Rogue_FindFainted();
+    EXPECT_EQ(gSpecialVar_Result, FALSE); // kept: not asked again
+
+    VarSet(VAR_TEMP_4, 0);
+    Rogue_OnBattleEnd();
+    EXPECT_EQ(VarGet(VAR_TEMP_4), 0);
+
+    SetUpFaintedTeam();
+    Rogue_FindFainted();
+    gSpecialVar_0x8005 = ROGUE_FAINTED_RELEASE;
+    Rogue_ResolveFainted();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
+    EXPECT(IsGraftBagEmpty());
+}
+
+TEST("Rogue: last rites break a fainted Pokemon down, a few times a floor")
+{
+    SetRoom(99, 1, 2, ROGUE_ROOM_WILD);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    VarSet(VAR_ROGUE_UNLOCKS, 1 << 6); // Last rites I: once a floor
+
+    SetUpFaintedTeam();
+    Rogue_FindFainted();
+    gSpecialVar_0x8005 = ROGUE_FAINTED_RITES;
+    Rogue_ResolveFainted();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
+    EXPECT(!IsGraftBagEmpty());
+
+    SetUpFaintedTeam(); // used up this floor: it's a plain release
+    Rogue_FindFainted();
+    gSpecialVar_0x8005 = ROGUE_FAINTED_RITES;
+    Rogue_ResolveFainted();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
+    EXPECT(IsGraftBagEmpty());
+
+    // The next floor brings it back
+    SetRoom(99, 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    gSpecialVar_0x8004 = 0;
+    {
+        u8 doors[3];
+        u32 slot;
+        Rogue_GetRoomDoors(doors);
+        for (slot = 0; slot < 3 && doors[slot] == 0xFF; slot++)
+            ;
+        gSpecialVar_0x8004 = slot;
+    }
+    Rogue_TakeDoor();
+    EXPECT_EQ(VarGet(VAR_ROGUE_FLOOR), 2);
+    SetUpFaintedTeam();
+    Rogue_FindFainted();
+    gSpecialVar_0x8005 = ROGUE_FAINTED_RITES;
+    Rogue_ResolveFainted();
+    EXPECT(!IsGraftBagEmpty());
     VarSet(VAR_ROGUE_UNLOCKS, 0);
 }

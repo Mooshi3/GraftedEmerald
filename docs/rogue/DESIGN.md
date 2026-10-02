@@ -94,15 +94,20 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
 - Meta-progression (the **Unlocks** new-game setting, On by default): bosses pay BP (5 a floor, 10 in the
   finale, +10 for the win, doubled on Hard). A scientist in the start room sells unlocks: Starter choice
   (30), 4th/5th/6th team slot (40/70/100), Ball pouch (+3 Poké, +2 Patch Balls, 20), First aid (2 Revives,
-  30), Last rites (fainted Pokémon are auto-spliced instead of released, 60), Heirloom (start each run with
-  one of three pieces: a strong ability, a 110–140 stat, a type, 50). With Unlocks Off, all of them and
-  Hard mode are open from the start (my reading of "on/off"; Jacob to confirm).
+  30), Last rites I/II/III (60/90/120), Heirloom (start each run with one of three pieces: a strong ability,
+  a 110–140 stat, a type, 50). With Unlocks Off, all of them and Hard mode are open from the start
+  (confirmed by Jacob).
+- Fainting (decided with Jacob 2026-10-02): nothing is lost on its own. After a battle, each Pokémon that
+  fainted asks: Keep it (stays on the team, fainted, until a Revive; asked again only if it faints again
+  after being revived), Let it go, or Last rites (broken down into graft pieces). Last rites I/II/III
+  give 1/2/3 uses a floor, so grafting balls and the Splicer stay useful and killing your own Pokémon for
+  pieces stays a limited strategy. Per floor or per run is still open (one constant to change).
 
 - "?" doors: 35% an event (a stranger who gives an ability and a stat piece, one rare Pokémon from two
   floors ahead's pool, or a merchant with Splice Balls, Rare Candy, held items), else a random room.
 
-Not done yet: bosses from other generations (sprites), more events, room variety (caves, water), the
-"team revives on floor clear" option.
+Not done yet: bosses from other generations (sprites, waiting on assets), more events, room types and
+floor themes (planned).
 - The settings screen shows only what applies to a run (`sRows`, `src/graft_settings.c`): Unlocks, Shiny
   Odds, EXP Share, Enemy/Wild Grafts, Battle Items, Force Set, Monotype (the starter gets the type),
   Sleep Clause, Inverse, Smart Wilds. A run forces the rest.

@@ -20,6 +20,7 @@ Rogue_Room_OnFrame:
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_LOST, Rogue_Room_EventScript_RunLost
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_WON, Rogue_Room_EventScript_RunWon
 	map_script_2 VAR_TEMP_2, 0, Rogue_Room_EventScript_EnterRoom
+	map_script_2 VAR_TEMP_4, 1, Rogue_Room_EventScript_AskFainted
 	.2byte 0
 
 Rogue_Room_EventScript_EnterRoom::
@@ -30,6 +31,25 @@ Rogue_Room_EventScript_EnterRoom::
 	msgbox gStringVar4, MSGBOX_DEFAULT
 	releaseall
 Rogue_Room_EventScript_EnterRoomEnd:
+	end
+
+@ After a battle: what to do with each Pokémon that fainted
+Rogue_Room_EventScript_AskFainted::
+	lockall
+	setvar VAR_TEMP_4, 0
+Rogue_Room_EventScript_AskFaintedLoop:
+	special Rogue_FindFainted
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_AskFaintedEnd
+	message Rogue_Room_Text_AskFainted
+	waitmessage
+	special Rogue_PushFaintedChoices
+	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	copyvar VAR_0x8005, VAR_RESULT
+	special Rogue_ResolveFainted
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	goto Rogue_Room_EventScript_AskFaintedLoop
+Rogue_Room_EventScript_AskFaintedEnd:
+	releaseall
 	end
 
 Rogue_Room_EventScript_RunLost::
@@ -341,6 +361,10 @@ Rogue_Room_Text_ConfirmRelease:
 
 Rogue_Room_Text_Released:
 	.string "{STR_VAR_1} went back to the wild.$"
+
+Rogue_Room_Text_AskFainted:
+	.string "{STR_VAR_1} fainted.\n"
+	.string "What will you do?$"
 
 Rogue_Room_Text_RunLost:
 	.string "Your team is gone…\n"

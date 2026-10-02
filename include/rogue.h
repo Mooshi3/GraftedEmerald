@@ -43,5 +43,9 @@ void Rogue_PushUnlockChoices(void);
 void Rogue_DescribeUnlock(void);
 void Rogue_BuyUnlock(void);
 void Rogue_GiveGiftPieces(void);
+void Rogue_OnBattleEnd(void);
+void Rogue_FindFainted(void);
+void Rogue_PushFaintedChoices(void);
+void Rogue_ResolveFainted(void);
 
 #endif // GUARD_ROGUE_H
