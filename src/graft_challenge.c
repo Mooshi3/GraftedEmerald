@@ -197,6 +197,18 @@ void OnWildHarvest(void)
     }
 }
 
+// Wild Pokémon setting. Nuzlocke keeps vanilla random encounters: what you get in the grass is what
+// you get, with no scouting the area's Pokémon first.
+bool32 AreOverworldWildEncountersOn(void)
+{
+    return !IsNuzlockeOn() && GetGraftSetting(GRAFT_SETTING_WILD_SPAWNS) != GRAFT_WILD_SPAWNS_HIDDEN;
+}
+
+bool32 AreRandomWildEncountersOn(void)
+{
+    return IsNuzlockeOn() || GetGraftSetting(GRAFT_SETTING_WILD_SPAWNS) != GRAFT_WILD_SPAWNS_VISIBLE;
+}
+
 bool32 AreBattleItemsBanned(void)
 {
     return GetGraftSetting(GRAFT_SETTING_BATTLE_ITEMS);

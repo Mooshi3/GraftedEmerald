@@ -27,7 +27,16 @@ enum GraftSetting
     GRAFT_SETTING_INVERSE,
     GRAFT_SETTING_DOUBLE_WILDS,
     GRAFT_SETTING_SMART_WILDS,
+    GRAFT_SETTING_WILD_SPAWNS,
     GRAFT_SETTINGS_COUNT,
+};
+
+enum GraftWildSpawns
+{
+    GRAFT_WILD_SPAWNS_HIDDEN,  // vanilla: random encounters in grass and water
+    GRAFT_WILD_SPAWNS_VISIBLE, // wild Pokémon walk around in the overworld instead
+    GRAFT_WILD_SPAWNS_BOTH,
+    GRAFT_WILD_SPAWNS_COUNT,
 };
 
 enum GraftDoubleWilds

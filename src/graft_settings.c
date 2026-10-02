@@ -41,6 +41,7 @@ struct GraftSettingInfo
 };
 
 static const u8 *const sOffOn[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("On") };
+static const u8 *const sWildSpawnChoices[] = { COMPOUND_STRING("Hidden"), COMPOUND_STRING("Visible"), COMPOUND_STRING("Both") };
 static const u8 *const sDoubleWildChoices[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("Sometimes"), COMPOUND_STRING("Often") };
 
 static const u8 *const sShinyOddsChoices[GRAFT_SHINY_ODDS_COUNT] =
@@ -311,6 +312,12 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .description = COMPOUND_STRING("Wild Pokémon choose their moves\nlike trainers do."),
         .choices = sOffOn, .choiceCount = 2,
         .defaultChoice = FALSE, .shift = 36, .bits = 1, .requires = -1,
+    },
+    [GRAFT_SETTING_WILD_SPAWNS] = {
+        .name = COMPOUND_STRING("Wild Pokémon"),
+        .description = COMPOUND_STRING("Visible: wild Pokémon roam the\nfield. Always Hidden with Nuzlocke."),
+        .choices = sWildSpawnChoices, .choiceCount = GRAFT_WILD_SPAWNS_COUNT,
+        .defaultChoice = GRAFT_WILD_SPAWNS_HIDDEN, .shift = 37, .bits = 2, .requires = -1,
     },
 };
 

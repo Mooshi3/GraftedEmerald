@@ -1,4 +1,5 @@
 #include "global.h"
+#include "graft_challenge.h"
 #include "battle_setup.h"
 #include "bike.h"
 #include "coord_event_weather.h"
@@ -898,13 +899,16 @@ static bool32 ShouldDisableRandomEncounters(void)
     if (FlagGet(WE_FLAG_NO_ENCOUNTER))
         return TRUE;
 
-    if (!WE_VANILLA_RANDOM && WE_OW_ENCOUNTERS)
+    // GRAFT: the Wild Pokémon setting decides at runtime (WE_VANILLA_RANDOM stays TRUE)
+    if (!AreRandomWildEncountersOn())
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS && !WE_OWE_BATTLE_PIKE)
             return FALSE;
 
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR && !WE_OWE_BATTLE_PYRAMID)
             return FALSE;
+
+        return TRUE;
     }
 
     return !WE_VANILLA_RANDOM;

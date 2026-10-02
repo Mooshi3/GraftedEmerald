@@ -1,4 +1,6 @@
 #include "global.h"
+#include "graft_data.h"
+#include "graft_challenge.h"
 #include "wild_encounter_ow.h"
 #include "battle_setup.h"
 #include "battle_main.h"
@@ -239,6 +241,7 @@ void UpdateOverworldWildEncounter(void)
         return;
 
     if (!WE_OW_ENCOUNTERS
+     || !AreOverworldWildEncountersOn() // GRAFT: Wild Pokémon setting
      || FlagGet(WE_OWE_FLAG_DISABLED)
      || FlagGet(WE_FLAG_NO_ENCOUNTER)
      || FlagGet(DN_FLAG_SEARCHING)
@@ -396,6 +399,7 @@ void StartWildBattleWithOWE(struct ScriptContext *ctx)
     personality = GetMonPersonality(speciesId, gender, NATURE_RANDOM, RANDOM_UNOWN_LETTER);
     CreateMonWithIVs(&gParties[B_TRAINER_OPPONENT_A][0], speciesId, level, personality, OTID_STRUCT_PLAYER_ID, USE_RANDOM_IVS);
     GiveMonInitialMoveset(&gParties[B_TRAINER_OPPONENT_A][0]);
+    TryApplyWildGrafts(&gParties[B_TRAINER_OPPONENT_A][0]); // GRAFT: rolled when the battle starts, like a hidden encounter
     SetMonData(&gParties[B_TRAINER_OPPONENT_A][0], MON_DATA_IS_SHINY, &shiny);
     
     if (StartWildBattleWithOWE_CheckBattleFrontier(headerId))
