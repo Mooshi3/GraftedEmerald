@@ -4,6 +4,8 @@
 #include "event_data.h"
 #include "malloc.h"
 #include "shop_criteria.h"
+#include "constants/hold_effects.h"
+#include "constants/map_groups.h"
 
 static EWRAM_DATA const u16 *sDynamicShopItemListRef = NULL;
 
@@ -35,11 +37,33 @@ static bool32 ListHasItem(const u16 *list, u32 count, u16 item)
     return FALSE;
 }
 
+// GRAFT: once the player has the Mega Ring (Mt. Pyre's summit), the battle-item clerk on Lilycove
+// Department Store's 3rd floor also sells every Mega Stone.
+static bool32 IsMegaStoneMart(const u16 *list, u32 count)
+{
+    return FlagGet(FLAG_RECEIVED_MEGA_RING)
+        && gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_LILYCOVE_CITY_DEPARTMENT_STORE_3F)
+        && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_LILYCOVE_CITY_DEPARTMENT_STORE_3F)
+        && ListHasItem(list, count, ITEM_X_ATTACK);
+}
+
+static u32 CountMegaStones(void)
+{
+    u32 n = 0;
+    for (u32 item = ITEM_NONE + 1; item < ITEMS_COUNT; item++)
+    {
+        if (GetItemHoldEffect(item) == HOLD_EFFECT_MEGA_STONE)
+            n++;
+    }
+    return n;
+}
+
 void TryBuildDynamicShopItemList(const u16 **ogItemList, u16 *resultingTotal)
 {
     sDynamicShopItemListRef = *ogItemList;
 
-    u16 *list = AllocZeroed((*resultingTotal + ARRAY_COUNT(sGraftMartItems) + 1) * sizeof(u16));
+    bool32 megaStones = IsMegaStoneMart(*ogItemList, *resultingTotal);
+    u16 *list = AllocZeroed((*resultingTotal + ARRAY_COUNT(sGraftMartItems) + (megaStones ? CountMegaStones() : 0) + 1) * sizeof(u16));
     u32 overallIdx = 0, idx = 0;
     bool32 sellsBalls = FALSE;
 
@@ -64,6 +88,15 @@ void TryBuildDynamicShopItemList(const u16 **ogItemList, u16 *resultingTotal)
         {
             if (!ListHasItem(list, overallIdx, sGraftMartItems[idx]))
                 list[overallIdx++] = sGraftMartItems[idx];
+        }
+    }
+
+    if (megaStones)
+    {
+        for (u32 item = ITEM_NONE + 1; item < ITEMS_COUNT; item++)
+        {
+            if (GetItemHoldEffect(item) == HOLD_EFFECT_MEGA_STONE)
+                list[overallIdx++] = item;
         }
     }
 

@@ -125,6 +125,7 @@ MtPyre_Summit_Movement_ArchieFacePlayer2:
 MtPyre_Summit_EventScript_OldMan::
 	lock
 	faceplayer
+	call_if_unset FLAG_RECEIVED_MEGA_RING, MtPyre_Summit_EventScript_OldManMegaRing
 	goto_if_set FLAG_SOOTOPOLIS_ARCHIE_MAXIE_LEAVE, MtPyre_Summit_EventScript_OldManAfterRayquaza
 	msgbox MtPyre_Summit_Text_WillYouHearOutMyTale, MSGBOX_YESNO
 	call_if_eq VAR_RESULT, YES, MtPyre_Summit_EventScript_OldManTale
@@ -138,6 +139,17 @@ MtPyre_Summit_EventScript_OldManAfterRayquaza::
 	call_if_eq VAR_RESULT, NO, MtPyre_Summit_EventScript_DeclineOldManTale
 	release
 	end
+
+@ GRAFT: the Mega Ring, once Team Aqua has come and gone with the orb
+MtPyre_Summit_EventScript_OldManMegaRing::
+	goto_if_lt VAR_MT_PYRE_STATE, 1, MtPyre_Summit_EventScript_OldManMegaRingEnd
+	msgbox MtPyre_Summit_Text_OldManTakeThisRing, MSGBOX_DEFAULT
+	giveitem ITEM_MEGA_RING
+	goto_if_eq VAR_RESULT, FALSE, MtPyre_Summit_EventScript_OldManMegaRingEnd
+	setflag FLAG_RECEIVED_MEGA_RING
+	msgbox MtPyre_Summit_Text_OldManMegaRingExplained, MSGBOX_DEFAULT
+MtPyre_Summit_EventScript_OldManMegaRingEnd:
+	return
 
 MtPyre_Summit_EventScript_OldManTale::
 	msgbox MtPyre_Summit_Text_GroudonKyogreTale, MSGBOX_DEFAULT
@@ -578,6 +590,22 @@ MtPyre_Summit_Text_GroudonKyogreTale:
 	.string "The pair, made docile, dove deep into\n"
 	.string "the sea where eventually they\l"
 	.string "disappeared…$"
+
+MtPyre_Summit_Text_OldManTakeThisRing:
+	.string "You stood up to those men for the\n"
+	.string "sake of this mountain…\p"
+	.string "Long ago, the people who kept watch\n"
+	.string "here wore this ring.\p"
+	.string "I am too old to make use of it.\n"
+	.string "Please, take it with you.$"
+
+MtPyre_Summit_Text_OldManMegaRingExplained:
+	.string "When a POKéMON holds the MEGA STONE\n"
+	.string "meant for it, that ring calls forth\l"
+	.string "a power beyond evolution.\p"
+	.string "It is said such stones are sold in\n"
+	.string "LILYCOVE, of all places.\p"
+	.string "The world has changed… Hohoho.$"
 
 MtPyre_Summit_Text_WellThatTooIsFine:
 	.string "I see…\n"

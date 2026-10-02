@@ -40,6 +40,8 @@ struct GraftSettingInfo
     s8 requires; // setting that must be non-zero for this one to matter, or -1
 };
 
+#define GRAFT_INVERSE_SHIFT 33
+STATIC_ASSERT(GRAFT_INVERSE_SHIFT >= 32 && GRAFT_INVERSE_SHIFT < 48, InverseSettingNotInVar3);
 static const u8 *const sOffOn[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("On") };
 static const u8 *const sWildSpawnChoices[] = { COMPOUND_STRING("Hidden"), COMPOUND_STRING("Visible"), COMPOUND_STRING("Both") };
 static const u8 *const sDoubleWildChoices[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("Sometimes"), COMPOUND_STRING("Often") };
@@ -299,7 +301,7 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .name = COMPOUND_STRING("Inverse Battles"),
         .description = COMPOUND_STRING("The type chart is flipped in every\nbattle: Fire beats Water."),
         .choices = sOffOn, .choiceCount = 2,
-        .defaultChoice = FALSE, .shift = 33, .bits = 1, .requires = -1,
+        .defaultChoice = FALSE, .shift = GRAFT_INVERSE_SHIFT, .bits = 1, .requires = -1, // default must stay Off (IsGraftInverseBattleOn)
     },
     [GRAFT_SETTING_DOUBLE_WILDS] = {
         .name = COMPOUND_STRING("Double Wilds"),
@@ -344,7 +346,18 @@ static bool32 IsValidChoice(const struct GraftSettingInfo *info, u32 value)
 u32 GetGraftSetting(enum GraftSetting setting)
 {
     const struct GraftSettingInfo *info = &sGraftSettings[setting];
-    u32 raw = (GetSettingsWord() >> info->shift) & ((1 << info->bits) - 1);
+    u32 raw;
+    // Fast path (battle code asks often, e.g. Inverse Battles in every type lookup): a setting
+    // inside one var needs only that var, without the 64-bit word.
+    if ((info->shift >> 4) == ((info->shift + info->bits - 1) >> 4))
+    {
+        static const u16 sSettingsVars[] = { VAR_GRAFTED_SETTINGS, VAR_GRAFTED_SETTINGS_2, VAR_GRAFTED_SETTINGS_3 };
+        raw = (VarGet(sSettingsVars[info->shift >> 4]) >> (info->shift & 15)) & ((1 << info->bits) - 1);
+    }
+    else
+    {
+        raw = (GetSettingsWord() >> info->shift) & ((1 << info->bits) - 1);
+    }
     u32 value = raw ^ info->defaultChoice;
     return IsValidChoice(info, value) ? value : info->defaultChoice;
 }
@@ -392,6 +405,13 @@ u32 GetGraftSettingChoiceCount(enum GraftSetting setting)
 bool32 IsGraftSettingValidChoice(enum GraftSetting setting, u32 value)
 {
     return IsValidChoice(&sGraftSettings[setting], value);
+}
+
+// Inverse Battles, read straight from its bit: GetTypeModifier asks this for every type lookup,
+// thousands of times per AI decision. test/graft.c checks it agrees with GetGraftSetting.
+bool32 IsGraftInverseBattleOn(void)
+{
+    return (gSaveBlock1Ptr->vars[VAR_GRAFTED_SETTINGS_3 - VARS_START] >> (GRAFT_INVERSE_SHIFT - 32)) & 1;
 }
 
 // National Dex On: wild Pokémon from every region show up from Route 101, so the Pokédex has its

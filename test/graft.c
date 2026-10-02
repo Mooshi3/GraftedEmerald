@@ -438,7 +438,9 @@ TEST("Inverse Battles setting flips the type chart")
     gBattleTypeFlags = 0;
     EXPECT_EQ(GetTypeModifier(TYPE_FIRE, TYPE_WATER), UQ_4_12(0.5));
     EXPECT_EQ(GetTypeModifier(TYPE_NORMAL, TYPE_GHOST), UQ_4_12(0.0));
+    EXPECT(!IsGraftInverseBattleOn());
     SetGraftSetting(GRAFT_SETTING_INVERSE, TRUE);
+    EXPECT(IsGraftInverseBattleOn()); // the fast bit read agrees with the setting
     EXPECT_EQ(GetTypeModifier(TYPE_FIRE, TYPE_WATER), UQ_4_12(2.0));
     EXPECT_EQ(GetTypeModifier(TYPE_NORMAL, TYPE_GHOST), UQ_4_12(2.0));
     gBattleTypeFlags = BATTLE_TYPE_LINK; // never in link battles

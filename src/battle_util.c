@@ -8477,7 +8477,7 @@ bool32 IsInverseBattle(void)
 {
     if (B_FLAG_INVERSE_BATTLE != 0 && FlagGet(B_FLAG_INVERSE_BATTLE))
         return TRUE;
-    return GetGraftSetting(GRAFT_SETTING_INVERSE) && !(gBattleTypeFlags & BATTLE_TYPE_LINK);
+    return IsGraftInverseBattleOn() && !(gBattleTypeFlags & BATTLE_TYPE_LINK);
 }
 
 uq4_12_t GetTypeModifier(enum Type atkType, enum Type defType)

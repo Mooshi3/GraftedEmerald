@@ -83,3 +83,26 @@ SINGLE_BATTLE_TEST("Grafted signature moves on other species don't break the bat
         EXPECT_EQ(opponent->species, SPECIES_WOBBUFFET);
     }
 }
+
+// Mega Evolution is a form change: grafted types and a grafted ability stay through it
+SINGLE_BATTLE_TEST("Grafted types and ability stay through Mega Evolution")
+{
+    GIVEN {
+        PLAYER(SPECIES_CHARIZARD)
+        {
+            Item(ITEM_CHARIZARDITE_X);
+            SetGraftedTypeOnMon(gBattleTestRunnerState->data.currentMon, 1, TYPE_WATER);
+            GRAFT_ABILITY(ABILITY_INTIMIDATE);
+        }
+        OPPONENT(SPECIES_WOBBUFFET);
+    } WHEN {
+        TURN { MOVE(player, MOVE_CELEBRATE, gimmick: GIMMICK_MEGA); }
+    } SCENE {
+        ANIMATION(ANIM_TYPE_GENERAL, B_ANIM_MEGA_EVOLUTION, player);
+    } THEN {
+        EXPECT_EQ(player->species, SPECIES_CHARIZARD_MEGA_X);
+        EXPECT_EQ(player->types[0], TYPE_FIRE);
+        EXPECT_EQ(player->types[1], TYPE_WATER); // the grafted slot, not Mega X's Dragon
+        EXPECT_EQ(player->ability, ABILITY_INTIMIDATE); // not Tough Claws
+    }
+}
