@@ -983,13 +983,14 @@ static u32 GetRelearnerEggMoves(struct BoxPokemon *mon, u16 *moves)
     while (GetSpeciesPreEvolution(species) != SPECIES_NONE)
         species = GetSpeciesPreEvolution(species);
 
-    // ROGUE: a Pokémon only has a few of its egg moves (Rogue_FilterEggMoves)
-    u16 eggMoves[2];
-    u32 count = Rogue_FilterEggMoves(mon, GetSpeciesEggMoves(species), eggMoves);
+    const u16 *eggMoves = GetSpeciesEggMoves(species);
+    // GRAFT: only egg moves this mon has known (hatched with, then forgot); ROGUE: plus its
+    // few random ones (Rogue_GetEggMoveMask)
+    u32 known = GetBoxMonData(mon, MON_DATA_KNOWN_EGG_MOVES) | Rogue_GetEggMoveMask(mon, eggMoves);
 
-    for (u32 i = 0; i < count; i++)
+    for (u32 i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
     {
-        if (!BoxMonKnowsMove(mon, eggMoves[i]))
+        if ((known & (1u << i)) && !BoxMonKnowsMove(mon, eggMoves[i]))
             moves[numMoves++] = eggMoves[i];
     }
 
@@ -1116,12 +1117,12 @@ static bool32 HasRelearnerEggMoves(struct BoxPokemon *boxMon)
     while (GetSpeciesPreEvolution(species) != SPECIES_NONE)
         species = GetSpeciesPreEvolution(species);
 
-    u16 eggMoves[2];
-    u32 count = Rogue_FilterEggMoves(boxMon, GetSpeciesEggMoves(species), eggMoves);
+    const u16 *eggMoves = GetSpeciesEggMoves(species);
+    u32 known = GetBoxMonData(boxMon, MON_DATA_KNOWN_EGG_MOVES) | Rogue_GetEggMoveMask(boxMon, eggMoves);
 
-    for (u32 i = 0; i < count; i++)
+    for (u32 i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
     {
-        if (!BoxMonKnowsMove(boxMon, eggMoves[i]))
+        if ((known & (1u << i)) && !BoxMonKnowsMove(boxMon, eggMoves[i]))
             return TRUE;
     }
 

@@ -129,7 +129,11 @@ enum MonData {
     MON_DATA_GRAFT_MOVE2,
     MON_DATA_GRAFT_MOVE3,
     MON_DATA_GRAFT_MOVE4,
+    MON_DATA_KNOWN_EGG_MOVES, // GRAFT: one bit per entry of the species' egg move list the mon has known
 };
+
+// Every species' egg move list fits (Buneary's is the longest, 19); test/graft.c checks it
+#define KNOWN_EGG_MOVES_COUNT 19
 
 #define BLOCK_AI_DYNAMAX 15 // Used as dynamax level value by the AI to indicate this mon shouldn't dynamax
 
@@ -138,15 +142,15 @@ struct PokemonSubstruct0
     enum Species species:11; // 2047 species.
     enum Type teraType:5; // 30 types.
     enum Item heldItem:10; // 1023 items.
-    u16 unused_02:6;
+    u16 knownEggMoves0:6; // GRAFT: MON_DATA_KNOWN_EGG_MOVES, bits 0-5
     u32 experience:21;
     u32 nickname11:8; // 11th character of nickname.
-    u32 unused_04:3;
+    u32 knownEggMoves1:3; // bits 6-8
     u8 ppBonuses;
     u8 friendship;
     u16 pokeball:6; // 63 balls.
     u16 nickname12:8; // 12th character of nickname.
-    u16 unused_0A:2;
+    u16 knownEggMoves2:2; // bits 9-10
 };
 
 struct PokemonSubstruct1
@@ -156,9 +160,9 @@ struct PokemonSubstruct1
     enum Move move2:11; // 2047 moves.
     u16 evolutionTracker2:5;
     enum Move move3:11; // 2047 moves.
-    u16 unused_04:5;
+    u16 knownEggMoves3:5; // bits 11-15
     enum Move move4:11; // 2047 moves.
-    u16 unused_06:3;
+    u16 knownEggMoves4:3; // bits 16-18
     u16 hyperTrainedHP:1;
     u16 hyperTrainedAttack:1;
     u8 pp1:7; // 127 PP.

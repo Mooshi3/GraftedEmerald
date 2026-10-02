@@ -2063,6 +2063,71 @@ static ALWAYS_INLINE bool32 IsEggOrBadEgg(struct BoxPokemon *boxMon)
  * safety we have a GetBoxMonData macro (in include/pokemon.h) which
  * dispatches to either GetBoxMonData2 or GetBoxMonData3 based on the
  * number of arguments. */
+// GRAFT: egg moves a mon has known, so the relearner offers only those. One bit per entry of the
+// base species' egg move list, kept in the substructs' spare bits. Only call these while the
+// substructs are decrypted (inside Get/SetBoxMonData).
+static u32 GetKnownEggMoves(struct BoxPokemon *boxMon)
+{
+    struct PokemonSubstruct0 *s0 = GetSubstruct0(boxMon);
+    struct PokemonSubstruct1 *s1 = GetSubstruct1(boxMon);
+    return s0->knownEggMoves0 | (s0->knownEggMoves1 << 6) | (s0->knownEggMoves2 << 9)
+         | (s1->knownEggMoves3 << 11) | (s1->knownEggMoves4 << 16);
+}
+
+static void SetKnownEggMoves(struct BoxPokemon *boxMon, u32 mask)
+{
+    struct PokemonSubstruct0 *s0 = GetSubstruct0(boxMon);
+    struct PokemonSubstruct1 *s1 = GetSubstruct1(boxMon);
+    s0->knownEggMoves0 = mask;
+    s0->knownEggMoves1 = mask >> 6;
+    s0->knownEggMoves2 = mask >> 9;
+    s1->knownEggMoves3 = mask >> 11;
+    s1->knownEggMoves4 = mask >> 16;
+}
+
+static EWRAM_DATA u16 sEggMoveBaseSpecies[NUM_SPECIES] = {0}; // a cache for RememberEggMove
+
+// A move slot is being overwritten: if the move leaving it is one of the species' egg moves,
+// remember it for the relearner
+static void RememberEggMove(struct BoxPokemon *boxMon, u32 move)
+{
+    enum Species species = GetSubstruct0(boxMon)->species;
+    const u16 *eggMoves;
+    u32 i;
+
+    // Only mons in the player's party, where moves get forgotten (learning, the Move Deleter,
+    // move grafts); trainer and wild mons set moves often and don't need it
+    if (move == MOVE_NONE || species == SPECIES_NONE || species >= NUM_SPECIES
+     || (void *)boxMon < (void *)&gParties[B_TRAINER_PLAYER][0]
+     || (void *)boxMon >= (void *)&gParties[B_TRAINER_PLAYER][PARTY_SIZE])
+        return;
+    // Evolved species have no list of their own; finding the base form is a slow search, so
+    // only when needed
+    eggMoves = GetSpeciesEggMoves(species);
+    if (eggMoves[0] == MOVE_UNAVAILABLE)
+    {
+        // Finding the base form searches every species' evolutions: done once per species
+        if (sEggMoveBaseSpecies[species] == SPECIES_NONE)
+        {
+            enum Species base = species;
+            u32 depth;
+            // a few forms evolve into each other: stop after any real evolution chain's length
+            for (depth = 0; depth < 3 && GetSpeciesPreEvolution(base) != SPECIES_NONE; depth++)
+                base = GetSpeciesPreEvolution(base);
+            sEggMoveBaseSpecies[species] = base;
+        }
+        eggMoves = GetSpeciesEggMoves(sEggMoveBaseSpecies[species]);
+    }
+    for (i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    {
+        if (eggMoves[i] == move)
+        {
+            SetKnownEggMoves(boxMon, GetKnownEggMoves(boxMon) | (1u << i));
+            return;
+        }
+    }
+}
+
 u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
 {
     s32 i;
@@ -2451,6 +2516,9 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
                 }
             }
             break;
+        case MON_DATA_KNOWN_EGG_MOVES:
+            retVal = GetKnownEggMoves(boxMon);
+            break;
         case MON_DATA_EVOLUTION_TRACKER:
             {
                 struct PokemonSubstruct1 *substruct1 = GetSubstruct1(boxMon);
@@ -2693,15 +2761,19 @@ void SetBoxMonData(struct BoxPokemon *boxMon, s32 field, const void *dataArg)
             SET8(GetSubstruct0(boxMon)->friendship);
             break;
         case MON_DATA_MOVE1:
+            RememberEggMove(boxMon, GetSubstruct1(boxMon)->move1);
             SET16(GetSubstruct1(boxMon)->move1);
             break;
         case MON_DATA_MOVE2:
+            RememberEggMove(boxMon, GetSubstruct1(boxMon)->move2);
             SET16(GetSubstruct1(boxMon)->move2);
             break;
         case MON_DATA_MOVE3:
+            RememberEggMove(boxMon, GetSubstruct1(boxMon)->move3);
             SET16(GetSubstruct1(boxMon)->move3);
             break;
         case MON_DATA_MOVE4:
+            RememberEggMove(boxMon, GetSubstruct1(boxMon)->move4);
             SET16(GetSubstruct1(boxMon)->move4);
             break;
         case MON_DATA_PP1:
@@ -2898,6 +2970,13 @@ void SetBoxMonData(struct BoxPokemon *boxMon, s32 field, const void *dataArg)
         case MON_DATA_TERA_TYPE:
             SET8(GetSubstruct0(boxMon)->teraType);
             break;
+        case MON_DATA_KNOWN_EGG_MOVES:
+        {
+            u32 mask;
+            SET32(mask);
+            SetKnownEggMoves(boxMon, mask);
+            break;
+        }
         case MON_DATA_EVOLUTION_TRACKER:
         {
             union EvolutionTracker evoTracker;

@@ -17,7 +17,7 @@ const struct Trainer *Rogue_GetTrainer(u16 trainerId);
 u32 Rogue_GetRoomDoors(u8 *doors);
 u32 Rogue_GetFloorDonors(u16 *species, u32 count);
 u16 Rogue_GetBossTrainerId(void);
-u32 Rogue_FilterEggMoves(struct BoxPokemon *mon, const u16 *eggMoves, u16 *out);
+u32 Rogue_GetEggMoveMask(struct BoxPokemon *mon, const u16 *eggMoves);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {

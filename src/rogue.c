@@ -1541,15 +1541,15 @@ void Rogue_ResolveFainted(void)
     UpdateFollowingPokemon();
 }
 
-// Egg moves in the relearner: only a few, picked by the Pokémon's personality (so the same Pokémon
-// always has the same ones). 10% have one; Good genes makes it 35%; with Pedigree every Pokémon has
-// one and 35% have two. Returns how many of eggMoves[] were written to out.
-u32 Rogue_FilterEggMoves(struct BoxPokemon *mon, const u16 *eggMoves, u16 *out)
+// Egg moves in the relearner, on top of the ones a Pokémon has known: a few, picked by its
+// personality (so the same Pokémon always gets the same ones). 10% have one; Good genes makes it 35%;
+// with Pedigree every Pokémon has one and 35% have two. Returns a mask over eggMoves[].
+u32 Rogue_GetEggMoveMask(struct BoxPokemon *mon, const u16 *eggMoves)
 {
-    u32 total, count, i, hash = Mix32(GetBoxMonData(mon, MON_DATA_PERSONALITY) ^ 0xE66);
+    u32 total, count, i, mask = 0, hash = Mix32(GetBoxMonData(mon, MON_DATA_PERSONALITY) ^ 0xE66);
     u32 roll = hash % 100;
 
-    for (total = 0; eggMoves[total] != MOVE_UNAVAILABLE; total++)
+    for (total = 0; total < KNOWN_EGG_MOVES_COUNT && eggMoves[total] != MOVE_UNAVAILABLE; total++)
         ;
     if (total == 0)
         return 0;
@@ -1557,10 +1557,9 @@ u32 Rogue_FilterEggMoves(struct BoxPokemon *mon, const u16 *eggMoves, u16 *out)
         count = 1 + (roll < 35);
     else
         count = roll < (HasUnlock(UNLOCK_GOOD_GENES) ? 35 : 10);
-    count = min(count, total);
     for (i = 0; i < count; i++)
-        out[i] = eggMoves[((hash >> 8) + i) % total];
-    return count;
+        mask |= 1u << (((hash >> 8) + i) % total);
+    return mask;
 }
 
 // The start room's first question (VAR_0x8004: YES/NO)
