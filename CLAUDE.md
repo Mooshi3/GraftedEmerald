@@ -47,7 +47,7 @@ Graft fields live on `struct BoxPokemon`, outside the encrypted `secure` union (
 
 - **Stat graft count cap:** 1 + badges, uncapped at 5 badges (`GetStatGraftCap`). Only stats are capped.
 - **Wonder Guard husk:** Shedinja, or anything grafted with Wonder Guard, has 1 max HP and refuses HP grafts (`IsGraftHusk`, `GetStatGraftRejectReason`).
-- Form-tied abilities (Disguise, Ice Face, Schooling, Zen Mode, Stance Change, Power Construct, Multitype…) grafted onto another species do nothing: the engine gates them on the species' form table. `test/graft_battle.c` checks they don't block damage, change species or crash, and that the graft comes back on switch-in.
+- Form-tied abilities (Disguise, Ice Face, Schooling, Zen Mode, Stance Change, Power Construct, Multitype…) grafted onto another species do nothing: the engine gates them on the species' form table. `test/graft_battle.c` checks they don't block damage, change species or crash, and that the graft comes back on switch-in; it also runs species-tied signature moves (Aura Wheel, Relic Song, Hyperspace Fury, Ivy Cudgel…) from another species.
 - Hidden abilities: wild mons never give them as pieces. The **Ability Capsule** (marts, 5 badges, 10,000) picks any of the species' natural abilities, hidden included, minus the current one (Up/Down to choose, `Task_AbilityCapsule`, `src/party_menu.c`), and replaces a grafted ability; the Splicer then takes the chosen ability as a piece. That keeps hidden abilities past the halfway point.
 
 ### Enemy trainer grafts

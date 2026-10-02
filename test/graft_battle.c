@@ -52,3 +52,34 @@ SINGLE_BATTLE_TEST("Grafted form-change abilities do nothing on other species")
         EXPECT_EQ(player->ability, ability); // the graft comes back on switch-in
     }
 }
+
+// Signature moves grafted onto another species: they fail or work as a plain move, never crash
+SINGLE_BATTLE_TEST("Grafted signature moves on other species don't break the battle")
+{
+    enum Move move;
+    PARAMETRIZE { move = MOVE_AURA_WHEEL; }
+    PARAMETRIZE { move = MOVE_RELIC_SONG; }
+    PARAMETRIZE { move = MOVE_HYPERSPACE_FURY; }
+    PARAMETRIZE { move = MOVE_IVY_CUDGEL; }
+    PARAMETRIZE { move = MOVE_RAGING_BULL; }
+    PARAMETRIZE { move = MOVE_DARK_VOID; }
+    PARAMETRIZE { move = MOVE_MULTI_ATTACK; }
+    PARAMETRIZE { move = MOVE_JUDGMENT; }
+    PARAMETRIZE { move = MOVE_TECHNO_BLAST; }
+    PARAMETRIZE { move = MOVE_TERA_STARSTORM; }
+    PARAMETRIZE { move = MOVE_ORDER_UP; }
+    PARAMETRIZE { move = MOVE_GIGATON_HAMMER; }
+    PARAMETRIZE { move = MOVE_DOODLE; }
+    PARAMETRIZE { move = MOVE_REVIVAL_BLESSING; }
+    GIVEN {
+        PLAYER(SPECIES_WOBBUFFET) { Moves(move, MOVE_CELEBRATE); }
+        PLAYER(SPECIES_WYNAUT);
+        OPPONENT(SPECIES_WOBBUFFET);
+    } WHEN {
+        TURN { MOVE(player, move); }
+        TURN { MOVE(player, MOVE_CELEBRATE); }
+    } THEN {
+        EXPECT_EQ(player->species, SPECIES_WOBBUFFET);
+        EXPECT_EQ(opponent->species, SPECIES_WOBBUFFET);
+    }
+}
