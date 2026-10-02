@@ -263,7 +263,7 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
     },
     [GRAFT_SETTING_FAINTING] = {
         .name = COMPOUND_STRING("Fainting"),
-        .description = COMPOUND_STRING("What happens to fainted Pokémon\nafter battle. See the manual."),
+        .description = COMPOUND_STRING("What happens to fainted Pokémon\nafter a battle is over."),
         .choices = sFaintingChoices, .choiceDescriptions = sFaintingDescriptions, .choiceCount = GRAFT_FAINTING_COUNT,
         .defaultChoice = GRAFT_FAINTING_NORMAL, .shift = 15, .bits = 2, .requires = -1,
     },
