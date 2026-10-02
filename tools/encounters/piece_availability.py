@@ -54,10 +54,10 @@ def evolutions():
     for f in glob.glob(os.path.join(ROOT, 'src/data/pokemon/species_info/gen_*_families.h')):
         txt = open(f).read()
         for m in re.finditer(r'\[(SPECIES_\w+)\]\s*=\s*\{(.*?)\n    \},', txt, re.S):
-            ev = re.search(r'\.evolutions = EVOLUTION\((.*?)\),?\n', m.group(2), re.S)
+            ev = re.search(r'\.evolutions = EVOLUTION\((.*?)\),?\s*(?:\n|$)', m.group(2), re.S)  # often the block's last field
             if ev:
                 text = ev.group(1)
-                for kind, lvl, target, rest in re.findall(r'\{(EVO_LEVEL\w*),\s*(\d+),\s*(SPECIES_\w+)(.*?)\}(?=\s*[,)])', text, re.S):
+                for kind, lvl, target, rest in re.findall(r'\{(EVO_LEVEL\w*),\s*(\d+),\s*(SPECIES_\w+)(.*?)\}(?=\s*[,)]|\s*$)', text, re.S):
                     if int(lvl) > 0 and 'CONDITIONS' not in rest:  # plain level-up (not a move, item or time)
                         out.setdefault(m.group(1), []).append((int(lvl), target))
                 # Shedinja-style: a second mon appears when the first evolves
