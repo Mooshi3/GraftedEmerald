@@ -671,3 +671,4 @@ def_special Rogue_SetMetaProgression
 def_special Rogue_PushChallengeChoices
 def_special Rogue_PushTypeChoices
 def_special Rogue_OpenDoors
+def_special Rogue_WarpToRoom, waitstate=1

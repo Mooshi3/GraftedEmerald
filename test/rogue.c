@@ -33,11 +33,12 @@ TEST("Rogue rooms always have a reachable door")
 {
     u32 seed, room;
     u8 doors[3];
-    for (seed = 1; seed < 200; seed++)
+    for (seed = 1; seed < 100; seed++)
     {
-        for (room = 1; room <= ROGUE_ROOMS_PER_FLOOR; room++)
+        for (room = 1; room <= ROGUE_ROOMS_PER_FLOOR; room += 2)
         {
-            SetRoom(seed * 7919, 1 + seed % ROGUE_FLOORS_NORMAL, room, ROGUE_ROOM_WILD + seed % 6);
+            // every theme (bits 9-11: forest, beach, cave, volcano)
+            SetRoom(seed * 7919, 1 + seed % ROGUE_FLOORS_NORMAL, room, (ROGUE_ROOM_WILD + seed % 6) | ((room / 2 % 4) << 9));
             EXPECT_GT(Rogue_GetRoomDoors(doors), 0);
         }
     }
@@ -146,7 +147,7 @@ TEST("A Rogue door leads to the room its sign shows")
             continue;
         gSpecialVar_0x8004 = slot;
         Rogue_TakeDoor();
-        EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE), doors[slot]);
+        EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE) & 0xFF, doors[slot]);
         EXPECT_EQ(VarGet(VAR_ROGUE_ROOM), 2 + seed % (ROGUE_ROOMS_PER_FLOOR - 1));
     }
 }

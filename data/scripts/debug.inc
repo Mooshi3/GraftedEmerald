@@ -252,9 +252,21 @@ Debug_EventScript_RogueEvent::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_EVENT | 0x100
 	goto Debug_EventScript_RogueWarp
 
+@ Rogue: a wild room of a theme (VAR_ROGUE_ROOM_TYPE bits 9-11)
+Debug_EventScript_RogueBeach::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x200
+	goto Debug_EventScript_RogueWarp
+
+Debug_EventScript_RogueCave::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x400
+	goto Debug_EventScript_RogueWarp
+
+Debug_EventScript_RogueVolcano::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x600
+	goto Debug_EventScript_RogueWarp
+
 Debug_EventScript_RogueWarp::
-	warp MAP_ROGUE_ROOM, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y
-	waitstate
+	special Rogue_WarpToRoom
 	release
 	end
 

@@ -106,8 +106,7 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
 - "?" doors: 35% an event (a stranger who gives an ability and a stat piece, one rare Pokémon from two
   floors ahead's pool, or a merchant with Splice Balls, Rare Candy, held items), else a random room.
 
-Not done yet: bosses from other generations (sprites, waiting on assets), more events, room types and
-floor themes (planned).
+Not done yet: bosses from other generations (sprites, waiting on assets), more events.
 - No settings screen (Jacob 2026-10-02). A new save's start room asks once: meta-progression yes/no
   (no = everything unlocked). A run sets the rest: shiny odds 1/512, EXP Share Item (Party with the Team
   training unlock), Enemy Grafts Normal (More on Hard), Wild Grafts Off, battle items allowed, Set style
@@ -122,3 +121,21 @@ floor themes (planned).
 - Trainers carry 1 Pokémon early (2 in a floor's second half), more on later floors.
 - Guarded rooms: trainer and boss rooms, and half the wild and item rooms, have a trainer; small trees
   block every door until the trainer is beaten (interacting says so). So a floor has several fights.
+
+### Room themes (2026-10-02)
+
+- Four themes: **forest**, **beach** (sand and a strip of sea along one side, few trees), **cave** (Granite
+  Cave walls, rocks, cave mouths as doors) and **volcano** (Fiery Path walls, corridors as doors). Each floor
+  has a home theme (floor 1 forest, 2 beach, 3 cave, 4 volcano, then around again) that a door's room takes
+  55% of the time, 15% for each other theme.
+- A door's opening shows the next room's theme: sand, cave rock, volcanic ground or grass in front of it.
+- Wild Pokémon fit the theme 80% of the time: forest Grass/Bug/Normal/Flying/Fairy/Poison, beach
+  Water/Ground/Flying/Fighting, cave Rock/Ground/Steel/Dark/Ghost/Poison, volcano Fire/Rock/Ground/Dragon.
+- Shops and rests are a Poké Mart or a Pokémon Center standing in a forest or beach room; walk in to buy or
+  heal, walk out to the same room.
+- Bosses fight in an Elite Four room that fits their type (Sidney's, Phoebe's, Glacia's or Drake's); the
+  door behind them opens once they're beaten, the only way on to the next floor.
+- Technical: the theme is `VAR_ROGUE_ROOM_TYPE` bits 9-11. Forest and beach are `Rogue_Room`; caves and
+  volcanoes have their own maps (`Rogue_Cave`, `Rogue_Volcano`) with the same size, inside and door columns;
+  `Rogue_WarpToRoom` picks the map. Debug menu > Scripts has Beach / Cave / Volcano jumps.
+  `tools/rogue/render.py` draws a layout or a tileset sheet with metatile ids, for finding tiles.

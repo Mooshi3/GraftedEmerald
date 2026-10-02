@@ -625,7 +625,15 @@
     "NavelRock_Down11",
     "NavelRock_Bottom",
     "TrainerHill_Elevator",
-    "Rogue_Room"
+    "Rogue_Room",
+    "Rogue_Cave",
+    "Rogue_Volcano",
+    "Rogue_Arena_Sidney",
+    "Rogue_Arena_Phoebe",
+    "Rogue_Arena_Glacia",
+    "Rogue_Arena_Drake",
+    "Rogue_Mart",
+    "Rogue_Center"
   ],
   "gMapGroup_IndoorRoute104Prototype": [
     "Route104_Prototype",

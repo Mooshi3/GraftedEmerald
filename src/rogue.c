@@ -9,6 +9,7 @@
 #include "data.h"
 #include "event_data.h"
 #include "event_object_movement.h"
+#include "field_screen_effect.h"
 #include "fieldmap.h"
 #include "graft_bag.h"
 #include "graft_challenge.h"
@@ -75,6 +76,58 @@ extern const u8 Rogue_Room_EventScript_Merchant[];
 
 static const u8 sDoorBlockX[NUM_DOORS] = {3, 5, 7};
 
+// The inside of every room map, in tiles
+#define INNER_X_MIN 4
+#define INNER_X_MAX 17
+#define INNER_Y_MIN 4
+#define INNER_Y_MAX 13
+
+// Room themes: VAR_ROGUE_ROOM_TYPE bits 9-11
+enum
+{
+    BIOME_FOREST,
+    BIOME_BEACH,
+    BIOME_CAVE,
+    BIOME_VOLCANO,
+    BIOME_COUNT,
+};
+#define ROOM_BIOME_SHIFT 9
+#define ROOM_BIOME_MASK  (7 << ROOM_BIOME_SHIFT)
+
+enum
+{
+    ROOM_KIND_OUTDOOR, // MAP_ROGUE_ROOM: forest or beach
+    ROOM_KIND_WALLED,  // MAP_ROGUE_CAVE / MAP_ROGUE_VOLCANO
+    ROOM_KIND_ARENA,   // a boss's Elite Four room
+};
+
+enum
+{
+    SEA_NONE,
+    SEA_LEFT,
+    SEA_RIGHT,
+};
+
+// Shop and rest rooms: a Mart or a Pokémon Center (4x4 metatiles, the door on the bottom row's
+// second column; Rogue_Room's warp events sit on the two doors)
+enum
+{
+    BUILDING_NONE,
+    BUILDING_MART,
+    BUILDING_CENTER,
+};
+#define BUILDING_W 4
+#define BUILDING_H 4
+#define BUILDING_Y 7
+#define MART_X 9
+#define CENTER_BUILDING_X 10
+
+// Elite Four rooms: the way in at the bottom, the boss in the middle
+#define ARENA_ENTRANCE_X 6
+#define ARENA_ENTRANCE_Y 12
+#define ARENA_BOSS_X 6
+#define ARENA_BOSS_Y 5
+
 // Metatiles (gTileset_General), with collision and elevation as Route 101 uses them
 #define TILE_TREE(id)  ((id) | (1 << MAPGRID_COLLISION_SHIFT))
 #define TILE_GROUND(id) ((id) | (3 << MAPGRID_ELEVATION_SHIFT))
@@ -82,7 +135,6 @@ enum
 {
     GROUND_GRASS,
     GROUND_TALL_GRASS,
-    GROUND_PATH,
 };
 
 struct RoomObject
@@ -98,7 +150,14 @@ struct RoomObject
 
 struct RoomPlan
 {
+    u8 kind;
+    u8 biome;
+    u8 seaSide;
+    u8 building;
+    u8 buildingX;
+    u8 doorBiomes[NUM_DOORS]; // the theme of the room behind each door
     bool8 tree[BLOCKS_H][BLOCKS_W];
+    bool8 rock[ROOM_H][ROOM_W]; // walled rooms' rocks
     bool8 water[BLOCKS_H][BLOCKS_W];
     u8 ground[ROOM_H][ROOM_W];
     u8 doors[NUM_DOORS]; // room type behind each door, or NO_DOOR
@@ -259,6 +318,7 @@ static const struct
 #define GRAFT_FLAG_ROGUE_KEPT (1 << 6)
 
 static void PushChoice(const u8 *name, u32 id);
+static u32 PickWeighted(rng_value_t *rng, const u8 *weights, u32 count, u32 excludeMask);
 static void SetLastRitesUsed(u32 used);
 
 static bool32 IsMetaOn(void)
@@ -542,6 +602,139 @@ static enum Species PickStarter(rng_value_t *rng)
 }
 
 // ---------------------------------------------------------------------------------------------
+// Room themes and maps
+//
+// A room is outdoors (forest or beach: MAP_ROGUE_ROOM, trees in 2x2 blocks), walled (cave or volcano:
+// their own maps, a rectangle of rock walls) or a boss arena (an Elite Four room). All the room maps
+// are 22x18 with the same inside (tiles 4..17 x 4..13), entrance (10,13) and door columns 6, 10, 14.
+
+static const u8 sFloorHomeBiome[] = {BIOME_FOREST, BIOME_BEACH, BIOME_CAVE, BIOME_VOLCANO};
+
+static u32 GetRoomBiome(void)
+{
+    if (VarGet(VAR_ROGUE_STATE) != ROGUE_STATE_RUN)
+        return BIOME_FOREST;
+    return (VarGet(VAR_ROGUE_ROOM_TYPE) & ROOM_BIOME_MASK) >> ROOM_BIOME_SHIFT;
+}
+
+static bool32 IsBuildingRoom(u32 type)
+{
+    return type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST;
+}
+
+// Each floor has a home theme most rooms take; buildings stand outdoors
+static u32 PickBiome(rng_value_t *rng, u32 type, u32 floor)
+{
+    u8 weights[BIOME_COUNT] = {15, 15, 15, 15};
+    u32 home = sFloorHomeBiome[(max(floor, 1) - 1) % ARRAY_COUNT(sFloorHomeBiome)];
+
+    weights[home] = 55;
+    if (IsBuildingRoom(type))
+    {
+        weights[BIOME_CAVE] = weights[BIOME_VOLCANO] = 0;
+        if (home == BIOME_BEACH)
+            weights[BIOME_FOREST] = 15;
+        else
+            weights[BIOME_BEACH] = 15;
+    }
+    return PickWeighted(rng, weights, BIOME_COUNT, 0);
+}
+
+static u32 GetRoomKind(void)
+{
+    if (VarGet(VAR_ROGUE_STATE) == ROGUE_STATE_RUN && GetRoomType() == ROGUE_ROOM_BOSS)
+        return ROOM_KIND_ARENA;
+    switch (GetRoomBiome())
+    {
+    case BIOME_CAVE:
+    case BIOME_VOLCANO:
+        return ROOM_KIND_WALLED;
+    }
+    return ROOM_KIND_OUTDOOR;
+}
+
+// Wild Pokémon fit the room's theme (most of the time)
+static enum Species PickRoomSpecies(rng_value_t *rng)
+{
+    static const u8 sForest[]  = {TYPE_GRASS, TYPE_BUG, TYPE_NORMAL, TYPE_FLYING, TYPE_FAIRY, TYPE_POISON};
+    static const u8 sBeach[]   = {TYPE_WATER, TYPE_GROUND, TYPE_FLYING, TYPE_FIGHTING};
+    static const u8 sCave[]    = {TYPE_ROCK, TYPE_GROUND, TYPE_STEEL, TYPE_DARK, TYPE_GHOST, TYPE_POISON};
+    static const u8 sVolcano[] = {TYPE_FIRE, TYPE_ROCK, TYPE_GROUND, TYPE_DRAGON};
+    const u8 *types;
+    u32 count;
+
+    if (LocalRandom(rng) % 100 >= 80)
+        return PickFloorSpecies(rng, TYPE_NONE);
+    switch (GetRoomBiome())
+    {
+    case BIOME_BEACH:   types = sBeach;   count = ARRAY_COUNT(sBeach);   break;
+    case BIOME_CAVE:    types = sCave;    count = ARRAY_COUNT(sCave);    break;
+    case BIOME_VOLCANO: types = sVolcano; count = ARRAY_COUNT(sVolcano); break;
+    default:            types = sForest;  count = ARRAY_COUNT(sForest);  break;
+    }
+    return PickFloorSpecies(rng, types[LocalRandom(rng) % count]);
+}
+
+// Bosses fight in an Elite Four room that fits their type
+static u16 GetArenaMap(enum Type type)
+{
+    switch (type)
+    {
+    case TYPE_GHOST:
+    case TYPE_PSYCHIC:
+    case TYPE_FAIRY:
+        return MAP_ROGUE_ARENA_PHOEBE;
+    case TYPE_ICE:
+    case TYPE_WATER:
+    case TYPE_FLYING:
+        return MAP_ROGUE_ARENA_GLACIA;
+    case TYPE_DARK:
+    case TYPE_FIGHTING:
+    case TYPE_POISON:
+    case TYPE_NORMAL:
+        return MAP_ROGUE_ARENA_SIDNEY;
+    default:
+        return MAP_ROGUE_ARENA_DRAKE;
+    }
+}
+
+static u16 GetRoomMap(void)
+{
+    switch (GetRoomKind())
+    {
+    case ROOM_KIND_ARENA:
+        return GetArenaMap(GetCurrentBoss()->type);
+    case ROOM_KIND_WALLED:
+        return GetRoomBiome() == BIOME_CAVE ? MAP_ROGUE_CAVE : MAP_ROGUE_VOLCANO;
+    }
+    return MAP_ROGUE_ROOM;
+}
+
+static bool32 IsRogueMap(u32 mapGroup, u32 mapNum)
+{
+    static const u16 sMaps[] = {MAP_ROGUE_ROOM, MAP_ROGUE_CAVE, MAP_ROGUE_VOLCANO, MAP_ROGUE_ARENA_SIDNEY,
+                                MAP_ROGUE_ARENA_PHOEBE, MAP_ROGUE_ARENA_GLACIA, MAP_ROGUE_ARENA_DRAKE};
+    u32 i;
+    for (i = 0; i < ARRAY_COUNT(sMaps); i++)
+    {
+        if (MAP_GROUP(sMaps[i]) == mapGroup && MAP_NUM(sMaps[i]) == mapNum)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// The door script's warp: to the map of the room the run is now in
+void Rogue_WarpToRoom(void)
+{
+    u16 map = GetRoomMap();
+    bool32 arena = (GetRoomKind() == ROOM_KIND_ARENA);
+    SetWarpDestination(MAP_GROUP(map), MAP_NUM(map), WARP_ID_NONE,
+                       arena ? ARENA_ENTRANCE_X : ROGUE_ENTRANCE_X, arena ? ARENA_ENTRANCE_Y : ROGUE_ENTRANCE_Y);
+    DoWarp();
+    ResetInitialPlayerAvatarState();
+}
+
+// ---------------------------------------------------------------------------------------------
 // Room plans
 
 static bool32 IsTreeBlock(s32 bx, s32 by)
@@ -567,36 +760,104 @@ static bool32 IsTreeTile(s32 x, s32 y)
 {
     if (x < 0 || x >= ROOM_W || y < 0 || y >= ROOM_H)
         return TRUE;
-    return sPlan.tree[y / 2][x / 2];
+    return sPlan.kind == ROOM_KIND_OUTDOOR && sPlan.tree[y / 2][x / 2];
 }
 
+// Beach: a strip of sea along one side (the sea tile and its shore, which can't be walked on)
+static bool32 IsSeaTile(s32 x, s32 y)
+{
+    if (sPlan.seaSide == SEA_NONE || y < INNER_Y_MIN || y > INNER_Y_MAX)
+        return FALSE;
+    if (sPlan.seaSide == SEA_LEFT)
+        return x == INNER_X_MIN || x == INNER_X_MIN + 1;
+    return x == INNER_X_MAX || x == INNER_X_MAX - 1;
+}
+
+static bool32 IsBuildingTile(s32 x, s32 y)
+{
+    if (sPlan.building == BUILDING_NONE)
+        return FALSE;
+    return x >= sPlan.buildingX && x < sPlan.buildingX + BUILDING_W
+        && y > BUILDING_Y && y < BUILDING_Y + BUILDING_H; // the roof's top row overhangs walkable ground
+}
+
+static u32 GetBuildingDoorX(void)
+{
+    return sPlan.buildingX + 1;
+}
+
+static u32 GetDoorX(u32 door)
+{
+    return sDoorBlockX[door] * 2;
+}
+
+// Walled rooms: the ways through the top wall (a cave mouth's middle, or a volcano corridor)
+static bool32 IsWallOpening(s32 x, s32 y)
+{
+    u32 i;
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        s32 gx = GetDoorX(i);
+        if (sPlan.doors[i] == NO_DOOR || y > INNER_Y_MIN - 1)
+            continue;
+        if (sPlan.biome == BIOME_CAVE ? (x == gx && y == INNER_Y_MIN - 1) : (x >= gx && x <= gx + 1))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static bool32 IsBlockedTile(s32 x, s32 y)
+{
+    if (x < 0 || x >= ROOM_W || y < 0 || y >= ROOM_H)
+        return TRUE;
+    if (sPlan.kind == ROOM_KIND_WALLED)
+    {
+        if (x >= INNER_X_MIN && x <= INNER_X_MAX && y >= INNER_Y_MIN && y <= INNER_Y_MAX)
+            return sPlan.rock[y][x];
+        return !IsWallOpening(x, y);
+    }
+    return IsTreeTile(x, y) || IsWaterTile(x, y) || IsSeaTile(x, y) || IsBuildingTile(x, y) || sPlan.rock[y][x];
+}
+
+// Every door, and the building's door, can be walked to from the entrance
 static bool32 AreDoorsReachable(void)
 {
-    u8 seen[BLOCKS_H][BLOCKS_W] = {0};
-    u8 queue[BLOCKS_W * BLOCKS_H];
+    // seen: 0 = not yet, 1 = blocked, 2 = reached
+    u8 seen[ROOM_H][ROOM_W];
+    u16 queue[ROOM_W * ROOM_H];
     u32 head = 0, tail = 0, i;
+    s32 x, y;
 
-    seen[ENTRANCE_BY][ENTRANCE_BX] = TRUE;
-    queue[tail++] = ENTRANCE_BY * BLOCKS_W + ENTRANCE_BX;
+    for (y = 0; y < ROOM_H; y++)
+    {
+        for (x = 0; x < ROOM_W; x++)
+            seen[y][x] = IsBlockedTile(x, y);
+    }
+    seen[ROGUE_ENTRANCE_Y][ROGUE_ENTRANCE_X] = 2;
+    queue[tail++] = ROGUE_ENTRANCE_Y * ROOM_W + ROGUE_ENTRANCE_X;
     while (head < tail)
     {
         static const s8 sDirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        u32 bx = queue[head] % BLOCKS_W, by = queue[head] / BLOCKS_W;
+        x = queue[head] % ROOM_W;
+        y = queue[head] / ROOM_W;
         head++;
         for (i = 0; i < 4; i++)
         {
-            s32 nx = bx + sDirs[i][0], ny = by + sDirs[i][1];
-            if (IsTreeBlock(nx, ny) || IsWaterBlock(nx, ny) || seen[ny][nx])
+            s32 nx = x + sDirs[i][0], ny = y + sDirs[i][1];
+            if (nx < 0 || nx >= ROOM_W || ny < 0 || ny >= ROOM_H || seen[ny][nx])
                 continue;
-            seen[ny][nx] = TRUE;
-            queue[tail++] = ny * BLOCKS_W + nx;
+            seen[ny][nx] = 2;
+            queue[tail++] = ny * ROOM_W + nx;
         }
     }
     for (i = 0; i < NUM_DOORS; i++)
     {
-        if (sPlan.doors[i] != NO_DOOR && !seen[INNER_BY_MIN][sDoorBlockX[i]])
+        u32 gx = GetDoorX(i);
+        if (sPlan.doors[i] != NO_DOOR && seen[INNER_Y_MIN][gx] != 2 && !(sPlan.biome != BIOME_CAVE && seen[INNER_Y_MIN][gx + 1] == 2))
             return FALSE;
     }
+    if (sPlan.building != BUILDING_NONE && seen[BUILDING_Y + BUILDING_H][GetBuildingDoorX()] != 2)
+        return FALSE;
     return TRUE;
 }
 
@@ -626,9 +887,13 @@ static void ChooseDoors(rng_value_t *rng)
 {
     u32 type = GetRoomType();
     u32 i, count, used = 0;
+    u32 nextFloor = GetFloor() + (type == ROGUE_ROOM_BOSS);
 
     for (i = 0; i < NUM_DOORS; i++)
+    {
         sPlan.doors[i] = NO_DOOR;
+        sPlan.doorBiomes[i] = BIOME_FOREST;
+    }
 
     if (VarGet(VAR_ROGUE_STATE) != ROGUE_STATE_RUN)
     {
@@ -646,25 +911,35 @@ static void ChooseDoors(rng_value_t *rng)
         sPlan.doors[1] = ROGUE_ROOM_BOSS;
         return;
     }
+    if (type == ROGUE_ROOM_BOSS)
+    {
+        // An arena has one way out: into the next floor
+        sPlan.doors[1] = PickWeighted(rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 0);
+        sPlan.doorBiomes[1] = PickBiome(rng, sPlan.doors[1], nextFloor);
+        return;
+    }
 
     count = 2 + LocalRandom(rng) % 2;
     for (i = 0; i < count; i++)
     {
         u32 door = PickWeighted(rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, used);
+        u32 slot = (count == 2) ? i * 2 : i;
         used |= 1u << door;
-        if (count == 2)
-            sPlan.doors[i * 2] = door;
-        else
-            sPlan.doors[i] = door;
+        sPlan.doors[slot] = door;
+        sPlan.doorBiomes[slot] = PickBiome(rng, door, nextFloor);
     }
 }
 
 static bool32 IsTileFree(u32 x, u32 y)
 {
     u32 i;
-    if (IsTreeTile(x, y) || IsWaterTile(x, y))
+    if (IsBlockedTile(x, y) || IsSeaTile(x, y))
         return FALSE;
     if (x == ROGUE_ENTRANCE_X && y >= ROGUE_ENTRANCE_Y - 1)
+        return FALSE;
+    if (y == INNER_Y_MIN)
+        return FALSE; // keep the row under the doors clear
+    if (sPlan.building != BUILDING_NONE && x == GetBuildingDoorX() && y == BUILDING_Y + BUILDING_H)
         return FALSE;
     for (i = 0; i < sPlan.numObjects; i++)
     {
@@ -694,8 +969,8 @@ static void AddObjectAnywhere(rng_value_t *rng, u16 graphicsId, u8 movementType,
     u32 tries;
     for (tries = 0; tries < 100; tries++)
     {
-        u32 x = 4 + LocalRandom(rng) % 14;
-        u32 y = 5 + LocalRandom(rng) % 8;
+        u32 x = INNER_X_MIN + LocalRandom(rng) % (INNER_X_MAX - INNER_X_MIN + 1);
+        u32 y = INNER_Y_MIN + 1 + LocalRandom(rng) % (INNER_Y_MAX - INNER_Y_MIN);
         if (IsTileFree(x, y))
         {
             AddObject(graphicsId, x, y, movementType, script);
@@ -727,19 +1002,12 @@ static void AddTrainerObject(void)
     sPlan.objects[sPlan.numObjects - 1].sight = 5;
 }
 
-static void BuildRoomPlan(void)
+// Outdoor rooms: the forest border with an opening per door, and trees, ponds or sea inside
+static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
 {
-    rng_value_t rng = LocalRandomSeed(GetRoomSeed());
-    u32 type = GetRoomType();
-    bool32 guarded = IsRoomGuarded(type);
-    bool32 hasCenterObject = (guarded || type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST || type == ROGUE_ROOM_EVENT);
     u32 bx, by, x, y, i, count;
+    bool32 beach = (sPlan.biome == BIOME_BEACH);
 
-    memset(&sPlan, 0, sizeof(sPlan));
-    sPlan.guarded = guarded;
-    ChooseDoors(&rng);
-
-    // Forest around the room, with an opening for each door
     for (by = 0; by < BLOCKS_H; by++)
     {
         for (bx = 0; bx < BLOCKS_W; bx++)
@@ -754,20 +1022,29 @@ static void BuildRoomPlan(void)
         {
             sPlan.tree[0][sDoorBlockX[i]] = FALSE;
             sPlan.tree[1][sDoorBlockX[i]] = FALSE;
-            for (y = 0; y < INNER_BY_MIN * 2; y++)
-            {
-                sPlan.ground[y][sDoorBlockX[i] * 2] = GROUND_PATH;
-                sPlan.ground[y][sDoorBlockX[i] * 2 + 1] = GROUND_PATH;
-            }
         }
     }
+    if (beach)
+        sPlan.seaSide = (LocalRandom(rng) % 2) ? SEA_LEFT : SEA_RIGHT;
 
-    // Sometimes a pond (1x1 to 2x2 blocks), never right under a door and with grass below it
-    if (type != ROGUE_ROOM_HUB && LocalRandom(&rng) % 100 < 40)
+    // A Mart or a Pokémon Center to walk into
+    if (type == ROGUE_ROOM_SHOP)
     {
-        u32 w = 1 + LocalRandom(&rng) % 2, h = 1 + LocalRandom(&rng) % 2;
-        u32 bx0 = INNER_BX_MIN + LocalRandom(&rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
-        u32 by0 = INNER_BY_MIN + 1 + LocalRandom(&rng) % (INNER_BY_MAX - INNER_BY_MIN - h);
+        sPlan.building = BUILDING_MART;
+        sPlan.buildingX = MART_X;
+    }
+    else if (type == ROGUE_ROOM_REST)
+    {
+        sPlan.building = BUILDING_CENTER;
+        sPlan.buildingX = CENTER_BUILDING_X;
+    }
+
+    // Forest: sometimes a pond (1x1 to 2x2 blocks), never right under a door and with grass below it
+    if (!beach && type != ROGUE_ROOM_HUB && sPlan.building == BUILDING_NONE && LocalRandom(rng) % 100 < 40)
+    {
+        u32 w = 1 + LocalRandom(rng) % 2, h = 1 + LocalRandom(rng) % 2;
+        u32 bx0 = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
+        u32 by0 = INNER_BY_MIN + 1 + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN - h);
         bool32 ok = TRUE;
         for (by = by0; by < by0 + h; by++)
         {
@@ -782,14 +1059,14 @@ static void BuildRoomPlan(void)
             memset(sPlan.water, 0, sizeof(sPlan.water));
     }
 
-    // A few trees inside, never closing off a door
+    // A few trees inside (fewer on a beach), never closing off a door
     if (type != ROGUE_ROOM_HUB)
     {
-        count = 2 + LocalRandom(&rng) % 4;
+        count = beach ? LocalRandom(rng) % 3 : 2 + LocalRandom(rng) % 4;
         for (i = 0; i < count * 4 && count > 0; i++)
         {
-            bx = INNER_BX_MIN + LocalRandom(&rng) % (INNER_BX_MAX - INNER_BX_MIN + 1);
-            by = INNER_BY_MIN + LocalRandom(&rng) % (INNER_BY_MAX - INNER_BY_MIN + 1);
+            bx = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 1);
+            by = INNER_BY_MIN + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN + 1);
             if (sPlan.tree[by][bx] || (bx == ENTRANCE_BX && by == ENTRANCE_BY))
                 continue;
             if (by == INNER_BY_MIN && (bx == 3 || bx == 5 || bx == 7))
@@ -798,6 +1075,11 @@ static void BuildRoomPlan(void)
                 continue;
             if (sPlan.water[by][bx] || IsWaterBlock(bx, by - 1))
                 continue; // not in a pond, nor right below one (its shore)
+            if (sPlan.building != BUILDING_NONE && bx >= sPlan.buildingX / 2 - 1 && bx <= (sPlan.buildingX + BUILDING_W) / 2
+             && by >= BUILDING_Y / 2 && by <= (BUILDING_Y + BUILDING_H) / 2 + 1)
+                continue; // around the building
+            if (beach && (bx == INNER_BX_MIN || bx == INNER_BX_MAX))
+                continue; // the sea side
             sPlan.tree[by][bx] = TRUE;
             if (!AreDoorsReachable())
                 sPlan.tree[by][bx] = FALSE;
@@ -806,18 +1088,69 @@ static void BuildRoomPlan(void)
         }
     }
 
-    // Patches of tall grass (just for looks: there are no random encounters here)
-    count = 2 + LocalRandom(&rng) % 3;
-    for (i = 0; i < count; i++)
+    // Patches of tall grass in a forest (just for looks: there are no random encounters here)
+    if (!beach)
     {
-        u32 w = 2 + LocalRandom(&rng) % 4, h = 2 + LocalRandom(&rng) % 2;
-        u32 x0 = 4 + LocalRandom(&rng) % (14 - w + 1), y0 = 4 + LocalRandom(&rng) % (10 - h + 1);
-        for (y = y0; y < y0 + h; y++)
+        count = 2 + LocalRandom(rng) % 3;
+        for (i = 0; i < count; i++)
         {
-            for (x = x0; x < x0 + w; x++)
-                sPlan.ground[y][x] = GROUND_TALL_GRASS;
+            u32 w = 2 + LocalRandom(rng) % 4, h = 2 + LocalRandom(rng) % 2;
+            u32 x0 = 4 + LocalRandom(rng) % (14 - w + 1), y0 = 4 + LocalRandom(rng) % (10 - h + 1);
+            for (y = y0; y < y0 + h; y++)
+            {
+                for (x = x0; x < x0 + w; x++)
+                    sPlan.ground[y][x] = GROUND_TALL_GRASS;
+            }
         }
     }
+}
+
+// Walled rooms (cave, volcano): a rectangle of rock walls with a few rocks inside
+static void PlanWalledRoom(rng_value_t *rng, bool32 hasCenterObject)
+{
+    u32 i, count = 3 + LocalRandom(rng) % 5;
+
+    for (i = 0; i < count * 4 && count > 0; i++)
+    {
+        u32 x = INNER_X_MIN + LocalRandom(rng) % (INNER_X_MAX - INNER_X_MIN + 1);
+        u32 y = INNER_Y_MIN + 1 + LocalRandom(rng) % (INNER_Y_MAX - INNER_Y_MIN - 1);
+        if (sPlan.rock[y][x] || (x == ROGUE_ENTRANCE_X && y >= ROGUE_ENTRANCE_Y - 2))
+            continue;
+        if (hasCenterObject && x >= CENTER_X - 1 && x <= CENTER_X + 1 && y <= CENTER_Y + 1)
+            continue;
+        sPlan.rock[y][x] = TRUE;
+        if (!AreDoorsReachable())
+            sPlan.rock[y][x] = FALSE;
+        else
+            count--;
+    }
+}
+
+static void BuildRoomPlan(void)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed());
+    u32 type = GetRoomType();
+    bool32 guarded = IsRoomGuarded(type);
+    bool32 hasCenterObject = (guarded || type == ROGUE_ROOM_EVENT);
+    u32 i, count;
+
+    memset(&sPlan, 0, sizeof(sPlan));
+    sPlan.guarded = guarded;
+    sPlan.kind = GetRoomKind();
+    sPlan.biome = GetRoomBiome();
+    ChooseDoors(&rng);
+
+    if (sPlan.kind == ROOM_KIND_ARENA)
+    {
+        AddObject(GetCurrentBoss()->graphicsId, ARENA_BOSS_X, ARENA_BOSS_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
+        sPlan.objects[0].trainerType = TRAINER_TYPE_NORMAL;
+        sPlan.objects[0].sight = 5;
+        return;
+    }
+    if (sPlan.kind == ROOM_KIND_WALLED)
+        PlanWalledRoom(&rng, hasCenterObject);
+    else
+        PlanOutdoorRoom(&rng, type, hasCenterObject);
 
     // What's in the room
     switch (type)
@@ -832,7 +1165,7 @@ static void BuildRoomPlan(void)
             AddTrainerObject();
         count = 1 + (LocalRandom(&rng) % 100 < 35);
         for (i = 0; i < count; i++)
-            AddObjectAnywhere(&rng, OBJ_EVENT_MON + PickFloorSpecies(&rng, TYPE_NONE), MOVEMENT_TYPE_LOOK_AROUND, Rogue_Room_EventScript_WildMon);
+            AddObjectAnywhere(&rng, OBJ_EVENT_MON + PickRoomSpecies(&rng), MOVEMENT_TYPE_LOOK_AROUND, Rogue_Room_EventScript_WildMon);
         break;
     case ROGUE_ROOM_EVENT:
         switch (GetEventKind())
@@ -855,19 +1188,8 @@ static void BuildRoomPlan(void)
         for (i = 0; i < count; i++)
             AddObjectAnywhere(&rng, OBJ_EVENT_GFX_ITEM_BALL, MOVEMENT_TYPE_NONE, Rogue_Room_EventScript_ItemBall);
         break;
-    case ROGUE_ROOM_SHOP:
-        AddObject(OBJ_EVENT_GFX_MART_EMPLOYEE, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Shop);
-        break;
-    case ROGUE_ROOM_REST:
-        AddObject(OBJ_EVENT_GFX_NURSE, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Nurse);
-        break;
     case ROGUE_ROOM_TRAINER:
         AddTrainerObject();
-        break;
-    case ROGUE_ROOM_BOSS:
-        AddObject(GetCurrentBoss()->graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
-        sPlan.objects[0].trainerType = TRAINER_TYPE_NORMAL;
-        sPlan.objects[0].sight = 5;
         break;
     }
 }
@@ -883,6 +1205,8 @@ u32 Rogue_GetRoomDoors(u8 *doors)
         if (doors[i] != NO_DOOR)
             count++;
     }
+    if (sPlan.kind == ROOM_KIND_ARENA)
+        return count;
     return AreDoorsReachable() ? count : 0;
 }
 
@@ -927,16 +1251,23 @@ static void SetObjectTemplate(u32 slot, u16 graphicsId, u32 x, u32 y, u8 movemen
 void Rogue_OnTransition(void)
 {
     u32 i;
+    bool32 cave;
 
     BuildRoomPlan();
+    cave = (sPlan.kind == ROOM_KIND_WALLED && sPlan.biome == BIOME_CAVE);
     ClearTrainerFlag(TRAINER_ROGUE_TRAINER);
     ClearTrainerFlag(TRAINER_ROGUE_BOSS);
+    // Leaving the room's Mart or Pokémon Center comes back out in front of its door
+    if (sPlan.building != BUILDING_NONE)
+        SetDynamicWarpWithCoords(0, gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, WARP_ID_NONE,
+                                 GetBuildingDoorX(), BUILDING_Y + BUILDING_H);
     for (i = 0; i < NUM_OBJECT_SLOTS; i++)
     {
         struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
-        if (i < NUM_MARKERS && sPlan.doors[i] != NO_DOOR)
+        bool32 doorShown = sPlan.kind != ROOM_KIND_ARENA;
+        if (i < NUM_MARKERS && doorShown && sPlan.doors[i] != NO_DOOR)
         {
-            SetObjectTemplate(i, GetDoorMarkerGraphics(sPlan.doors[i]), sDoorBlockX[i] * 2, 2,
+            SetObjectTemplate(i, GetDoorMarkerGraphics(sPlan.doors[i]), GetDoorX(i), cave ? 1 : 2,
                               MOVEMENT_TYPE_FACE_DOWN, TRAINER_TYPE_NONE, 0, NULL);
         }
         else if (i >= NUM_MARKERS && i < FIRST_THICKET_SLOT && i - NUM_MARKERS < sPlan.numObjects)
@@ -944,10 +1275,12 @@ void Rogue_OnTransition(void)
             const struct RoomObject *obj = &sPlan.objects[i - NUM_MARKERS];
             SetObjectTemplate(i, obj->graphicsId, obj->x, obj->y, obj->movementType, obj->trainerType, obj->sight, obj->script);
         }
-        else if (i >= FIRST_THICKET_SLOT && sPlan.guarded && sPlan.doors[(i - FIRST_THICKET_SLOT) / 2] != NO_DOOR)
+        else if (i >= FIRST_THICKET_SLOT && doorShown && sPlan.guarded && sPlan.doors[(i - FIRST_THICKET_SLOT) / 2] != NO_DOOR
+              && !(cave && (i - FIRST_THICKET_SLOT) % 2))
         {
             u32 door = (i - FIRST_THICKET_SLOT) / 2;
-            SetObjectTemplate(i, OBJ_EVENT_GFX_CUTTABLE_TREE, sDoorBlockX[door] * 2 + (i - FIRST_THICKET_SLOT) % 2, 3,
+            SetObjectTemplate(i, cave ? OBJ_EVENT_GFX_BREAKABLE_ROCK : OBJ_EVENT_GFX_CUTTABLE_TREE,
+                              GetDoorX(door) + (i - FIRST_THICKET_SLOT) % 2, 3,
                               MOVEMENT_TYPE_NONE, TRAINER_TYPE_NONE, 0, Rogue_Room_EventScript_Thicket);
         }
         else
@@ -956,6 +1289,9 @@ void Rogue_OnTransition(void)
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Drawing
 
 static u16 GetTreeMetatile(s32 x, s32 y)
 {
@@ -976,27 +1312,71 @@ static u16 GetTreeMetatile(s32 x, s32 y)
     return TILE_TREE(IsTreeBlock(bx + 1, by) ? 0x1E5 : 0x1E7);
 }
 
-static u16 GetGroundMetatile(s32 x, s32 y)
+// The door openings' ground shows the next room's theme
+static u16 GetDoorGroundMetatile(s32 x, s32 y)
+{
+    u32 i;
+    bool32 left = (x % 2) == 0;
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        if (sPlan.doors[i] == NO_DOOR || (x != GetDoorX(i) && x != GetDoorX(i) + 1))
+            continue;
+        if (IsBuildingRoom(sPlan.doors[i]) || sPlan.doors[i] == ROGUE_ROOM_BOSS || sPlan.doors[i] > ROGUE_ROOM_BOSS)
+            break; // a dirt path
+        switch (sPlan.doorBiomes[i])
+        {
+        case BIOME_BEACH:
+            return TILE_GROUND(0x124);
+        case BIOME_CAVE:
+            if (y < INNER_Y_MIN - 2)
+                return TILE_TREE(left ? 0x1A0 : 0x1A0);
+            return TILE_GROUND(y == INNER_Y_MIN - 1 ? 0x1A1 : 0x1A1);
+        case BIOME_VOLCANO:
+            return TILE_GROUND(0x1A9);
+        }
+        break;
+    }
+    if (y == INNER_BY_MIN * 2 - 1)
+        return TILE_GROUND(left ? 0x1E0 : 0x1E2);
+    return TILE_GROUND(left ? 0x1D8 : 0x1DA);
+}
+
+static u16 GetBuildingMetatile(s32 x, s32 y)
+{
+    static const u16 sMart[BUILDING_H][BUILDING_W] =
+    {
+        {0x028, 0x029, 0x029, 0x029},
+        {0x030, 0x031, 0x032, 0x033},
+        {0x038, 0x039, 0x03A, 0x03B},
+        {0x060, 0x041, 0x042, 0x043},
+    };
+    static const u16 sCenter[BUILDING_H][BUILDING_W] =
+    {
+        {0x048, 0x049, 0x04A, 0x04B},
+        {0x050, 0x051, 0x052, 0x053},
+        {0x058, 0x059, 0x05A, 0x05B},
+        {0x060, 0x061, 0x062, 0x063},
+    };
+    u32 col = x - sPlan.buildingX, row = y - BUILDING_Y;
+    u16 id = (sPlan.building == BUILDING_MART ? sMart : sCenter)[row][col];
+    return row == 0 ? TILE_GROUND(id) : TILE_TREE(id); // the roof's top row is walkable
+}
+
+static u16 GetOutdoorGroundMetatile(s32 x, s32 y)
 {
     bool32 left = (x % 2) == 0;
     bool32 treeBelow = IsTreeTile(x, y + 1) && ((y + 1) % 2) == 0 && y + 1 < ROOM_H;
+    bool32 beach = (sPlan.biome == BIOME_BEACH);
 
+    if (y < INNER_Y_MIN)
+        return GetDoorGroundMetatile(x, y);
     if (IsWaterTile(x, y - 1))
         return TILE_GROUND(0x002);
-    switch (sPlan.ground[y][x])
-    {
-    case GROUND_PATH:
-        if (y == INNER_BY_MIN * 2 - 1)
-            return TILE_GROUND(left ? 0x1E0 : 0x1E2);
-        return TILE_GROUND(left ? 0x1D8 : 0x1DA);
-    case GROUND_TALL_GRASS:
-        if (treeBelow)
-            return TILE_GROUND(left ? 0x1C6 : 0x1C7);
-        return TILE_GROUND(METATILE_General_TallGrass);
-    }
+    if (sPlan.ground[y][x] == GROUND_TALL_GRASS)
+        return TILE_GROUND(treeBelow ? (left ? 0x1C6 : 0x1C7) : METATILE_General_TallGrass);
     if (treeBelow)
         return TILE_GROUND(left ? 0x1CE : 0x1CF);
-    return TILE_GROUND(METATILE_General_Grass);
+    return TILE_GROUND(beach ? 0x124 : METATILE_General_Grass);
 }
 
 // Ponds as on Route 102: the shore is drawn into the water's top and side tiles, and into the
@@ -1012,12 +1392,17 @@ static u16 GetWaterMetatile(s32 x, s32 y)
     return id | (1 << MAPGRID_ELEVATION_SHIFT);
 }
 
-// ON_LOAD (after every warp and battle): draw the room
-void Rogue_OnLoad(void)
+// Sea as on Route 109: the shore tile has the sand
+static u16 GetSeaMetatile(s32 x, s32 y)
+{
+    bool32 shore = (sPlan.seaSide == SEA_LEFT) ? (x == INNER_X_MIN + 1) : (x == INNER_X_MAX - 1);
+    u16 id = shore ? (sPlan.seaSide == SEA_LEFT ? 0x123 : 0x125) : 0x170;
+    return id | (1 << MAPGRID_ELEVATION_SHIFT);
+}
+
+static void DrawOutdoorRoom(void)
 {
     s32 x, y;
-
-    BuildRoomPlan();
     for (y = 0; y < ROOM_H; y++)
     {
         for (x = 0; x < ROOM_W; x++)
@@ -1027,10 +1412,148 @@ void Rogue_OnLoad(void)
                 tile = GetTreeMetatile(x, y);
             else if (IsWaterTile(x, y))
                 tile = GetWaterMetatile(x, y);
+            else if (IsSeaTile(x, y))
+                tile = GetSeaMetatile(x, y);
+            else if (sPlan.building != BUILDING_NONE && x >= sPlan.buildingX && x < sPlan.buildingX + BUILDING_W
+                  && y >= BUILDING_Y && y < BUILDING_Y + BUILDING_H)
+                tile = GetBuildingMetatile(x, y);
             else
-                tile = GetGroundMetatile(x, y);
+                tile = GetOutdoorGroundMetatile(x, y);
             MapGridSetMetatileEntryAt(x + MAP_OFFSET, y + MAP_OFFSET, tile);
         }
+    }
+}
+
+// Walled rooms' tiles (Granite Cave and Fiery Path)
+struct WallTiles
+{
+    u16 fill, floor, floorAlt, rock, rockAlt;
+    u16 top, topLeft, topRight, left, right, leftTop, rightTop, bottom, bottomLeft, bottomRight;
+};
+
+static const struct WallTiles sCaveTiles =
+{
+    .fill = 0x211, .floor = 0x201, .floorAlt = 0x201, .rock = 0x202, .rockAlt = 0x203,
+    .top = 0x219, .topLeft = 0x21B, .topRight = 0x21C, .left = 0x212, .right = 0x210, .leftTop = 0x212, .rightTop = 0x210,
+    .bottom = 0x221, .bottomLeft = 0x224, .bottomRight = 0x224,
+};
+
+static const struct WallTiles sVolcanoTiles =
+{
+    .fill = 0x271, .floor = 0x308, .floorAlt = 0x310, .rock = 0x30D, .rockAlt = 0x30D,
+    .top = 0x274, .topLeft = 0x27B, .topRight = 0x27C, .left = 0x307, .right = 0x306, .leftTop = 0x30F, .rightTop = 0x30E,
+    .bottom = 0x30C, .bottomLeft = 0x27F, .bottomRight = 0x27E,
+};
+
+static u16 GetWalledMetatile(s32 x, s32 y)
+{
+    const struct WallTiles *t = (sPlan.biome == BIOME_CAVE) ? &sCaveTiles : &sVolcanoTiles;
+    u32 i;
+
+    if (x >= INNER_X_MIN && x <= INNER_X_MAX && y >= INNER_Y_MIN && y <= INNER_Y_MAX)
+    {
+        if (sPlan.rock[y][x])
+            return TILE_TREE(((x + y) % 2) ? t->rock : t->rockAlt);
+        // The ground in front of a door shows the next room's theme
+        if (y == INNER_Y_MIN)
+        {
+            for (i = 0; i < NUM_DOORS; i++)
+            {
+                if (sPlan.doors[i] == NO_DOOR || x < GetDoorX(i) || x > GetDoorX(i) + (sPlan.biome != BIOME_CAVE))
+                    continue;
+                if (sPlan.doorBiomes[i] == BIOME_FOREST && sPlan.doors[i] < ROGUE_ROOM_BOSS && !IsBuildingRoom(sPlan.doors[i]))
+                    return TILE_GROUND(METATILE_General_Grass);
+                if (sPlan.doorBiomes[i] == BIOME_BEACH)
+                    return TILE_GROUND(0x124);
+            }
+        }
+        return TILE_GROUND((Mix32(x * 31 + y * 17 + GetRoomSeed()) % 10) ? t->floor : t->floorAlt);
+    }
+
+    // The doors: cave mouths, or corridors through the volcano's rock
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        s32 gx = GetDoorX(i);
+        if (sPlan.doors[i] == NO_DOOR)
+            continue;
+        if (sPlan.biome == BIOME_CAVE)
+        {
+            if (x >= gx - 1 && x <= gx + 1 && y == INNER_Y_MIN - 2)
+                return TILE_TREE(0x20B + (x - gx + 1));
+            if (x >= gx - 1 && x <= gx + 1 && y == INNER_Y_MIN - 1)
+                return x == gx ? TILE_GROUND(0x214) : TILE_TREE(0x213 + (x - gx + 1));
+        }
+        else if (y < INNER_Y_MIN)
+        {
+            if (x == gx || x == gx + 1)
+                return TILE_GROUND(t->floor);
+            if (x == gx - 1)
+                return TILE_TREE(y == INNER_Y_MIN - 1 ? t->topRight : t->right);
+            if (x == gx + 2)
+                return TILE_TREE(y == INNER_Y_MIN - 1 ? t->topLeft : t->left);
+        }
+    }
+
+    if (y == INNER_Y_MIN - 1 && x >= INNER_X_MIN && x <= INNER_X_MAX)
+        return TILE_TREE(t->top);
+    if (y == INNER_Y_MIN - 1 && x == INNER_X_MIN - 1)
+        return TILE_TREE(t->topLeft);
+    if (y == INNER_Y_MIN - 1 && x == INNER_X_MAX + 1)
+        return TILE_TREE(t->topRight);
+    if (y >= INNER_Y_MIN && y <= INNER_Y_MAX && x == INNER_X_MIN - 1)
+        return TILE_TREE(y == INNER_Y_MIN ? t->leftTop : t->left);
+    if (y >= INNER_Y_MIN && y <= INNER_Y_MAX && x == INNER_X_MAX + 1)
+        return TILE_TREE(y == INNER_Y_MIN ? t->rightTop : t->right);
+    if (y == INNER_Y_MAX + 1 && x >= INNER_X_MIN && x <= INNER_X_MAX)
+        return TILE_TREE(t->bottom);
+    if (y == INNER_Y_MAX + 1 && x == INNER_X_MIN - 1)
+        return TILE_TREE(t->bottomLeft);
+    if (y == INNER_Y_MAX + 1 && x == INNER_X_MAX + 1)
+        return TILE_TREE(t->bottomRight);
+    return TILE_TREE(t->fill);
+}
+
+static void DrawWalledRoom(void)
+{
+    s32 x, y;
+    for (y = 0; y < ROOM_H; y++)
+    {
+        for (x = 0; x < ROOM_W; x++)
+            MapGridSetMetatileEntryAt(x + MAP_OFFSET, y + MAP_OFFSET, GetWalledMetatile(x, y));
+    }
+}
+
+// The arena's doors: the way in closes behind the player, the way out opens once the boss is beaten
+static void SetArenaDoors(bool32 open)
+{
+    s32 x;
+    for (x = 5; x <= 7; x++)
+    {
+        MapGridSetMetatileIdAt(x + MAP_OFFSET, 12 + MAP_OFFSET, METATILE_EliteFour_EntryDoor_ClosedTop | MAPGRID_COLLISION_MASK);
+        MapGridSetMetatileIdAt(x + MAP_OFFSET, 13 + MAP_OFFSET, METATILE_EliteFour_EntryDoor_ClosedBottom | MAPGRID_COLLISION_MASK);
+    }
+    if (open)
+    {
+        MapGridSetMetatileIdAt(6 + MAP_OFFSET, 1 + MAP_OFFSET, METATILE_EliteFour_OpenDoor_Frame);
+        MapGridSetMetatileIdAt(6 + MAP_OFFSET, 2 + MAP_OFFSET, METATILE_EliteFour_OpenDoor_Opening);
+    }
+}
+
+// ON_LOAD (after every warp and battle): draw the room
+void Rogue_OnLoad(void)
+{
+    BuildRoomPlan();
+    switch (sPlan.kind)
+    {
+    case ROOM_KIND_ARENA:
+        SetArenaDoors(HasTrainerBeenFought(TRAINER_ROGUE_BOSS));
+        break;
+    case ROOM_KIND_WALLED:
+        DrawWalledRoom();
+        break;
+    default:
+        DrawOutdoorRoom();
+        break;
     }
 }
 
@@ -1097,7 +1620,7 @@ void Rogue_OpenDoors(void)
 // The map name popup in a run: where the player is
 bool32 Rogue_GetPopUpName(u8 *dest)
 {
-    if (!Rogue_IsRunActive() || gMapHeader.mapLayoutId != LAYOUT_ROGUE_ROOM)
+    if (!Rogue_IsRunActive() || !IsRogueMap(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum))
         return FALSE;
     if (IsFinale(GetFloor()))
     {
@@ -1249,10 +1772,11 @@ static void EndRun(bool32 won)
 
 void Rogue_TakeDoor(void)
 {
-    u32 door, type, floorBefore = GetFloor();
+    u32 door, type, biome, floorBefore = GetFloor();
 
     BuildRoomPlan();
     door = sPlan.doors[gSpecialVar_0x8004 % NUM_DOORS];
+    biome = sPlan.doorBiomes[gSpecialVar_0x8004 % NUM_DOORS];
     gSpecialVar_Result = ROGUE_DOOR_NEXT_ROOM;
     if (door == NO_DOOR) // can't happen unless the run state changed under the drawn room
         door = ROGUE_ROOM_WILD;
@@ -1309,9 +1833,11 @@ void Rogue_TakeDoor(void)
             type = ROGUE_ROOM_EVENT;
         else
             type = PickWeighted(&rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 1u << ROGUE_ROOM_MYSTERY);
+        if (IsBuildingRoom(type) && biome != BIOME_FOREST && biome != BIOME_BEACH)
+            biome = BIOME_FOREST; // buildings stand outdoors
         type |= ROOM_TYPE_FROM_MYSTERY;
     }
-    VarSet(VAR_ROGUE_ROOM_TYPE, type);
+    VarSet(VAR_ROGUE_ROOM_TYPE, type | (biome << ROOM_BIOME_SHIFT));
 }
 
 void Rogue_PrepareWildMon(void)

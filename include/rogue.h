@@ -31,6 +31,7 @@ void Rogue_OnLoad(void);
 void Rogue_GetRoomIntro(void);
 void Rogue_CanLeaveRoom(void);
 void Rogue_OpenDoors(void);
+void Rogue_WarpToRoom(void);
 void Rogue_TakeDoor(void);
 void Rogue_PrepareWildMon(void);
 void Rogue_PrepareItemBall(void);

@@ -171,8 +171,7 @@ Rogue_Room_EventScript_WonRun::
 	end
 
 Rogue_Room_EventScript_Warp::
-	warp MAP_ROGUE_ROOM, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y
-	waitstate
+	special Rogue_WarpToRoom
 	releaseall
 	end
 

@@ -198,7 +198,22 @@
       "flag": "FLAG_TEMP_1E"
     }
   ],
-  "warp_events": [],
+  "warp_events": [
+    {
+      "x": 10,
+      "y": 10,
+      "elevation": 0,
+      "dest_map": "MAP_ROGUE_MART",
+      "dest_warp_id": "0"
+    },
+    {
+      "x": 11,
+      "y": 10,
+      "elevation": 0,
+      "dest_map": "MAP_ROGUE_CENTER",
+      "dest_warp_id": "0"
+    }
+  ],
   "coord_events": [
     {
       "type": "trigger",

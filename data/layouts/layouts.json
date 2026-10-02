@@ -9334,6 +9334,28 @@
       "border_filepath": "data/layouts/Rogue_Room/border.bin",
       "blockdata_filepath": "data/layouts/Rogue_Room/map.bin",
       "layout_version": "emerald"
+    },
+    {
+      "id": "LAYOUT_ROGUE_CAVE",
+      "name": "Rogue_Cave_Layout",
+      "width": 22,
+      "height": 18,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Cave",
+      "border_filepath": "data/layouts/Rogue_Cave/border.bin",
+      "blockdata_filepath": "data/layouts/Rogue_Cave/map.bin",
+      "layout_version": "emerald"
+    },
+    {
+      "id": "LAYOUT_ROGUE_VOLCANO",
+      "name": "Rogue_Volcano_Layout",
+      "width": 22,
+      "height": 18,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_Lavaridge",
+      "border_filepath": "data/layouts/Rogue_Volcano/border.bin",
+      "blockdata_filepath": "data/layouts/Rogue_Volcano/map.bin",
+      "layout_version": "emerald"
     }
   ]
 }

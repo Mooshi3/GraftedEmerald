@@ -380,6 +380,9 @@ extern const u8 Debug_EventScript_SetAbility[];
 extern const u8 Debug_EventScript_SetFriendship[];
 extern const u8 Debug_EventScript_Script_1[];
 extern const u8 Debug_EventScript_RogueEvent[];
+extern const u8 Debug_EventScript_RogueBeach[];
+extern const u8 Debug_EventScript_RogueCave[];
+extern const u8 Debug_EventScript_RogueVolcano[];
 extern const u8 Debug_EventScript_Script_2[];
 extern const u8 Debug_EventScript_Script_3[];
 extern const u8 Debug_EventScript_Script_4[];
@@ -687,6 +690,9 @@ static const struct DebugMenuOption sDebugMenu_Actions_Scripts[] =
     { COMPOUND_STRING("Rogue: Last room"), DebugAction_ExecuteScript, Debug_EventScript_Script_7 },
     { COMPOUND_STRING("Rogue: Next floor"), DebugAction_ExecuteScript, Debug_EventScript_Script_8 },
     { COMPOUND_STRING("Rogue: Event"), DebugAction_ExecuteScript, Debug_EventScript_RogueEvent },
+    { COMPOUND_STRING("Rogue: Beach"), DebugAction_ExecuteScript, Debug_EventScript_RogueBeach },
+    { COMPOUND_STRING("Rogue: Cave"), DebugAction_ExecuteScript, Debug_EventScript_RogueCave },
+    { COMPOUND_STRING("Rogue: Volcano"), DebugAction_ExecuteScript, Debug_EventScript_RogueVolcano },
     { NULL }
 };
 
