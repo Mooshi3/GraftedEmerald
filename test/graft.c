@@ -5,6 +5,8 @@
 #include "graft_challenge.h"
 #include "graft_encounter_dex.h"
 #include "battle.h"
+#include "battle_main.h"
+#include "battle_util.h"
 #include "battle_controllers.h"
 #include "item.h"
 #include "item_use.h"
@@ -277,6 +279,7 @@ TEST("Every new-game setting reads back what was set")
                 continue;
             VarSet(VAR_GRAFTED_SETTINGS, 0);
             VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+            VarSet(VAR_GRAFTED_SETTINGS_3, 0);
             SetGraftSetting(i, value);
             EXPECT_EQ(GetGraftSetting(i), value);
             // No other setting moved off its default
@@ -289,6 +292,7 @@ TEST("Every new-game setting reads back what was set")
     }
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }
 
 TEST("Level cap settings: off, hard and soft")
@@ -296,6 +300,7 @@ TEST("Level cap settings: off, hard and soft")
     FlagClear(FLAG_BADGE01_GET);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     EXPECT_EQ(GetCurrentLevelCap(), MAX_LEVEL);
     EXPECT_EQ(GetSoftLevelCapExpValue(20, 1000), 1000);
 
@@ -314,12 +319,14 @@ TEST("Level cap settings: off, hard and soft")
     FlagClear(FLAG_BADGE01_GET);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }
 
 static void ResetGraftSettingsForTest(void)
 {
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     for (u32 i = 0; i < NUM_BADGES; i++)
         FlagClear(FLAG_BADGE01_GET + i);
 }
@@ -406,6 +413,37 @@ TEST("Graft Limit counters: Standard counts stats until 5 badges, Budget counts 
 
     SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
     EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
+    ResetGraftSettingsForTest();
+}
+
+TEST("Settings past bit 32 round-trip and don't touch the others")
+{
+    ResetGraftSettingsForTest();
+    SetGraftSetting(GRAFT_SETTING_MONOTYPE, TYPE_FIRE);
+    SetGraftSetting(GRAFT_SETTING_DOUBLE_WILDS, GRAFT_DOUBLE_WILDS_OFTEN);
+    SetGraftSetting(GRAFT_SETTING_SMART_WILDS, TRUE);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_DOUBLE_WILDS), GRAFT_DOUBLE_WILDS_OFTEN);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SMART_WILDS), TRUE);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_INVERSE), FALSE);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_MONOTYPE), TYPE_FIRE);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SHINY_ODDS), GetGraftSettingDefault(GRAFT_SETTING_SHINY_ODDS));
+    EXPECT(IsWildMonSmart());
+    ResetGraftSettingsForTest();
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_DOUBLE_WILDS), GRAFT_DOUBLE_WILDS_OFF);
+}
+
+TEST("Inverse Battles setting flips the type chart")
+{
+    ResetGraftSettingsForTest();
+    gBattleTypeFlags = 0;
+    EXPECT_EQ(GetTypeModifier(TYPE_FIRE, TYPE_WATER), UQ_4_12(0.5));
+    EXPECT_EQ(GetTypeModifier(TYPE_NORMAL, TYPE_GHOST), UQ_4_12(0.0));
+    SetGraftSetting(GRAFT_SETTING_INVERSE, TRUE);
+    EXPECT_EQ(GetTypeModifier(TYPE_FIRE, TYPE_WATER), UQ_4_12(2.0));
+    EXPECT_EQ(GetTypeModifier(TYPE_NORMAL, TYPE_GHOST), UQ_4_12(2.0));
+    gBattleTypeFlags = BATTLE_TYPE_LINK; // never in link battles
+    EXPECT_EQ(GetTypeModifier(TYPE_FIRE, TYPE_WATER), UQ_4_12(0.5));
+    gBattleTypeFlags = 0;
     ResetGraftSettingsForTest();
 }
 
@@ -716,6 +754,7 @@ TEST("Rations leave out grafting balls when harvests are off")
         FlagClear(i);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     EXPECT_EQ(GetGraftRationSplicers(), 0xFF); // shops: no rations
 
     SetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY, GRAFT_SUPPLY_RATIONS);
@@ -738,6 +777,7 @@ TEST("EXP Share and Poké Center settings")
 {
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     EXPECT(!IsGen6ExpShareEnabled());
     EXPECT(!ArePokeCentersClosed());
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_WILD_GRAFTS), GRAFT_WILD_GRAFTS_OFF);
@@ -748,6 +788,7 @@ TEST("EXP Share and Poké Center settings")
     EXPECT(ArePokeCentersClosed());
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }
 
 TEST("Marts that sell Poké Balls also sell the grafting items")
@@ -991,6 +1032,7 @@ TEST("National Dex setting: Off uses Emerald's own tables, Postgame switches aft
 
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     FlagClear(FLAG_SYS_GAME_CLEAR);
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_NATDEX), GRAFT_NATDEX_ON); // default: the sheet
     sheet = GetActiveWildMonHeaders();
@@ -1015,6 +1057,7 @@ TEST("National Dex setting: Off uses Emerald's own tables, Postgame switches aft
     FlagClear(FLAG_SYS_GAME_CLEAR);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }
 
 static u32 DonorPoolSizeAt(u32 map, u32 escapeMap)
@@ -1032,6 +1075,7 @@ TEST("Boss rooms with no wild Pokémon still get an enemy graft donor pool")
 {
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     EXPECT_NE(DonorPoolSizeAt(MAP_EVER_GRANDE_CITY_SIDNEYS_ROOM, MAP_EVER_GRANDE_CITY), 0);
     EXPECT_NE(DonorPoolSizeAt(MAP_EVER_GRANDE_CITY_CHAMPIONS_ROOM, MAP_EVER_GRANDE_CITY), 0);
     EXPECT_NE(DonorPoolSizeAt(MAP_AQUA_HIDEOUT_B2F, MAP_LILYCOVE_CITY), 0);
@@ -1091,6 +1135,7 @@ TEST("Enemy grafts leave every species valid (fuzz, max grafts, several donor po
 
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, GRAFT_ENEMY_GRAFTS_MORE);
     for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE08_GET; f++)
         FlagSet(f);
@@ -1118,6 +1163,7 @@ TEST("Enemy grafts leave every species valid (fuzz, max grafts, several donor po
         FlagClear(f);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }
 
 TEST("Bosses keep their specialty type and bring a wrong-type ace with it grafted on")
@@ -1127,6 +1173,7 @@ TEST("Bosses keep their specialty type and bring a wrong-type ace with it grafte
 
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     for (i = FLAG_BADGE01_GET; i <= FLAG_BADGE08_GET; i++)
         FlagSet(i); // the most grafts: every type slot gets tried
     DonorPoolSizeAt(MAP_ROUTE119, MAP_EVER_GRANDE_CITY);

@@ -1,8 +1,8 @@
 #ifndef GUARD_GRAFT_SETTINGS_H
 #define GUARD_GRAFT_SETTINGS_H
 
-// Per-save settings chosen once at new game, packed into VAR_GRAFTED_SETTINGS (low 16 bits)
-// and VAR_GRAFTED_SETTINGS_2 (high 16 bits). To add one: add it here and to sGraftSettings[].
+// Per-save settings chosen once at new game, packed into a 48-bit word across VAR_GRAFTED_SETTINGS
+// (bits 0-15), VAR_GRAFTED_SETTINGS_2 (16-31) and VAR_GRAFTED_SETTINGS_3 (32-47). To add one: add it here and to sGraftSettings[].
 enum GraftSetting
 {
     GRAFT_SETTING_SHINY_ODDS,
@@ -23,7 +23,19 @@ enum GraftSetting
     GRAFT_SETTING_POKECENTERS,
     GRAFT_SETTING_SET_MODE,
     GRAFT_SETTING_MONOTYPE,
+    GRAFT_SETTING_SLEEP_CLAUSE,
+    GRAFT_SETTING_INVERSE,
+    GRAFT_SETTING_DOUBLE_WILDS,
+    GRAFT_SETTING_SMART_WILDS,
     GRAFT_SETTINGS_COUNT,
+};
+
+enum GraftDoubleWilds
+{
+    GRAFT_DOUBLE_WILDS_OFF,
+    GRAFT_DOUBLE_WILDS_SOMETIMES, // 20% of wild battles
+    GRAFT_DOUBLE_WILDS_OFTEN,     // 50%
+    GRAFT_DOUBLE_WILDS_COUNT,
 };
 
 enum GraftShinyOdds

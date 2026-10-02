@@ -11,6 +11,7 @@
 #include "battle_interface.h"
 #include "battle_main.h"
 #include "graft_challenge.h"
+#include "graft_settings.h"
 #include "battle_message.h"
 #include "battle_pyramid.h"
 #include "battle_scripts.h"
@@ -5821,6 +5822,8 @@ void ScriptSetTotemBoost(struct ScriptContext *ctx)
 
 bool32 IsWildMonSmart(void)
 {
+    if (GetGraftSetting(GRAFT_SETTING_SMART_WILDS)) // GRAFT: new-game setting
+        return TRUE;
 #if WE_SMART_WILD_AI_FLAG != 0
     return (FlagGet(WE_SMART_WILD_AI_FLAG));
 #else

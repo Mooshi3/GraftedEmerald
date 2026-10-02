@@ -117,6 +117,7 @@ TEST("Every trainer's party takes enemy grafts validly on its own map")
 
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
     for (i = slice; i < ARRAY_COUNT(sTrainerMaps); i += SLICES)
     {
         u32 trainer = sTrainerMaps[i].trainer;
@@ -142,4 +143,5 @@ TEST("Every trainer's party takes enemy grafts validly on its own map")
     EXPECT_GT(checked, 90);
     VarSet(VAR_GRAFTED_SETTINGS, 0);
     VarSet(VAR_GRAFTED_SETTINGS_2, 0);
+    VarSet(VAR_GRAFTED_SETTINGS_3, 0);
 }

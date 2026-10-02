@@ -143,6 +143,7 @@ s32 DoFixedDamageMoveCalc(struct DamageContext *ctx);
 s32 ApplyModifiersAfterDmgRoll(struct DamageContext *ctx, s32 dmg);
 uq4_12_t CalcTypeEffectivenessMultiplier(struct DamageContext *ctx);
 uq4_12_t CalcPartyMonTypeEffectivenessMultiplier(enum Move move, enum Species speciesDef, enum Ability abilityDef, struct Pokemon *monDef);
+bool32 IsInverseBattle(void);
 uq4_12_t GetTypeModifier(enum Type atkType, enum Type defType);
 uq4_12_t GetOverworldTypeEffectiveness(struct Pokemon *mon, enum Type moveType);
 void UpdateMoveResultFlags(uq4_12_t modifier, u32 *resultFlags);

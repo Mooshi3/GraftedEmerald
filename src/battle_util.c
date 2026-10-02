@@ -5982,7 +5982,7 @@ static bool32 IsBattlerGroundedInverseCheck(enum BattlerId battler, enum Ability
         return TRUE;
     if (IsBattlerUngroundedByAbilityItemOrEffect(battler, ability, holdEffect))
         return FALSE;
-    if (IS_BATTLER_OF_TYPE(battler, TYPE_FLYING) && (checkInverse != INVERSE_BATTLE || !FlagGet(B_FLAG_INVERSE_BATTLE)))
+    if (IS_BATTLER_OF_TYPE(battler, TYPE_FLYING) && (checkInverse != INVERSE_BATTLE || !IsInverseBattle()))
         return FALSE;
     return TRUE;
 }
@@ -8331,7 +8331,7 @@ static inline uq4_12_t CalcTypeEffectivenessMultiplierInternal(struct DamageCont
         && ctx->holdEffects[ctx->battlerDef] == HOLD_EFFECT_IRON_BALL
         && IS_BATTLER_OF_TYPE(ctx->battlerDef, TYPE_FLYING)
         && !IsBattlerGrounded(ctx->battlerDef, ctx->abilities[ctx->battlerDef], HOLD_EFFECT_NONE) // We want to ignore Iron Ball so skip item check
-        && !FlagGet(B_FLAG_INVERSE_BATTLE))
+        && !IsInverseBattle())
     {
         modifier = UQ_4_12(1.0);
     }
@@ -8472,9 +8472,17 @@ uq4_12_t GetOverworldTypeEffectiveness(struct Pokemon *mon, enum Type moveType)
     return modifier;
 }
 
-uq4_12_t GetTypeModifier(enum Type atkType, enum Type defType)
+// GRAFT: the Inverse Battles setting flips every battle but link battles; the flag is for scripted ones
+bool32 IsInverseBattle(void)
 {
     if (B_FLAG_INVERSE_BATTLE != 0 && FlagGet(B_FLAG_INVERSE_BATTLE))
+        return TRUE;
+    return GetGraftSetting(GRAFT_SETTING_INVERSE) && !(gBattleTypeFlags & BATTLE_TYPE_LINK);
+}
+
+uq4_12_t GetTypeModifier(enum Type atkType, enum Type defType)
+{
+    if (IsInverseBattle())
         return GetInverseTypeMultiplier(gTypeEffectivenessTable[atkType][defType]);
     return gTypeEffectivenessTable[atkType][defType];
 }
@@ -9933,6 +9941,8 @@ bool32 IsSleepClauseEnabled(void)
     if (B_SLEEP_CLAUSE)
         return TRUE;
     if (FlagGet(B_FLAG_SLEEP_CLAUSE))
+        return TRUE;
+    if (GetGraftSetting(GRAFT_SETTING_SLEEP_CLAUSE) && !(gBattleTypeFlags & BATTLE_TYPE_LINK)) // GRAFT: new-game setting
         return TRUE;
     return FALSE;
 }

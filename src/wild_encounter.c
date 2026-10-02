@@ -1344,6 +1344,22 @@ static void ApplyCleanseTagEncounterRateMod(u32 *encRate)
         *encRate = *encRate * 2 / 3;
 }
 
+// GRAFT: the Double Wilds setting. Never under Nuzlocke, where an area's encounter is one Pokémon.
+static u32 GetDoubleWildChance(void)
+{
+    if (GetGraftSetting(GRAFT_SETTING_ENCOUNTERS))
+        return 0;
+    switch (GetGraftSetting(GRAFT_SETTING_DOUBLE_WILDS))
+    {
+    case GRAFT_DOUBLE_WILDS_SOMETIMES:
+        return 20;
+    case GRAFT_DOUBLE_WILDS_OFTEN:
+        return 50;
+    default:
+        return WE_DOUBLE_WILD_CHANCE;
+    }
+}
+
 bool8 TryDoDoubleWildBattle(void)
 {
     if (GetSafariZoneFlag()
@@ -1354,7 +1370,7 @@ bool8 TryDoDoubleWildBattle(void)
         return TRUE;
     else if (FlagGet(WE_FLAG_FORCE_DOUBLE_WILD))
         return TRUE;
-    else if (RandomPercentage(RNG_NONE, WE_DOUBLE_WILD_CHANCE))
+    else if (RandomPercentage(RNG_NONE, GetDoubleWildChance()))
         return TRUE;
     return FALSE;
 }

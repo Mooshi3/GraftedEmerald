@@ -35,12 +35,13 @@ struct GraftSettingInfo
     bool32 (*isValidChoice)(u32 value);   // optional: values to skip while cycling
     u8 choiceCount;
     u8 defaultChoice;
-    u8 shift; // bit position in the 32-bit settings word
+    u8 shift; // bit position in the 48-bit settings word
     u8 bits;
     s8 requires; // setting that must be non-zero for this one to matter, or -1
 };
 
 static const u8 *const sOffOn[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("On") };
+static const u8 *const sDoubleWildChoices[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("Sometimes"), COMPOUND_STRING("Often") };
 
 static const u8 *const sShinyOddsChoices[GRAFT_SHINY_ODDS_COUNT] =
 {
@@ -287,17 +288,42 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .choiceName = MonotypeName, .isValidChoice = IsMonotypeChoice, .choiceCount = NUMBER_OF_MON_TYPES,
         .defaultChoice = TYPE_NONE, .shift = 19, .bits = 5, .requires = -1,
     },
+    [GRAFT_SETTING_SLEEP_CLAUSE] = {
+        .name = COMPOUND_STRING("Sleep Clause"),
+        .description = COMPOUND_STRING("Only one Pokémon on each side can\nbe put to sleep at a time."),
+        .choices = sOffOn, .choiceCount = 2,
+        .defaultChoice = FALSE, .shift = 32, .bits = 1, .requires = -1,
+    },
+    [GRAFT_SETTING_INVERSE] = {
+        .name = COMPOUND_STRING("Inverse Battles"),
+        .description = COMPOUND_STRING("The type chart is flipped in every\nbattle: Fire beats Water."),
+        .choices = sOffOn, .choiceCount = 2,
+        .defaultChoice = FALSE, .shift = 33, .bits = 1, .requires = -1,
+    },
+    [GRAFT_SETTING_DOUBLE_WILDS] = {
+        .name = COMPOUND_STRING("Double Wilds"),
+        .description = COMPOUND_STRING("How often two wild Pokémon appear\nat once. Never with Nuzlocke."),
+        .choices = sDoubleWildChoices, .choiceCount = GRAFT_DOUBLE_WILDS_COUNT,
+        .defaultChoice = GRAFT_DOUBLE_WILDS_OFF, .shift = 34, .bits = 2, .requires = -1,
+    },
+    [GRAFT_SETTING_SMART_WILDS] = {
+        .name = COMPOUND_STRING("Smart Wilds"),
+        .description = COMPOUND_STRING("Wild Pokémon choose their moves\nlike trainers do."),
+        .choices = sOffOn, .choiceCount = 2,
+        .defaultChoice = FALSE, .shift = 36, .bits = 1, .requires = -1,
+    },
 };
 
-static u32 GetSettingsWord(void)
+static u64 GetSettingsWord(void)
 {
-    return VarGet(VAR_GRAFTED_SETTINGS) | (VarGet(VAR_GRAFTED_SETTINGS_2) << 16);
+    return VarGet(VAR_GRAFTED_SETTINGS) | ((u64)VarGet(VAR_GRAFTED_SETTINGS_2) << 16) | ((u64)VarGet(VAR_GRAFTED_SETTINGS_3) << 32);
 }
 
-static void SetSettingsWord(u32 word)
+static void SetSettingsWord(u64 word)
 {
     VarSet(VAR_GRAFTED_SETTINGS, word & 0xFFFF);
-    VarSet(VAR_GRAFTED_SETTINGS_2, word >> 16);
+    VarSet(VAR_GRAFTED_SETTINGS_2, (word >> 16) & 0xFFFF);
+    VarSet(VAR_GRAFTED_SETTINGS_3, (word >> 32) & 0xFFFF);
 }
 
 static bool32 IsValidChoice(const struct GraftSettingInfo *info, u32 value)
@@ -319,9 +345,9 @@ u32 GetGraftSetting(enum GraftSetting setting)
 void SetGraftSetting(enum GraftSetting setting, u32 value)
 {
     const struct GraftSettingInfo *info = &sGraftSettings[setting];
-    u32 mask = ((1 << info->bits) - 1) << info->shift;
-    u32 word = GetSettingsWord() & ~mask;
-    word |= ((value ^ info->defaultChoice) << info->shift) & mask;
+    u64 mask = (u64)((1 << info->bits) - 1) << info->shift;
+    u64 word = GetSettingsWord() & ~mask;
+    word |= ((u64)(value ^ info->defaultChoice) << info->shift) & mask;
     SetSettingsWord(word);
 }
 
