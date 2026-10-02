@@ -23,6 +23,8 @@
 #define ROGUE_DOOR_NEXT_ROOM   0
 #define ROGUE_DOOR_STARTED_RUN 1 // STR_VAR_1 holds the starter's name
 #define ROGUE_DOOR_WON_RUN     2
+#define ROGUE_DOOR_ASK_MODE    3 // Hard mode is open: ask Normal or Hard (VAR_0x8005), then take the door again
+#define ROGUE_DOOR_CHOOSE_STARTER 4 // the run started; the player picks the starter
 
 // Where the player arrives in every room
 #define ROGUE_ENTRANCE_X 10

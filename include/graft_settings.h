@@ -28,6 +28,7 @@ enum GraftSetting
     GRAFT_SETTING_DOUBLE_WILDS,
     GRAFT_SETTING_SMART_WILDS,
     GRAFT_SETTING_WILD_SPAWNS,
+    GRAFT_SETTING_ROGUE_META, // Rogue: earn BP for unlocks (On), or everything unlocked (Off)
     GRAFT_SETTINGS_COUNT,
 };
 

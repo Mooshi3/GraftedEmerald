@@ -68,16 +68,43 @@ Rogue_Room_EventScript_Door::
 	lockall
 	special Rogue_CanLeaveRoom
 	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_DoorBlocked
+	setvar VAR_0x8005, 0
+Rogue_Room_EventScript_TakeDoor::
 	special Rogue_TakeDoor
+	goto_if_eq VAR_RESULT, ROGUE_DOOR_ASK_MODE, Rogue_Room_EventScript_AskMode
+	goto_if_eq VAR_RESULT, ROGUE_DOOR_CHOOSE_STARTER, Rogue_Room_EventScript_ChooseStarter
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_STARTED_RUN, Rogue_Room_EventScript_StartedRun
 	goto_if_eq VAR_RESULT, ROGUE_DOOR_WON_RUN, Rogue_Room_EventScript_WonRun
 	goto Rogue_Room_EventScript_Warp
+	end
+
+Rogue_Room_EventScript_AskMode::
+	msgbox Rogue_Room_Text_AskHardMode, MSGBOX_YESNO
+	setvar VAR_0x8005, 1
+	goto_if_eq VAR_RESULT, NO, Rogue_Room_EventScript_TakeDoor
+	setvar VAR_0x8005, 2
+	goto Rogue_Room_EventScript_TakeDoor
+	end
+
+Rogue_Room_EventScript_ChooseStarter::
+	msgbox Rogue_Room_Text_ChooseStarter, MSGBOX_DEFAULT
+	special Rogue_PushStarterChoices
+	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	special Rogue_GiveChosenStarter
+	goto Rogue_Room_EventScript_StartedRun
 	end
 
 Rogue_Room_EventScript_StartedRun::
 	playfanfare MUS_OBTAIN_ITEM
 	msgbox Rogue_Room_Text_ReceivedStarter, MSGBOX_DEFAULT
 	waitfanfare
+	special Rogue_HasHeirloom
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_Warp
+	msgbox Rogue_Room_Text_ChooseHeirloom, MSGBOX_DEFAULT
+	special Rogue_PushHeirloomChoices
+	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	special Rogue_GiveHeirloom
+	msgbox Rogue_Room_Text_GotHeirloom, MSGBOX_DEFAULT
 	goto Rogue_Room_EventScript_Warp
 	end
 
@@ -121,7 +148,6 @@ Rogue_Room_EventScript_CheckTeamCap::
 	closemessage
 Rogue_Room_EventScript_ChooseRelease::
 	special ChoosePartyMon
-	waitstate
 	goto_if_ge VAR_0x8004, PARTY_SIZE, Rogue_Room_EventScript_ChooseRelease
 	bufferpartymonnick STR_VAR_1, VAR_0x8004
 	msgbox Rogue_Room_Text_ConfirmRelease, MSGBOX_YESNO
@@ -193,9 +219,60 @@ Rogue_Room_EventScript_Nurse::
 	release
 	end
 
+Rogue_Room_EventScript_UnlockShop::
+	lock
+	faceplayer
+	special Rogue_BufferBP
+	msgbox Rogue_Room_Text_UnlockShopIntro, MSGBOX_DEFAULT
+Rogue_Room_EventScript_UnlockShopLoop::
+	special Rogue_PushUnlockChoices
+	goto_if_eq VAR_RESULT, 0, Rogue_Room_EventScript_UnlockShopSoldOut
+	dynmultistack 0, 0, FALSE, 5, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	goto_if_eq VAR_RESULT, MULTI_B_PRESSED, Rogue_Room_EventScript_UnlockShopEnd
+	copyvar VAR_0x8004, VAR_RESULT
+	special Rogue_DescribeUnlock
+	msgbox gStringVar4, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, NO, Rogue_Room_EventScript_UnlockShopLoop
+	special Rogue_BuyUnlock
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_UnlockShopNoBP
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	waitfanfare
+	goto Rogue_Room_EventScript_UnlockShopLoop
+Rogue_Room_EventScript_UnlockShopNoBP:
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	goto Rogue_Room_EventScript_UnlockShopLoop
+Rogue_Room_EventScript_UnlockShopSoldOut:
+	msgbox Rogue_Room_Text_UnlockShopSoldOut, MSGBOX_DEFAULT
+Rogue_Room_EventScript_UnlockShopEnd:
+	release
+	end
+
 Rogue_Room_EventScript_Guide::
 	msgbox Rogue_Room_Text_Guide, MSGBOX_NPC
 	end
+
+Rogue_Room_Text_AskHardMode:
+	.string "Take on HARD mode?\n"
+	.string "Eight floors and the ELITE FOUR.$"
+
+Rogue_Room_Text_ChooseStarter:
+	.string "Choose your partner!$"
+
+Rogue_Room_Text_ChooseHeirloom:
+	.string "Pick a graft piece to bring along.$"
+
+Rogue_Room_Text_GotHeirloom:
+	.string "{STR_VAR_1} was added to the\n"
+	.string "GRAFT BAG.$"
+
+Rogue_Room_Text_UnlockShopIntro:
+	.string "I trade BP for things that help\n"
+	.string "every run after this one.\p"
+	.string "You have {STR_VAR_1} BP.$"
+
+Rogue_Room_Text_UnlockShopSoldOut:
+	.string "You've unlocked everything I have!$"
 
 Rogue_Room_Text_ReceivedStarter:
 	.string "{PLAYER} received {STR_VAR_1}!$"

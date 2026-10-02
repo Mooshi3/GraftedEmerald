@@ -33,5 +33,14 @@ void Rogue_PrepareItemBall(void);
 void Rogue_OnBossDefeated(void);
 void Rogue_IsTeamOverCap(void);
 void Rogue_ReleasePartyMon(void);
+void Rogue_PushStarterChoices(void);
+void Rogue_GiveChosenStarter(void);
+void Rogue_HasHeirloom(void);
+void Rogue_PushHeirloomChoices(void);
+void Rogue_GiveHeirloom(void);
+void Rogue_BufferBP(void);
+void Rogue_PushUnlockChoices(void);
+void Rogue_DescribeUnlock(void);
+void Rogue_BuyUnlock(void);
 
 #endif // GUARD_ROGUE_H

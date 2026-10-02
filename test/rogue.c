@@ -5,6 +5,7 @@
 #include "pokemon.h"
 #include "test/test.h"
 #include "constants/rogue.h"
+#include "graft_settings.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
 
@@ -160,4 +161,49 @@ TEST("After the last floor's boss comes the Champion, then the way out")
     EXPECT_GE((u32)GetTrainerStructFromId(TRAINER_ROGUE_BOSS)->partySize, 5);
     EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
     EXPECT_EQ(doors[1], ROGUE_ROOM_HUB);
+}
+
+TEST("Rogue unlocks cost BP and apply from the next run")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    gSaveBlock2Ptr->frontier.battlePoints = 45;
+    gSpecialVar_0x8004 = 1; // 4th team slot, 40 BP
+    Rogue_BuyUnlock();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5);
+    gSpecialVar_0x8004 = 0; // starter choice, 30 BP: not enough left
+    Rogue_BuyUnlock();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5);
+
+    VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
+    VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+    gSpecialVar_0x8004 = 1;
+    gSpecialVar_0x8005 = 0;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_STARTED_RUN);
+    EXPECT_EQ(VarGet(VAR_ROGUE_TEAM_SLOTS), 4);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+}
+
+TEST("With Unlocks Off, a run starts with everything unlocked")
+{
+    SetGraftSetting(GRAFT_SETTING_ROGUE_META, FALSE);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
+    VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+    gSpecialVar_0x8004 = 1;
+    gSpecialVar_0x8005 = 0;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_ASK_MODE); // Hard mode is open too
+    gSpecialVar_0x8005 = 2;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_CHOOSE_STARTER);
+    EXPECT_EQ(CalculatePlayerPartyCount(), 0);
+    gSpecialVar_Result = 2;
+    Rogue_GiveChosenStarter();
+    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
+    EXPECT_EQ(VarGet(VAR_ROGUE_TEAM_SLOTS), 6);
+    EXPECT_EQ(VarGet(VAR_ROGUE_RUN_FLAGS), 1);
+    SetGraftSetting(GRAFT_SETTING_ROGUE_META, TRUE);
 }

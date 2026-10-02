@@ -43,6 +43,11 @@ struct GraftSettingInfo
 #define GRAFT_INVERSE_SHIFT 33
 STATIC_ASSERT(GRAFT_INVERSE_SHIFT >= 32 && GRAFT_INVERSE_SHIFT < 48, InverseSettingNotInVar3);
 static const u8 *const sOffOn[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("On") };
+static const u8 *const sRogueMetaDescriptions[] =
+{
+    COMPOUND_STRING("Every unlock is open from the\nstart. No BP to earn."),
+    COMPOUND_STRING("Bosses pay BP. Spend it on unlocks\nfor your next runs."),
+};
 static const u8 *const sWildSpawnChoices[] = { COMPOUND_STRING("Hidden"), COMPOUND_STRING("Visible"), COMPOUND_STRING("Both") };
 static const u8 *const sDoubleWildChoices[] = { COMPOUND_STRING("Off"), COMPOUND_STRING("Sometimes"), COMPOUND_STRING("Often") };
 
@@ -320,6 +325,11 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
         .description = COMPOUND_STRING("Visible: wild Pokémon roam the\nfield. Always Hidden with Nuzlocke."),
         .choices = sWildSpawnChoices, .choiceCount = GRAFT_WILD_SPAWNS_COUNT,
         .defaultChoice = GRAFT_WILD_SPAWNS_HIDDEN, .shift = 37, .bits = 2, .requires = -1,
+    },
+    [GRAFT_SETTING_ROGUE_META] = {
+        .name = COMPOUND_STRING("Unlocks"),
+        .choices = sOffOn, .choiceCount = 2, .choiceDescriptions = sRogueMetaDescriptions,
+        .defaultChoice = TRUE, .shift = 39, .bits = 1, .requires = -1,
     },
 };
 

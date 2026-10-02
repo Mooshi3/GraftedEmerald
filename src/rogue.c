@@ -19,10 +19,14 @@
 #include "pokemon.h"
 #include "pokemon_storage_system.h"
 #include "random.h"
+#include "script_menu.h"
+#include "malloc.h"
+#include "list_menu.h"
 #include "script.h"
 #include "script_pokemon_util.h"
 #include "sound.h"
 #include "string_util.h"
+#include "constants/battle_frontier.h"
 #include "constants/event_object_movement.h"
 #include "constants/event_objects.h"
 #include "constants/flags.h"
@@ -40,6 +44,7 @@ extern const u8 Rogue_Room_EventScript_Boss[];
 extern const u8 Rogue_Room_EventScript_Shop[];
 extern const u8 Rogue_Room_EventScript_Nurse[];
 extern const u8 Rogue_Room_EventScript_Guide[];
+extern const u8 Rogue_Room_EventScript_UnlockShop[];
 
 // The room map: 22x18 tiles, trees in 2x2 blocks. The outer two blocks are forest, the inside is
 // 7x5 blocks (tiles 4..17 x 4..13). Doors are openings in the north forest at block columns 3, 5, 7.
@@ -187,6 +192,52 @@ static const struct { u16 item; u8 quantity; u8 weight; u8 minFloor; } sItemBall
     {ITEM_SITRUS_BERRY,   1,  3, 1},
 };
 
+// Meta-progression: unlocks bought with BP in the start room, kept between runs (VAR_ROGUE_UNLOCKS)
+enum
+{
+    UNLOCK_STARTER_CHOICE,
+    UNLOCK_TEAM_4,
+    UNLOCK_TEAM_5,
+    UNLOCK_TEAM_6,
+    UNLOCK_MORE_BALLS,
+    UNLOCK_REVIVES,
+    UNLOCK_AUTO_HARVEST,
+    UNLOCK_START_PIECE,
+    UNLOCK_SHOP_COUNT,
+    UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
+};
+
+static const struct
+{
+    const u8 *name;
+    const u8 *description;
+    u16 cost;
+    s8 requires;
+} sUnlocks[UNLOCK_SHOP_COUNT] =
+{
+    [UNLOCK_STARTER_CHOICE] = {COMPOUND_STRING("Starter choice"), COMPOUND_STRING("Choose your starter from three."), 30, -1},
+    [UNLOCK_TEAM_4] = {COMPOUND_STRING("4th team slot"), COMPOUND_STRING("Your team can hold 4 Pokémon."), 40, -1},
+    [UNLOCK_TEAM_5] = {COMPOUND_STRING("5th team slot"), COMPOUND_STRING("Your team can hold 5 Pokémon."), 70, UNLOCK_TEAM_4},
+    [UNLOCK_TEAM_6] = {COMPOUND_STRING("6th team slot"), COMPOUND_STRING("Your team can hold 6 Pokémon."), 100, UNLOCK_TEAM_5},
+    [UNLOCK_MORE_BALLS] = {COMPOUND_STRING("Ball pouch"), COMPOUND_STRING("Start with 3 more Poké Balls\nand 2 more Patch Balls."), 20, -1},
+    [UNLOCK_REVIVES] = {COMPOUND_STRING("First aid"), COMPOUND_STRING("Start with 2 Revives."), 30, -1},
+    [UNLOCK_AUTO_HARVEST] = {COMPOUND_STRING("Last rites"), COMPOUND_STRING("Fainted Pokémon are broken down\ninto graft pieces, not lost."), 60, -1},
+    [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
+};
+
+#define RUN_FLAG_HARD (1 << 0)
+
+static bool32 IsMetaOn(void)
+{
+    return GetGraftSetting(GRAFT_SETTING_ROGUE_META);
+}
+
+// With Unlocks Off, everything is open
+static bool32 HasUnlock(u32 id)
+{
+    return !IsMetaOn() || ((VarGet(VAR_ROGUE_UNLOCKS) >> id) & 1);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Run state
 
@@ -216,6 +267,11 @@ static u32 GetTeamSlots(void)
 {
     u32 slots = VarGet(VAR_ROGUE_TEAM_SLOTS);
     return slots ? slots : 3;
+}
+
+static u32 GetStartingTeamSlots(void)
+{
+    return 3 + HasUnlock(UNLOCK_TEAM_4) + HasUnlock(UNLOCK_TEAM_5) + HasUnlock(UNLOCK_TEAM_6);
 }
 
 bool32 Rogue_IsTeamFull(void)
@@ -283,7 +339,7 @@ static u32 GetFloorBoss(u32 floor)
 // Hard mode: the full length (8 floors, then the Elite Four). Unlocked by a win (meta-progression).
 static bool32 IsHardMode(void)
 {
-    return FALSE;
+    return VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_HARD;
 }
 
 static u32 GetNumFloors(void)
@@ -654,6 +710,8 @@ static void BuildRoomPlan(void)
     {
     case ROGUE_ROOM_HUB:
         AddObject(OBJ_EVENT_GFX_PROF_BIRCH, 13, 9, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Guide);
+        if (IsMetaOn())
+            AddObject(OBJ_EVENT_GFX_SCIENTIST_1, 7, 9, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_UnlockShop);
         break;
     case ROGUE_ROOM_WILD:
         count = 1 + (LocalRandom(&rng) % 100 < 35);
@@ -891,7 +949,7 @@ static void SetForcedSettings(void)
     SetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY, GRAFT_SUPPLY_SHOP);
     SetGraftSetting(GRAFT_SETTING_HARVESTS, GRAFT_HARVESTS_ANY);
     SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, FALSE);
-    SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_RELEASE);
+    SetGraftSetting(GRAFT_SETTING_FAINTING, HasUnlock(UNLOCK_AUTO_HARVEST) ? GRAFT_FAINTING_AUTO_SPLICE : GRAFT_FAINTING_RELEASE);
     SetGraftSetting(GRAFT_SETTING_WILD_SPAWNS, GRAFT_WILD_SPAWNS_HIDDEN);
     SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_OFF);
 }
@@ -910,11 +968,32 @@ static void ClearRunProgress(void)
     VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
 }
 
-static void StartRun(void)
+// The starter candidates of a run: one, or three with the Starter choice unlock
+static void GetStarterCandidates(enum Species *out)
+{
+    rng_value_t rng = LocalRandomSeed(Mix32(GetRunSeed() ^ 0x57A7));
+    u32 i, j;
+    for (i = 0; i < 3; i++)
+    {
+        do
+        {
+            out[i] = PickStarter(&rng);
+            for (j = 0; j < i && out[j] != out[i]; j++)
+                ;
+        } while (j < i);
+    }
+}
+
+static void GiveStarter(enum Species species)
+{
+    ScriptGiveMon(species, 5, ITEM_NONE);
+    StringCopy(gStringVar1, GetSpeciesName(species));
+}
+
+static void StartRun(bool32 hard)
 {
     u32 seed = Random32();
-    rng_value_t rng;
-    enum Species starter;
+    enum Species starters[3];
 
     ClearRunProgress();
     VarSet(VAR_ROGUE_SEED_LO, seed & 0xFFFF);
@@ -923,16 +1002,20 @@ static void StartRun(void)
     VarSet(VAR_ROGUE_FLOOR, 1);
     VarSet(VAR_ROGUE_ROOM, 1);
     VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD);
-    VarSet(VAR_ROGUE_TEAM_SLOTS, 3);
+    VarSet(VAR_ROGUE_TEAM_SLOTS, GetStartingTeamSlots());
+    VarSet(VAR_ROGUE_RUN_FLAGS, hard ? RUN_FLAG_HARD : 0);
     SetForcedSettings();
 
-    rng = LocalRandomSeed(Mix32(seed ^ 0x57A7));
-    starter = PickStarter(&rng);
-    ScriptGiveMon(starter, 5, ITEM_NONE);
-    StringCopy(gStringVar1, GetSpeciesName(starter));
+    if (!HasUnlock(UNLOCK_STARTER_CHOICE))
+    {
+        GetStarterCandidates(starters);
+        GiveStarter(starters[0]);
+    }
 
-    AddBagItem(ITEM_POKE_BALL, 5);
-    AddBagItem(ITEM_PATCH_BALL, 3);
+    AddBagItem(ITEM_POKE_BALL, HasUnlock(UNLOCK_MORE_BALLS) ? 8 : 5);
+    AddBagItem(ITEM_PATCH_BALL, HasUnlock(UNLOCK_MORE_BALLS) ? 5 : 3);
+    if (HasUnlock(UNLOCK_REVIVES))
+        AddBagItem(ITEM_REVIVE, 2);
     AddBagItem(ITEM_GRAFT_BALL, 1);
     AddBagItem(ITEM_POTION, 3);
     SetMoney(&gSaveBlock1Ptr->money, 1000);
@@ -960,8 +1043,14 @@ void Rogue_TakeDoor(void)
 
     if (door == ROGUE_ROOM_START)
     {
-        StartRun();
-        gSpecialVar_Result = ROGUE_DOOR_STARTED_RUN;
+        // VAR_0x8005: 0 = not asked yet, 1 = Normal, 2 = Hard
+        if (gSpecialVar_0x8005 == 0 && HasUnlock(UNLOCK_HARD_MODE))
+        {
+            gSpecialVar_Result = ROGUE_DOOR_ASK_MODE;
+            return;
+        }
+        StartRun(gSpecialVar_0x8005 == 2);
+        gSpecialVar_Result = HasUnlock(UNLOCK_STARTER_CHOICE) ? ROGUE_DOOR_CHOOSE_STARTER : ROGUE_DOOR_STARTED_RUN;
         return;
     }
     if (door == ROGUE_ROOM_HUB)
@@ -1020,9 +1109,23 @@ void Rogue_PrepareItemBall(void)
     gSpecialVar_0x8001 = sItemBallItems[pick].quantity;
 }
 
+static void GiveBP(u32 amount)
+{
+    gSaveBlock2Ptr->frontier.battlePoints = min(gSaveBlock2Ptr->frontier.battlePoints + amount, MAX_BATTLE_FRONTIER_POINTS);
+}
+
+static u32 GetBossBP(void)
+{
+    u32 bp = IsFinale(GetFloor()) ? 10 : 5;
+    if (IsFinale(GetFloor()) && GetRoom() >= GetFinaleLength())
+        bp += 10; // the run is won
+    return IsHardMode() ? bp * 2 : bp;
+}
+
 void Rogue_OnBossDefeated(void)
 {
     u32 floor = GetFloor();
+    u32 bp = GetBossBP();
 
     if (!IsFinale(floor) && floor <= NUM_BADGES)
         FlagSet(FLAG_BADGE01_GET + floor - 1);
@@ -1039,6 +1142,156 @@ void Rogue_OnBossDefeated(void)
         ConvertIntToDecimalStringN(gStringVar1, floor, STR_CONV_MODE_LEFT_ALIGN, 2);
         StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("FLOOR {STR_VAR_1} cleared!\nThe way forward is open."));
     }
+    if (IsFinale(floor) && GetRoom() >= GetFinaleLength() && !IsHardMode() && IsMetaOn()
+     && !HasUnlock(UNLOCK_HARD_MODE))
+    {
+        VarSet(VAR_ROGUE_UNLOCKS, VarGet(VAR_ROGUE_UNLOCKS) | (1 << UNLOCK_HARD_MODE));
+        StringAppend(gStringVar4, COMPOUND_STRING("\pHARD mode is open: eight floors\nand the ELITE FOUR!"));
+    }
+    if (IsMetaOn())
+    {
+        GiveBP(bp);
+        ConvertIntToDecimalStringN(gStringVar2, bp, STR_CONV_MODE_LEFT_ALIGN, 3);
+        StringAppend(gStringVar4, COMPOUND_STRING("\p"));
+        StringExpandPlaceholders(gStringVar3, COMPOUND_STRING("You earned {STR_VAR_2} BP!"));
+        StringAppend(gStringVar4, gStringVar3);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Start of a run: starter and heirloom choices
+
+static void PushChoice(const u8 *name, u32 id)
+{
+    struct ListMenuItem item;
+    u8 *buffer = Alloc(100);
+    StringCopy(buffer, name);
+    item.name = buffer;
+    item.id = id;
+    MultichoiceDynamic_PushElement(item);
+}
+
+void Rogue_PushStarterChoices(void)
+{
+    enum Species starters[3];
+    u32 i;
+    GetStarterCandidates(starters);
+    for (i = 0; i < 3; i++)
+        PushChoice(GetSpeciesName(starters[i]), i);
+}
+
+void Rogue_GiveChosenStarter(void)
+{
+    enum Species starters[3];
+    GetStarterCandidates(starters);
+    GiveStarter(starters[gSpecialVar_Result < 3 ? gSpecialVar_Result : 0]);
+}
+
+static const u16 sHeirloomAbilities[] =
+{
+    ABILITY_INTIMIDATE, ABILITY_LEVITATE, ABILITY_SPEED_BOOST, ABILITY_ADAPTABILITY, ABILITY_TECHNICIAN,
+    ABILITY_MAGIC_GUARD, ABILITY_REGENERATOR, ABILITY_MOXIE, ABILITY_SHEER_FORCE, ABILITY_TOUGH_CLAWS,
+    ABILITY_PRANKSTER, ABILITY_MULTISCALE, ABILITY_THICK_FAT, ABILITY_GUTS, ABILITY_TINTED_LENS,
+    ABILITY_SERENE_GRACE, ABILITY_SKILL_LINK, ABILITY_STURDY, ABILITY_DROUGHT, ABILITY_DRIZZLE,
+};
+
+// The heirloom's three candidates: an ability, a high stat and a type
+static void GetHeirloomCandidates(struct GraftPiece *out)
+{
+    rng_value_t rng = LocalRandomSeed(Mix32(GetRunSeed() ^ 0x4E1B));
+    out[0].kind = GRAFT_PIECE_ABILITY;
+    out[0].stat = 0;
+    out[0].value = sHeirloomAbilities[LocalRandom(&rng) % ARRAY_COUNT(sHeirloomAbilities)];
+    out[1].kind = GRAFT_PIECE_STAT;
+    out[1].stat = LocalRandom(&rng) % NUM_STATS;
+    out[1].value = 110 + LocalRandom(&rng) % 31;
+    out[2].kind = GRAFT_PIECE_TYPE;
+    out[2].stat = 0;
+    do
+        out[2].value = TYPE_NORMAL + LocalRandom(&rng) % (TYPE_FAIRY - TYPE_NORMAL + 1);
+    while (out[2].value == TYPE_MYSTERY);
+}
+
+void Rogue_HasHeirloom(void)
+{
+    gSpecialVar_Result = HasUnlock(UNLOCK_START_PIECE);
+}
+
+void Rogue_PushHeirloomChoices(void)
+{
+    struct GraftPiece pieces[3];
+    u8 name[64];
+    u32 i;
+    GetHeirloomCandidates(pieces);
+    for (i = 0; i < 3; i++)
+    {
+        GetGraftPieceName(name, &pieces[i]);
+        PushChoice(name, i);
+    }
+}
+
+void Rogue_GiveHeirloom(void)
+{
+    struct GraftPiece pieces[3];
+    struct GraftPiece *piece;
+    GetHeirloomCandidates(pieces);
+    piece = &pieces[gSpecialVar_Result < 3 ? gSpecialVar_Result : 0];
+    AddGraftPiece(piece);
+    GiveGraftBagIfMissing();
+    GetGraftPieceName(gStringVar1, piece);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The unlock shop (start room)
+
+void Rogue_BufferBP(void)
+{
+    ConvertIntToDecimalStringN(gStringVar1, gSaveBlock2Ptr->frontier.battlePoints, STR_CONV_MODE_LEFT_ALIGN, 4);
+}
+
+// Pushes the unlocks still for sale; VAR_RESULT = how many
+void Rogue_PushUnlockChoices(void)
+{
+    u32 i, count = 0;
+    u8 name[48];
+    for (i = 0; i < UNLOCK_SHOP_COUNT; i++)
+    {
+        if (HasUnlock(i) || (sUnlocks[i].requires >= 0 && !HasUnlock(sUnlocks[i].requires)))
+            continue;
+        ConvertIntToDecimalStringN(gStringVar2, sUnlocks[i].cost, STR_CONV_MODE_LEFT_ALIGN, 3);
+        StringCopy(name, sUnlocks[i].name);
+        StringAppend(name, COMPOUND_STRING(" "));
+        StringAppend(name, gStringVar2);
+        StringAppend(name, COMPOUND_STRING("BP"));
+        PushChoice(name, i);
+        count++;
+    }
+    gSpecialVar_Result = count;
+}
+
+void Rogue_DescribeUnlock(void)
+{
+    u32 id = gSpecialVar_0x8004 % UNLOCK_SHOP_COUNT;
+    ConvertIntToDecimalStringN(gStringVar2, sUnlocks[id].cost, STR_CONV_MODE_LEFT_ALIGN, 3);
+    StringCopy(gStringVar4, sUnlocks[id].description);
+    StringExpandPlaceholders(gStringVar3, COMPOUND_STRING("\pUnlock it for {STR_VAR_2} BP?"));
+    StringAppend(gStringVar4, gStringVar3);
+}
+
+void Rogue_BuyUnlock(void)
+{
+    u32 id = gSpecialVar_0x8004 % UNLOCK_SHOP_COUNT;
+    if (gSaveBlock2Ptr->frontier.battlePoints < sUnlocks[id].cost)
+    {
+        gSpecialVar_Result = FALSE;
+        StringCopy(gStringVar4, COMPOUND_STRING("You don't have enough BP.\nBeat bosses to earn more."));
+        return;
+    }
+    gSaveBlock2Ptr->frontier.battlePoints -= sUnlocks[id].cost;
+    VarSet(VAR_ROGUE_UNLOCKS, VarGet(VAR_ROGUE_UNLOCKS) | (1 << id));
+    gSpecialVar_Result = TRUE;
+    StringCopy(gStringVar1, sUnlocks[id].name);
+    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} unlocked!\nIt's yours from the next run on."));
 }
 
 // ---------------------------------------------------------------------------------------------

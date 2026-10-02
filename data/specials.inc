@@ -654,3 +654,12 @@ def_special Rogue_PrepareItemBall
 def_special Rogue_OnBossDefeated
 def_special Rogue_IsTeamOverCap
 def_special Rogue_ReleasePartyMon
+def_special Rogue_PushStarterChoices
+def_special Rogue_GiveChosenStarter
+def_special Rogue_HasHeirloom
+def_special Rogue_PushHeirloomChoices
+def_special Rogue_GiveHeirloom
+def_special Rogue_BufferBP
+def_special Rogue_PushUnlockChoices
+def_special Rogue_DescribeUnlock
+def_special Rogue_BuyUnlock

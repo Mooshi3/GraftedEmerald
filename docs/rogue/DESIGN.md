@@ -88,5 +88,15 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
 - Debug: the debug menu's Scripts list jumps to a room type (`rogue_room` in tools/smoke/lib.sh;
   `tools/smoke/scenarios/rogue.sh` starts a run).
 
-Not done yet: meta-progression, Normal/Hard length, bosses from other generations (sprites), boss aces,
-an Elite Four finale, "?" events, room variety (caves, water), a way to swap team members at the cap.
+- Catching past the team cap asks who to let go after the battle.
+- Bosses bring their Leader's ace. After the last floor: the Champion (Normal, 4 floors) or the Elite
+  Four and the Champion (Hard, 8 floors). Beating a Normal run opens Hard mode.
+- Meta-progression (the **Unlocks** new-game setting, On by default): bosses pay BP (5 a floor, 10 in the
+  finale, +10 for the win, doubled on Hard). A scientist in the start room sells unlocks: Starter choice
+  (30), 4th/5th/6th team slot (40/70/100), Ball pouch (+3 Poké, +2 Patch Balls, 20), First aid (2 Revives,
+  30), Last rites (fainted Pokémon are auto-spliced instead of released, 60), Heirloom (start each run with
+  one of three pieces: a strong ability, a 110–140 stat, a type, 50). With Unlocks Off, all of them and
+  Hard mode are open from the start (my reading of "on/off"; Jacob to confirm).
+
+Not done yet: bosses from other generations (sprites), "?" events, room variety (caves, water), the
+"team revives on floor clear" option, hiding settings that don't apply in Rogue.
