@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "battle_pyramid.h"
 #include "bg.h"
 #include "event_data.h"
@@ -597,7 +598,8 @@ static void ShowMapNamePopUpWindow(void)
     else
     {
         withoutPrefixPtr = &(mapDisplayHeader[MAP_POPUP_PREFIX_BUFFER_LENGTH]);
-        GetPopUpMapName(withoutPrefixPtr, &gMapHeader);
+        if (!Rogue_GetPopUpName(withoutPrefixPtr)) // ROGUE: "FLOOR 1  3/10" in a run's rooms
+            GetPopUpMapName(withoutPrefixPtr, &gMapHeader);
     }
 
     if (OW_POPUP_GENERATION == GEN_5)

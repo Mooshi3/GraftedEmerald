@@ -41,6 +41,9 @@ Rogue_Room_EventScript_MetaOff:
 
 Rogue_Room_EventScript_EnterRoom::
 	setvar VAR_TEMP_2, 1
+	goto_if_eq VAR_ROGUE_STATE, ROGUE_STATE_HUB, Rogue_Room_EventScript_EnterRoomNoPopUp
+	special ShowMapNamePopup
+Rogue_Room_EventScript_EnterRoomNoPopUp:
 	special Rogue_GetRoomIntro
 	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_EnterRoomEnd
 	lockall

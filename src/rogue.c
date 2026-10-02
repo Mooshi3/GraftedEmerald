@@ -32,6 +32,7 @@
 #include "constants/event_objects.h"
 #include "constants/flags.h"
 #include "constants/items.h"
+#include "constants/layouts.h"
 #include "constants/metatile_labels.h"
 #include "constants/rogue.h"
 #include "constants/species.h"
@@ -1076,11 +1077,6 @@ void Rogue_GetRoomIntro(void)
         StringCopy(gStringVar1, type == ROGUE_ROOM_EVENT ? sEventNames[GetEventKind()] : sRoomNames[type]);
         StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Behind the “?” door: {STR_VAR_1}!"));
     }
-    else if (GetRoom() == 1)
-    {
-        ConvertIntToDecimalStringN(gStringVar1, GetFloor(), STR_CONV_MODE_LEFT_ALIGN, 2);
-        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("FLOOR {STR_VAR_1}"));
-    }
     else
     {
         gSpecialVar_Result = FALSE;
@@ -1096,6 +1092,30 @@ void Rogue_OpenDoors(void)
         FlagSet(gSaveBlock1Ptr->objectEventTemplates[i].flagId);
         RemoveObjectEventByLocalIdAndMap(i + 1, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup);
     }
+}
+
+// The map name popup in a run: where the player is
+bool32 Rogue_GetPopUpName(u8 *dest)
+{
+    if (!Rogue_IsRunActive() || gMapHeader.mapLayoutId != LAYOUT_ROGUE_ROOM)
+        return FALSE;
+    if (IsFinale(GetFloor()))
+    {
+        StringCopy(dest, GetCurrentBoss()->trainerId == TRAINER_WALLACE ? COMPOUND_STRING("CHAMPION") : COMPOUND_STRING("ELITE FOUR"));
+        return TRUE;
+    }
+    ConvertIntToDecimalStringN(gStringVar1, GetFloor(), STR_CONV_MODE_LEFT_ALIGN, 2);
+    if (GetRoomType() == ROGUE_ROOM_BOSS)
+    {
+        StringExpandPlaceholders(dest, COMPOUND_STRING("FLOOR {STR_VAR_1}  BOSS"));
+    }
+    else
+    {
+        ConvertIntToDecimalStringN(gStringVar2, GetRoom(), STR_CONV_MODE_LEFT_ALIGN, 2);
+        ConvertIntToDecimalStringN(gStringVar3, ROGUE_ROOMS_PER_FLOOR, STR_CONV_MODE_LEFT_ALIGN, 2);
+        StringExpandPlaceholders(dest, COMPOUND_STRING("FLOOR {STR_VAR_1}  {STR_VAR_2}/{STR_VAR_3}"));
+    }
+    return TRUE;
 }
 
 void Rogue_CanLeaveRoom(void)
