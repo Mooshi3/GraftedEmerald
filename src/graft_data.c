@@ -221,12 +221,97 @@ u8 GetBadgeCount(void)
     }
     return count;
 }
-u8 GetStatGraftCap(void)
+// ============================================================
+// Stat Budget: a cap on a mon's base stat total (BST), the same for every species, so a weak mon
+// has room to grow and a strong one has to trade. 420 + 20 per badge, 600 as Champion. A mon whose
+// own BST is higher keeps that as its cap: it can move points around but not add any.
+// ============================================================
+// The base form a Mega Evolution came from (the form whose Mega form change leads to it)
+static u16 GetMegaBaseSpecies(u16 mega)
 {
-    u8 badges = GetBadgeCount();
-    if (badges >= 5)
-        return 255; // uncapped
-    return 1 + badges;
+    const u16 *forms = GetSpeciesFormTable(mega);
+    for (u32 i = 0; forms[i] != FORM_SPECIES_END; i++)
+    {
+        const struct FormChange *changes;
+        if (gSpeciesInfo[forms[i]].isMegaEvolution)
+            continue;
+        changes = GetSpeciesFormChanges(forms[i]);
+        for (u32 j = 0; changes != NULL && changes[j].method != FORM_CHANGE_TERMINATOR; j++)
+        {
+            if ((changes[j].method == FORM_CHANGE_BATTLE_MEGA_EVOLUTION_ITEM || changes[j].method == FORM_CHANGE_BATTLE_MEGA_EVOLUTION_MOVE)
+             && changes[j].targetSpecies == mega)
+                return forms[i];
+        }
+    }
+    return mega;
+}
+
+// The base stat CalculateMonStats uses for a grafted stat, or 0 if the stat isn't grafted. Mega
+// Evolution adds its boost on top of a graft (the one way past the Stat Budget): a grafted 160 Sp. Atk
+// Mewtwo becomes 200 as Mega Mewtwo Y (+40), capped at 255.
+u8 GetGraftedBaseStatForCalc(const struct BoxPokemon *boxMon, u16 species, u8 statIndex)
+{
+    s32 value = boxMon->graftStatOverrides[statIndex];
+    if (value == 0)
+        return 0;
+    if (gSpeciesInfo[species].isMegaEvolution)
+    {
+        u16 base = GetMegaBaseSpecies(species);
+        value += (s32)GetSpeciesBaseStat(species, statIndex) - (s32)GetSpeciesBaseStat(base, statIndex);
+        if (value > 255)
+            value = 255;
+        if (value < 1)
+            value = 1;
+    }
+    return value;
+}
+
+u32 GetStatBudget(void)
+{
+    if (FlagGet(FLAG_IS_CHAMPION))
+        return 600;
+    return 420 + 20 * GetBadgeCount();
+}
+
+bool32 IsStatBudgetOn(void)
+{
+    return GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT) != GRAFT_LIMIT_FREE;
+}
+
+u32 GetBoxMonBaseStatTotal(const struct BoxPokemon *boxMon)
+{
+    u16 species = GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES);
+    u32 total = 0;
+    for (u32 i = 0; i < NUM_STATS; i++)
+        total += boxMon->graftStatOverrides[i] != 0 ? boxMon->graftStatOverrides[i] : GetSpeciesBaseStat(species, i);
+    return total;
+}
+
+u32 GetBoxMonStatBudget(const struct BoxPokemon *boxMon)
+{
+    u16 species = GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES);
+    u32 natural = 0, budget = GetStatBudget();
+    for (u32 i = 0; i < NUM_STATS; i++)
+        natural += GetSpeciesBaseStat(species, i);
+    return natural > budget ? natural : budget;
+}
+
+// The mon's BST if this stat were set to value
+u32 GetBoxMonBaseStatTotalWith(const struct BoxPokemon *boxMon, u8 statIndex, u8 value)
+{
+    u16 species = GetBoxMonData((struct BoxPokemon *)boxMon, MON_DATA_SPECIES);
+    u32 current = boxMon->graftStatOverrides[statIndex] != 0 ? boxMon->graftStatOverrides[statIndex] : GetSpeciesBaseStat(species, statIndex);
+    return GetBoxMonBaseStatTotal(boxMon) - current + value;
+}
+
+// Would setting this stat to value break the budget? Lowering the total is always allowed.
+bool32 IsOverStatBudget(const struct BoxPokemon *boxMon, u8 statIndex, u8 value)
+{
+    u32 after;
+    if (!IsStatBudgetOn())
+        return FALSE;
+    after = GetBoxMonBaseStatTotalWith(boxMon, statIndex, value);
+    return after > GetBoxMonStatBudget(boxMon) && after > GetBoxMonBaseStatTotal(boxMon);
 }
 u8 CountStatGraftsOnBoxMon(const struct BoxPokemon *boxMon)
 {
@@ -249,7 +334,7 @@ bool8 IsGraftHusk(const struct BoxPokemon *boxMon)
 }
 
 static const u8 sText_HuskHPGraft[] = _("It won't have any effect.");
-static const u8 sText_StatGraftLimit[] = _("Stat graft limit reached!\nNeed more badges.");
+static const u8 sText_StatBudgetFull[] = _("That would raise its base stat\ntotal past the limit.");
 static const u8 sText_FallenTarget[] = _("Fallen Pokémon can't take grafts.");
 static const u8 sText_GraftBudgetFull[] = _("It can't take any more grafts.");
 static const u8 sText_GateType[] = _("Type grafts need a badge.");
@@ -333,12 +418,8 @@ bool32 GetGraftLimitCount(const struct BoxPokemon *boxMon, u8 graftMenuType, u32
 {
     switch (GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT))
     {
-    case GRAFT_LIMIT_STANDARD:
-        if ((graftMenuType != GRAFT_MENU_STAT && graftMenuType != GRAFT_MENU_COUNT) || GetStatGraftCap() == 255)
-            return FALSE;
-        *used = CountStatGraftsOnBoxMon(boxMon);
-        *cap = GetStatGraftCap();
-        return TRUE;
+    case GRAFT_LIMIT_STAT_BUDGET:
+        return FALSE; // the BST budget has its own counter (GetBoxMonBaseStatTotal / GetBoxMonStatBudget)
     case GRAFT_LIMIT_BUDGET:
     case GRAFT_LIMIT_STRICT:
         if (graftMenuType == GRAFT_MENU_MOVE)
@@ -395,10 +476,6 @@ const u8 *GetGraftRejectReason(const struct BoxPokemon *boxMon, u8 graftMenuType
 
     switch (GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT))
     {
-    case GRAFT_LIMIT_STANDARD:
-        if (graftMenuType == GRAFT_MENU_STAT && CountStatGraftsOnBoxMon(boxMon) >= GetStatGraftCap())
-            return sText_StatGraftLimit;
-        break;
     case GRAFT_LIMIT_BUDGET:
     case GRAFT_LIMIT_STRICT:
         if (CountBudgetGraftsOnBoxMon(boxMon) >= GetGraftBudget())
@@ -419,14 +496,18 @@ bool32 IsGraftKindGated(u8 graftMenuType)
         || (graftMenuType == GRAFT_MENU_ABILITY && badges < 3);
 }
 
-const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex)
+// A stat piece of this value: the rules above, then the Stat Budget
+const u8 *GetStatGraftRejectReason(const struct BoxPokemon *boxMon, u8 statIndex, u8 value)
 {
-    return GetGraftRejectReason(boxMon, GRAFT_MENU_STAT, statIndex);
+    const u8 *reason = GetGraftRejectReason(boxMon, GRAFT_MENU_STAT, statIndex);
+    if (reason == NULL && IsOverStatBudget(boxMon, statIndex, value))
+        reason = sText_StatBudgetFull;
+    return reason;
 }
 
-bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex)
+bool8 CanApplyStatGraft(const struct BoxPokemon *boxMon, u8 statIndex, u8 value)
 {
-    return GetStatGraftRejectReason(boxMon, statIndex) == NULL;
+    return GetStatGraftRejectReason(boxMon, statIndex, value) == NULL;
 }
 
 // ============================================================
@@ -758,7 +839,7 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
                 if (s == STAT_HP && IsGraftHusk(&mon->box))
                     continue;
                 u8 donorStat = GetSpeciesBaseStatGraft(donor, s);
-                if (donorStat > GetEffectiveBaseStat(mon, s))
+                if (donorStat > GetEffectiveBaseStat(mon, s) && !IsOverStatBudget(&mon->box, s, donorStat))
                     candidates[n++] = s;
             }
             if (n == 0)

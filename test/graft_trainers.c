@@ -76,6 +76,8 @@ static void ExpectValidEnemy(struct Pokemon *mon)
         if (box->graftStatOverrides[i] != 0)
             EXPECT_GT(box->graftStatOverrides[i], GetSpeciesBaseStat(species, i));
     }
+    // Enemy stat grafts follow the Stat Budget (the default Graft Limit)
+    EXPECT_LE(GetBoxMonBaseStatTotal(box), GetBoxMonStatBudget(box));
     if (GetMonAbility(mon) == ABILITY_WONDER_GUARD)
         EXPECT_EQ(GetMonData(mon, MON_DATA_MAX_HP), 1);
     EXPECT_GT(GetMonData(mon, MON_DATA_MAX_HP), 0);

@@ -70,7 +70,7 @@ static const u8 *const sLevelCapDescriptions[GRAFT_LEVEL_CAP_COUNT] =
 static const u8 *const sGraftLimitChoices[GRAFT_LIMIT_COUNT] =
 {
     [GRAFT_LIMIT_FREE]     = COMPOUND_STRING("Free"),
-    [GRAFT_LIMIT_STANDARD] = COMPOUND_STRING("Standard"),
+    [GRAFT_LIMIT_STAT_BUDGET] = COMPOUND_STRING("Stat Budget"),
     [GRAFT_LIMIT_BUDGET]   = COMPOUND_STRING("Budget"),
     [GRAFT_LIMIT_STRICT]   = COMPOUND_STRING("Strict"),
 };
@@ -78,9 +78,9 @@ static const u8 *const sGraftLimitChoices[GRAFT_LIMIT_COUNT] =
 static const u8 *const sGraftLimitDescriptions[GRAFT_LIMIT_COUNT] =
 {
     [GRAFT_LIMIT_FREE] = COMPOUND_STRING("No limits on grafts."),
-    [GRAFT_LIMIT_STANDARD] = COMPOUND_STRING("Stat grafts: 1 + badges per Pokémon.\nNo limit from 5 badges on."),
-    [GRAFT_LIMIT_BUDGET] = COMPOUND_STRING("2 + half your badges in grafts per\nPokémon. Moves don't count."),
-    [GRAFT_LIMIT_STRICT] = COMPOUND_STRING("3 grafts per Pokémon.\nMoves don't count."),
+    [GRAFT_LIMIT_STAT_BUDGET] = COMPOUND_STRING("Base stat total: 420, +20 per badge,\n600 as Champion. Same for all."),
+    [GRAFT_LIMIT_BUDGET] = COMPOUND_STRING("Stat Budget, and 2 + half your\nbadges in grafts. Moves are free."),
+    [GRAFT_LIMIT_STRICT] = COMPOUND_STRING("Stat Budget, and 3 grafts per\nPokémon. Moves are free."),
 };
 
 static const u8 *const sGraftSupplyChoices[GRAFT_SUPPLY_COUNT] =
@@ -203,9 +203,9 @@ static const struct GraftSettingInfo sGraftSettings[GRAFT_SETTINGS_COUNT] =
     },
     [GRAFT_SETTING_GRAFT_LIMIT] = {
         .name = COMPOUND_STRING("Graft Limit"),
-        .description = COMPOUND_STRING("Standard caps stat grafts by badge.\nBudget/Strict cap all but moves."),
+        .description = COMPOUND_STRING("Stat Budget caps base stat totals.\nBudget/Strict also cap graft count."),
         .choices = sGraftLimitChoices, .choiceDescriptions = sGraftLimitDescriptions, .choiceCount = GRAFT_LIMIT_COUNT,
-        .defaultChoice = GRAFT_LIMIT_STANDARD, .shift = 4, .bits = 2, .requires = -1,
+        .defaultChoice = GRAFT_LIMIT_STAT_BUDGET, .shift = 4, .bits = 2, .requires = -1,
     },
     [GRAFT_SETTING_GRAFT_GATES] = {
         .name = COMPOUND_STRING("Graft Gates"),

@@ -765,7 +765,6 @@ static const u8 sTextColors[][3] =
     {0, 15, 4}, // PSS_COLOR_GRAFTED: grafted traits (palette 6 slot 15, set green in LoadGraphics)
 };
 #define PSS_COLOR_GRAFTED 13
-static const u8 sText_StatGrafts[] = _("STAT GRAFTS ");
 static const u8 sText_Grafts[] = _("GRAFTS ");
 static const u16 sGraftedTextColor = RGB(10, 29, 10);
 static const u8 sMemoGraftedNatureTextColor[] = {EXT_CTRL_CODE_BEGIN, EXT_CTRL_CODE_COLOR, 15, EXT_CTRL_CODE_BEGIN, EXT_CTRL_CODE_SHADOW, 4, EOS};
@@ -3564,18 +3563,30 @@ static void Task_PrintInfoPage(u8 taskId)
     data[0]++;
 }
 
-// GRAFT: under a Graft Limit, how many grafts the mon has against its cap, on the right of the PROFILE bar
+// GRAFT: on the right of the PROFILE bar, the mon's graft count against its cap (Budget/Strict),
+// else its base stat total against its Stat Budget
 static void PrintMonGraftCount(void)
 {
     u32 used, cap, x;
     u8 *end;
 
-    if (!GetGraftLimitCount(&sMonSummaryScreen->currentMon.box, GRAFT_MENU_COUNT, &used, &cap))
+    if (GetGraftLimitCount(&sMonSummaryScreen->currentMon.box, GRAFT_MENU_COUNT, &used, &cap))
+    {
+        end = StringCopy(gStringVar4, sText_Grafts);
+    }
+    else if (IsStatBudgetOn())
+    {
+        used = GetBoxMonBaseStatTotal(&sMonSummaryScreen->currentMon.box);
+        cap = GetBoxMonStatBudget(&sMonSummaryScreen->currentMon.box);
+        end = StringCopy(gStringVar4, COMPOUND_STRING("BST "));
+    }
+    else
+    {
         return;
-    end = StringCopy(gStringVar4, GetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT) == GRAFT_LIMIT_STANDARD ? sText_StatGrafts : sText_Grafts);
-    end = ConvertIntToDecimalStringN(end, used, STR_CONV_MODE_LEFT_ALIGN, 2);
+    }
+    end = ConvertIntToDecimalStringN(end, used, STR_CONV_MODE_LEFT_ALIGN, 4);
     *end++ = CHAR_SLASH;
-    ConvertIntToDecimalStringN(end, cap, STR_CONV_MODE_LEFT_ALIGN, 2);
+    ConvertIntToDecimalStringN(end, cap, STR_CONV_MODE_LEFT_ALIGN, 4);
     x = GetStringRightAlignXOffset(FONT_NORMAL, gStringVar4, 86);
     PrintTextOnWindow(AddWindowFromTemplateList(sPageInfoTemplate, PSS_DATA_WINDOW_INFO_GRAFTS), gStringVar4, x, 1, 0, 1);
 }

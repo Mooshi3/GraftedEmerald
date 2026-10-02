@@ -66,9 +66,9 @@ enum GraftLevelCap
 enum GraftLimit
 {
     GRAFT_LIMIT_FREE,     // no caps
-    GRAFT_LIMIT_STANDARD, // stat grafts capped at 1 + badges until 5 badges
-    GRAFT_LIMIT_BUDGET,   // 2 + badges/2 grafts per mon, all kinds but moves
-    GRAFT_LIMIT_STRICT,   // 3 grafts per mon
+    GRAFT_LIMIT_STAT_BUDGET, // base stat total capped at 420 + 20 per badge (600 as Champion); was Standard
+    GRAFT_LIMIT_BUDGET,   // 2 + badges/2 grafts per mon, all kinds but moves (plus the Stat Budget)
+    GRAFT_LIMIT_STRICT,   // 3 grafts per mon (plus the Stat Budget)
     GRAFT_LIMIT_COUNT,
 };
 

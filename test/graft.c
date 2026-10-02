@@ -131,13 +131,13 @@ TEST("HP grafts are refused on husks but other stats are not")
 {
     struct Pokemon mon;
     CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
-    EXPECT(CanApplyStatGraft(&mon.box, STAT_HP));
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_HP, 100));
     SetGraftedAbilityOnMon(&mon, ABILITY_WONDER_GUARD);
-    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP));
-    EXPECT(CanApplyStatGraft(&mon.box, STAT_DEF));
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP, 100));
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_DEF, 60));
 
     CreateRandomMonWithIVs(&mon, SPECIES_SHEDINJA, 50, 0);
-    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP));
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_HP, 100));
     EXPECT_EQ(GetMonData(&mon, MON_DATA_MAX_HP), 1);
 }
 
@@ -353,28 +353,66 @@ TEST("Graft Gates hold back type, stat and ability grafts by badge")
     ResetGraftSettingsForTest();
 }
 
-TEST("Graft Limit: Free ignores the stat cap, Strict allows 3 grafts, replacing is free")
+TEST("Stat Budget: base stat total up to 420 + 20 per badge; lowering is always allowed")
+{
+    struct Pokemon mon;
+    u32 f;
+    ResetGraftSettingsForTest();
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0); // BST 405: 190/33/58/33/58/33
+    EXPECT_EQ(GetBoxMonBaseStatTotal(&mon.box), 405);
+    EXPECT_EQ(GetBoxMonStatBudget(&mon.box), 420);
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_ATK, 48));   // 420: at the cap
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_ATK, 49));  // 421
+    EXPECT_EQ(GetBoxMonBaseStatTotalWith(&mon.box, STAT_ATK, 49), 421);
+    // Trade: drop HP to 100 (BST 315), then there's room for big Atk
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_HP, 100));
+    SetGraftedStatOnMon(&mon, STAT_HP, 100);
+    EXPECT_EQ(GetBoxMonBaseStatTotal(&mon.box), 315);
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_ATK, 138));  // 420
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_ATK, 139));
+    // Badges and the Champion title raise the cap
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE08_GET; f++)
+        FlagSet(f);
+    EXPECT_EQ(GetStatBudget(), 580);
+    FlagSet(FLAG_IS_CHAMPION);
+    EXPECT_EQ(GetStatBudget(), 600);
+    FlagClear(FLAG_IS_CHAMPION);
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE08_GET; f++)
+        FlagClear(f);
+
+    // A mon above the budget keeps its own BST as the cap: it can move points, not add them
+    CreateRandomMonWithIVs(&mon, SPECIES_GARCHOMP, 50, 0); // BST 600: 108/130/95/102/80/85
+    EXPECT_EQ(GetBoxMonStatBudget(&mon.box), 600);
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_SPATK, 81));
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_SPATK, 10)); // lowering
+    SetGraftedStatOnMon(&mon, STAT_SPATK, 10);
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_ATK, 200));   // spends what Sp. Atk gave up
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_ATK, 201));
+
+    // Free: no budget
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
+    EXPECT(CanApplyStatGraft(&mon.box, STAT_ATK, 255));
+    ResetGraftSettingsForTest();
+}
+
+TEST("Graft Limit: Strict allows 3 grafts, replacing is free; Budget grows with badges")
 {
     struct Pokemon mon;
     ResetGraftSettingsForTest();
     CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
-    SetGraftedStatOnMon(&mon, STAT_ATK, 100);
-    // Standard: 1 stat graft at 0 badges
-    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) != NULL);
-    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_ATK) == NULL);
-    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
-    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) == NULL);
-
+    SetGraftedStatOnMon(&mon, STAT_ATK, 40);
     SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_STRICT);
     SetGraftedTypeOnMon(&mon, 0, TYPE_FIRE);
     SetGraftedTypeOnMon(&mon, 1, TYPE_WATER); // both type slots count as one graft
     SetGraftedAbilityOnMon(&mon, ABILITY_INTIMIDATE);
     EXPECT_EQ(CountBudgetGraftsOnBoxMon(&mon.box), 3);
     EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_DEF) != NULL);
+    EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_STAT, STAT_ATK) == NULL); // replaces
     EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_NATURE, 0) != NULL);
     EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_TYPE, 0) == NULL);    // replaces
     EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_ABILITY, 0) == NULL); // replaces
     EXPECT(GetGraftRejectReason(&mon.box, GRAFT_MENU_MOVE, 0) == NULL);    // moves never count
+    EXPECT(!CanApplyStatGraft(&mon.box, STAT_ATK, 200)); // the Stat Budget applies on top
 
     SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_BUDGET);
     EXPECT_EQ(GetGraftBudget(), 2);
@@ -384,25 +422,15 @@ TEST("Graft Limit: Free ignores the stat cap, Strict allows 3 grafts, replacing 
     ResetGraftSettingsForTest();
 }
 
-TEST("Graft Limit counters: Standard counts stats until 5 badges, Budget counts all but moves, Free none")
+TEST("Graft Limit counters: Budget counts all but moves; Stat Budget and Free have no count")
 {
     struct Pokemon mon;
-    u32 used = 0, cap = 0, f;
+    u32 used = 0, cap = 0;
     ResetGraftSettingsForTest();
     CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
-    SetGraftedStatOnMon(&mon, STAT_ATK, 100);
+    SetGraftedStatOnMon(&mon, STAT_ATK, 40);
     SetGraftedAbilityOnMon(&mon, ABILITY_INTIMIDATE);
-    // Standard: stats only
-    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
-    EXPECT_EQ(used, 1);
-    EXPECT_EQ(cap, 1);
-    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_STAT, &used, &cap));
-    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_ABILITY, &used, &cap));
-    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE05_GET; f++)
-        FlagSet(f);
-    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap)); // uncapped from 5 badges
-    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE05_GET; f++)
-        FlagClear(f);
+    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap)); // Stat Budget: the BST counter instead
 
     SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_BUDGET);
     EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
@@ -414,6 +442,19 @@ TEST("Graft Limit counters: Standard counts stats until 5 badges, Budget counts 
     SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
     EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
     ResetGraftSettingsForTest();
+}
+
+TEST("Mega Evolution adds its stat boosts on top of stat grafts")
+{
+    struct Pokemon mon;
+    CreateRandomMonWithIVs(&mon, SPECIES_CHARIZARD, 50, 0);
+    SetGraftedStatOnMon(&mon, STAT_ATK, 100);
+    EXPECT_EQ(GetGraftedBaseStatForCalc(&mon.box, SPECIES_CHARIZARD, STAT_ATK), 100);
+    EXPECT_EQ(GetGraftedBaseStatForCalc(&mon.box, SPECIES_CHARIZARD_MEGA_X, STAT_ATK), 146); // 84 -> 130: +46
+    EXPECT_EQ(GetGraftedBaseStatForCalc(&mon.box, SPECIES_CHARIZARD_MEGA_Y, STAT_ATK), 120); // 84 -> 104: +20
+    EXPECT_EQ(GetGraftedBaseStatForCalc(&mon.box, SPECIES_CHARIZARD_MEGA_X, STAT_DEF), 0);   // not grafted
+    SetGraftedStatOnMon(&mon, STAT_DEF, 230);
+    EXPECT_EQ(GetGraftedBaseStatForCalc(&mon.box, SPECIES_CHARIZARD_MEGA_X, STAT_DEF), 255); // capped
 }
 
 TEST("Settings past bit 32 round-trip and don't touch the others")

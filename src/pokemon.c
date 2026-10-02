@@ -1435,8 +1435,8 @@ void CalculateMonStatsCont(struct Pokemon *mon, bool32 updateSpeedStat)
         u8 baseStat = GetSpeciesBaseStat(species, i);
             // GRAFT: Check for stat override (direct BoxMon accessor)
             {
-                u16 grafted = GetGraftedStatFromBoxMon(&mon->box, i);
-                if (grafted != GRAFT_STAT_NONE)
+                u8 grafted = GetGraftedBaseStatForCalc(&mon->box, species, i);
+                if (grafted != 0)
                     baseStat = grafted;
             }
         s32 n = (((2 * baseStat + iv[i] + ev[i] / 4) * level) / 100) + 5;
@@ -1460,8 +1460,8 @@ void CalculateMonStatsCont(struct Pokemon *mon, bool32 updateSpeedStat)
         s32 n = 2 * GetSpeciesBaseHP(species) + iv[STAT_HP];
                 // GRAFT: Check for HP stat override (direct BoxMon accessor)
                 {
-                    u16 graftedHP = GetGraftedStatFromBoxMon(&mon->box, STAT_HP);
-                    if (graftedHP != GRAFT_STAT_NONE)
+                    u8 graftedHP = GetGraftedBaseStatForCalc(&mon->box, species, STAT_HP);
+                    if (graftedHP != 0)
                         n = 2 * graftedHP + iv[STAT_HP];
                 }
         newMaxHP = (((n + ev[STAT_HP] / 4) * level) / 100) + level + 10;

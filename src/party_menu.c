@@ -9050,10 +9050,39 @@ static const u8 *GetPieceRejectReason(struct Pokemon *mon)
     const u8 *reason;
     if (GetMonData(mon, MON_DATA_IS_EGG))
         return gText_EggCantBattle;
-    reason = GetGraftRejectReason(&mon->box, GraftPieceMenuType(), gGraftPieceInUse.stat);
+    if (gGraftPieceInUse.kind == GRAFT_PIECE_STAT)
+        reason = GetStatGraftRejectReason(&mon->box, gGraftPieceInUse.stat, gGraftPieceInUse.value);
+    else
+        reason = GetGraftRejectReason(&mon->box, GraftPieceMenuType(), gGraftPieceInUse.stat);
     if (reason == NULL && gGraftPieceInUse.kind == GRAFT_PIECE_MOVE && MonKnowsMove(mon, gGraftPieceInUse.value))
         reason = sText_PieceKnowsMove;
     return reason;
+}
+
+// Under a cap the box shows where the graft would leave the mon, like a TM's ABLE / NOT ABLE:
+// a stat piece shows the base stat total after the graft against the Stat Budget ("ABLE 465/500",
+// "OVER 520/500"); other pieces show the graft count under Budget/Strict ("ABLE 1/3", "FULL 3/3").
+static bool32 GetGraftPieceCounter(struct Pokemon *mon, const u8 *reason, const u8 **label, u32 *used, u32 *cap)
+{
+    if (GetMonData(mon, MON_DATA_IS_EGG))
+        return FALSE;
+    if (gGraftPieceInUse.kind == GRAFT_PIECE_STAT)
+    {
+        bool32 over;
+        if (!IsStatBudgetOn())
+            return FALSE;
+        over = IsOverStatBudget(&mon->box, gGraftPieceInUse.stat, gGraftPieceInUse.value);
+        if (reason != NULL && !over)
+            return FALSE; // refused for another reason: plain NOT ABLE
+        *used = GetBoxMonBaseStatTotalWith(&mon->box, gGraftPieceInUse.stat, gGraftPieceInUse.value);
+        *cap = GetBoxMonStatBudget(&mon->box);
+        *label = over ? COMPOUND_STRING("OVER ") : COMPOUND_STRING("ABLE ");
+        return TRUE;
+    }
+    if (!GetGraftLimitCount(&mon->box, GraftPieceMenuType(), used, cap) || (reason != NULL && *used < *cap))
+        return FALSE;
+    *label = reason == NULL ? COMPOUND_STRING("ABLE ") : COMPOUND_STRING("FULL ");
+    return TRUE;
 }
 
 static void DisplayPartyPokemonDataForGraftPiece(u8 slot)
@@ -9061,25 +9090,25 @@ static void DisplayPartyPokemonDataForGraftPiece(u8 slot)
     struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][slot];
     struct PartyMenuBox *menuBox = &sPartyMenuBoxes[slot];
     const u8 *reason = GetPieceRejectReason(mon);
+    const u8 *label;
     u32 used, cap;
 
     if (reason == sText_PieceKnowsMove)
     {
         DisplayPartyPokemonDescriptionData(slot, PARTYBOX_DESC_LEARNED);
     }
-    else if (!GetMonData(mon, MON_DATA_IS_EGG) && GetGraftLimitCount(&mon->box, GraftPieceMenuType(), &used, &cap)
-          && (reason == NULL || used >= cap))
+    else if (GetGraftPieceCounter(mon, reason, &label, &used, &cap))
     {
-        // Under a graft cap the box shows how full the mon is: "ABLE 1/3", "FULL 3/3"
-        u8 *str = StringCopy(gStringVar4, reason == NULL ? COMPOUND_STRING("ABLE ") : COMPOUND_STRING("FULL "));
-        str = ConvertIntToDecimalStringN(str, used, STR_CONV_MODE_LEFT_ALIGN, 1);
+        u8 *str = StringCopy(gStringVar4, label);
+        str = ConvertIntToDecimalStringN(str, used, STR_CONV_MODE_LEFT_ALIGN, 4);
         *str++ = CHAR_SLASH;
-        ConvertIntToDecimalStringN(str, cap, STR_CONV_MODE_LEFT_ALIGN, 1);
+        ConvertIntToDecimalStringN(str, cap, STR_CONV_MODE_LEFT_ALIGN, 4);
         DisplayPartyPokemonDescriptionData(slot, PARTYBOX_DESC_ABLE);
         menuBox->infoRects->blitFunc(menuBox->windowId, menuBox->infoRects->descTextLeft >> 3, menuBox->infoRects->descTextTop >> 3,
                                      ((menuBox->infoRects->descTextLeft % 8) + menuBox->infoRects->descTextWidth + 7) / 8,
                                      ((menuBox->infoRects->descTextTop % 8) + menuBox->infoRects->descTextHeight + 7) / 8, TRUE);
-        AddTextPrinterParameterized3(menuBox->windowId, FONT_NORMAL, menuBox->infoRects->descTextLeft, menuBox->infoRects->descTextTop,
+        AddTextPrinterParameterized3(menuBox->windowId, GetFontIdToFit(gStringVar4, FONT_NORMAL, 0, menuBox->infoRects->descTextWidth),
+                                     menuBox->infoRects->descTextLeft, menuBox->infoRects->descTextTop,
                                      sFontColorTable[0], 0, gStringVar4);
     }
     else
