@@ -94,6 +94,7 @@ struct RoomObject
 struct RoomPlan
 {
     bool8 tree[BLOCKS_H][BLOCKS_W];
+    bool8 water[BLOCKS_H][BLOCKS_W];
     u8 ground[ROOM_H][ROOM_W];
     u8 doors[NUM_DOORS]; // room type behind each door, or NO_DOOR
     u8 numObjects;
@@ -517,6 +518,18 @@ static bool32 IsTreeBlock(s32 bx, s32 by)
     return sPlan.tree[by][bx];
 }
 
+static bool32 IsWaterBlock(s32 bx, s32 by)
+{
+    if (bx < 0 || bx >= BLOCKS_W || by < 0 || by >= BLOCKS_H)
+        return FALSE;
+    return sPlan.water[by][bx];
+}
+
+static bool32 IsWaterTile(s32 x, s32 y)
+{
+    return x >= 0 && y >= 0 && IsWaterBlock(x / 2, y / 2);
+}
+
 static bool32 IsTreeTile(s32 x, s32 y)
 {
     if (x < 0 || x >= ROOM_W || y < 0 || y >= ROOM_H)
@@ -540,7 +553,7 @@ static bool32 AreDoorsReachable(void)
         for (i = 0; i < 4; i++)
         {
             s32 nx = bx + sDirs[i][0], ny = by + sDirs[i][1];
-            if (IsTreeBlock(nx, ny) || seen[ny][nx])
+            if (IsTreeBlock(nx, ny) || IsWaterBlock(nx, ny) || seen[ny][nx])
                 continue;
             seen[ny][nx] = TRUE;
             queue[tail++] = ny * BLOCKS_W + nx;
@@ -616,7 +629,7 @@ static void ChooseDoors(rng_value_t *rng)
 static bool32 IsTileFree(u32 x, u32 y)
 {
     u32 i;
-    if (IsTreeTile(x, y))
+    if (IsTreeTile(x, y) || IsWaterTile(x, y))
         return FALSE;
     if (x == ROGUE_ENTRANCE_X && y >= ROGUE_ENTRANCE_Y - 1)
         return FALSE;
@@ -697,6 +710,26 @@ static void BuildRoomPlan(void)
         }
     }
 
+    // Sometimes a pond (1x1 to 2x2 blocks), never right under a door and with grass below it
+    if (type != ROGUE_ROOM_HUB && LocalRandom(&rng) % 100 < 40)
+    {
+        u32 w = 1 + LocalRandom(&rng) % 2, h = 1 + LocalRandom(&rng) % 2;
+        u32 bx0 = INNER_BX_MIN + LocalRandom(&rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
+        u32 by0 = INNER_BY_MIN + 1 + LocalRandom(&rng) % (INNER_BY_MAX - INNER_BY_MIN - h);
+        bool32 ok = TRUE;
+        for (by = by0; by < by0 + h; by++)
+        {
+            for (bx = bx0; bx < bx0 + w; bx++)
+            {
+                if ((bx == ENTRANCE_BX && by >= ENTRANCE_BY - 1) || (hasCenterObject && bx == CENTER_X / 2))
+                    ok = FALSE;
+                sPlan.water[by][bx] = TRUE;
+            }
+        }
+        if (!ok || !AreDoorsReachable())
+            memset(sPlan.water, 0, sizeof(sPlan.water));
+    }
+
     // A few trees inside, never closing off a door
     if (type != ROGUE_ROOM_HUB)
     {
@@ -711,6 +744,8 @@ static void BuildRoomPlan(void)
                 continue; // right under a door
             if (hasCenterObject && bx == CENTER_X / 2 && by <= CENTER_Y / 2 + 1)
                 continue;
+            if (sPlan.water[by][bx] || IsWaterBlock(bx, by - 1))
+                continue; // not in a pond, nor right below one (its shore)
             sPlan.tree[by][bx] = TRUE;
             if (!AreDoorsReachable())
                 sPlan.tree[by][bx] = FALSE;
@@ -886,6 +921,8 @@ static u16 GetGroundMetatile(s32 x, s32 y)
     bool32 left = (x % 2) == 0;
     bool32 treeBelow = IsTreeTile(x, y + 1) && ((y + 1) % 2) == 0 && y + 1 < ROOM_H;
 
+    if (IsWaterTile(x, y - 1))
+        return TILE_GROUND(0x002);
     switch (sPlan.ground[y][x])
     {
     case GROUND_PATH:
@@ -902,6 +939,19 @@ static u16 GetGroundMetatile(s32 x, s32 y)
     return TILE_GROUND(METATILE_General_Grass);
 }
 
+// Ponds as on Route 102: the shore is drawn into the water's top and side tiles, and into the
+// grass below
+static u16 GetWaterMetatile(s32 x, s32 y)
+{
+    bool32 top = !IsWaterTile(x, y - 1), left = !IsWaterTile(x - 1, y), right = !IsWaterTile(x + 1, y);
+    u16 id;
+    if (top)
+        id = left ? 0x0B0 : (right ? 0x0B2 : 0x0B1);
+    else
+        id = left ? 0x0B8 : (right ? 0x0BA : METATILE_General_ReflectiveWater);
+    return id | (1 << MAPGRID_ELEVATION_SHIFT);
+}
+
 // ON_LOAD (after every warp and battle): draw the room
 void Rogue_OnLoad(void)
 {
@@ -912,7 +962,13 @@ void Rogue_OnLoad(void)
     {
         for (x = 0; x < ROOM_W; x++)
         {
-            u16 tile = IsTreeTile(x, y) ? GetTreeMetatile(x, y) : GetGroundMetatile(x, y);
+            u16 tile;
+            if (IsTreeTile(x, y))
+                tile = GetTreeMetatile(x, y);
+            else if (IsWaterTile(x, y))
+                tile = GetWaterMetatile(x, y);
+            else
+                tile = GetGroundMetatile(x, y);
             MapGridSetMetatileEntryAt(x + MAP_OFFSET, y + MAP_OFFSET, tile);
         }
     }
