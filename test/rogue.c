@@ -207,3 +207,21 @@ TEST("With Unlocks Off, a run starts with everything unlocked")
     EXPECT_EQ(VarGet(VAR_ROGUE_RUN_FLAGS), 1);
     SetGraftSetting(GRAFT_SETTING_ROGUE_META, TRUE);
 }
+
+TEST("Beating the Champion pays BP and opens Hard mode")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+    SetRoom(4242, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    Rogue_OnBossDefeated();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5);
+    EXPECT(FlagGet(FLAG_BADGE02_GET));
+    EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS), 0);
+
+    SetRoom(4242, ROGUE_FLOORS_NORMAL + 1, 1, ROGUE_ROOM_BOSS); // the Champion
+    Rogue_OnBossDefeated();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5 + 20);
+    EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS), 1 << 15);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+}
