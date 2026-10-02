@@ -684,7 +684,7 @@ static const struct DebugMenuOption sDebugMenu_Actions_Scripts[] =
     { COMPOUND_STRING("Rogue: Shop"), DebugAction_ExecuteScript, Debug_EventScript_Script_4 },
     { COMPOUND_STRING("Rogue: Rest"), DebugAction_ExecuteScript, Debug_EventScript_Script_5 },
     { COMPOUND_STRING("Rogue: Boss"), DebugAction_ExecuteScript, Debug_EventScript_Script_6 },
-    { COMPOUND_STRING("Rogue: Room 6"), DebugAction_ExecuteScript, Debug_EventScript_Script_7 },
+    { COMPOUND_STRING("Rogue: Last room"), DebugAction_ExecuteScript, Debug_EventScript_Script_7 },
     { COMPOUND_STRING("Rogue: Next floor"), DebugAction_ExecuteScript, Debug_EventScript_Script_8 },
     { COMPOUND_STRING("Rogue: Event"), DebugAction_ExecuteScript, Debug_EventScript_RogueEvent },
     { NULL }

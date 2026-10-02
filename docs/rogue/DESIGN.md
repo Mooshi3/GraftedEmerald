@@ -75,7 +75,7 @@ Sleep Clause, Smart Wilds, shiny odds…) plus Rogue's own (meta-progression on/
 Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `test/rogue.c`.
 
 - A new game starts in the start room (Prof. Birch explains, one door starts a run). A run is 4 floors of
-  6 rooms + a boss (Hoenn's 8 Leaders in a per-run shuffled order, a typed party of floor + 2).
+  10 rooms + a boss (Hoenn's 8 Leaders in a per-run shuffled order, a typed party of floor + 2).
 - Rooms are generated: forest border, 2–5 inside trees (never closing off a door, checked by a search),
   tall grass for looks, 2–3 doors (one boss door after room 6). Signs: Zigzagoon wild, Youngster trainer,
   item ball, clerk shop, nurse rest, Unown "?" mystery, the Leader for the boss.
@@ -114,3 +114,11 @@ floor themes (planned).
   (Shift with the Switch style unlock), no Sleep Clause, Smart Wilds on Hard only.
 - Challenges, picked at the start door for one run: Inverse battles or Monotype (choose the type; the
   starter gets it grafted). Bosses pay half again in BP.
+
+### Balance pass (2026-10-02, after Jacob's first run: the floor-1 boss was out of reach)
+
+- Floors are 10 rooms. Levels climb slowly: wilds 3 to 9 on floor 1 (+8 a floor), trainers one above,
+  the boss 2 above the last room (floor 1: level 11) with floor + 1 Pokémon plus its ace.
+- Trainers carry 1 Pokémon early (2 in a floor's second half), more on later floors.
+- Guarded rooms: trainer and boss rooms, and half the wild and item rooms, have a trainer; small trees
+  block every door until the trainer is beaten (interacting says so). So a floor has several fights.

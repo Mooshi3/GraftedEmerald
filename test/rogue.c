@@ -87,7 +87,7 @@ TEST("Rogue bosses use their type")
             enum Type type;
             SetRoom(seed * 15485863, floor, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
             boss = GetTrainerStructFromId(TRAINER_ROGUE_BOSS);
-            EXPECT_GE((u32)boss->partySize, 3);
+            EXPECT_GE((u32)boss->partySize, 2);
             // every boss mon shares a type with the first one's specialty
             type = GetSpeciesType(boss->party[0].species, 0);
             for (i = 0; i < boss->partySize; i++)

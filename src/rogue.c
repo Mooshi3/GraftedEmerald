@@ -46,6 +46,7 @@ extern const u8 Rogue_Room_EventScript_Shop[];
 extern const u8 Rogue_Room_EventScript_Nurse[];
 extern const u8 Rogue_Room_EventScript_Guide[];
 extern const u8 Rogue_Room_EventScript_UnlockShop[];
+extern const u8 Rogue_Room_EventScript_Thicket[];
 extern const u8 Rogue_Room_EventScript_GiftPieces[];
 extern const u8 Rogue_Room_EventScript_Merchant[];
 
@@ -67,7 +68,9 @@ extern const u8 Rogue_Room_EventScript_Merchant[];
 #define NO_DOOR 0xFF
 #define NUM_MARKERS NUM_DOORS // object local IDs 1-3: the signs over the doors
 #define MAX_ROOM_OBJECTS 5    // local IDs 4-8: what's in the room
-#define NUM_OBJECT_SLOTS (NUM_MARKERS + MAX_ROOM_OBJECTS)
+#define NUM_THICKETS (NUM_DOORS * 2) // local IDs 9-14: two small trees blocking each door of a guarded room
+#define FIRST_THICKET_SLOT (NUM_MARKERS + MAX_ROOM_OBJECTS)
+#define NUM_OBJECT_SLOTS (NUM_MARKERS + MAX_ROOM_OBJECTS + NUM_THICKETS)
 
 static const u8 sDoorBlockX[NUM_DOORS] = {3, 5, 7};
 
@@ -98,6 +101,7 @@ struct RoomPlan
     bool8 water[BLOCKS_H][BLOCKS_W];
     u8 ground[ROOM_H][ROOM_W];
     u8 doors[NUM_DOORS]; // room type behind each door, or NO_DOOR
+    bool8 guarded;       // a trainer (or the boss) blocks the doors until beaten
     u8 numObjects;
     struct RoomObject objects[MAX_ROOM_OBJECTS];
 };
@@ -431,18 +435,20 @@ static void GetBossDoorDestination(u32 *floor, u32 *room)
     }
 }
 
+// Levels climb slowly over a floor (floor 1: 3 to 9) so the battles on the way can keep up; the boss
+// is a couple of levels above the floor's last rooms
 static u32 GetWildLevel(void)
 {
     if (IsFinale(GetFloor()))
-        return 4 + GetNumFloors() * 9;
-    return 4 + (GetFloor() - 1) * 9 + GetRoom();
+        return 3 + GetNumFloors() * 8;
+    return 3 + (GetFloor() - 1) * 8 + (GetRoom() * 6) / ROGUE_ROOMS_PER_FLOOR;
 }
 
 static u32 GetBossLevel(void)
 {
     if (IsFinale(GetFloor()))
-        return 4 + GetNumFloors() * 9 + 3 + GetRoom();
-    return 4 + GetFloor() * 9 + 1;
+        return 3 + GetNumFloors() * 8 + 2 + GetRoom();
+    return 3 + (GetFloor() - 1) * 8 + 8;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -702,15 +708,34 @@ static u32 GetTrainerKind(void)
     return Mix32(GetRoomSeed() ^ 0x7A1E) % ARRAY_COUNT(sTrainerKinds);
 }
 
+// Trainer and boss rooms have a trainer at the doors; so do half the wild and item rooms, so a floor
+// has enough battles to keep the team's levels up with the boss
+static bool32 IsRoomGuarded(u32 type)
+{
+    if (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_BOSS)
+        return TRUE;
+    if (type == ROGUE_ROOM_WILD || type == ROGUE_ROOM_ITEM)
+        return Mix32(GetRoomSeed() ^ 0x6A7D) % 100 < 50;
+    return FALSE;
+}
+
+static void AddTrainerObject(void)
+{
+    AddObject(sTrainerKinds[GetTrainerKind()].graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
+    sPlan.objects[sPlan.numObjects - 1].trainerType = TRAINER_TYPE_NORMAL;
+    sPlan.objects[sPlan.numObjects - 1].sight = 5;
+}
+
 static void BuildRoomPlan(void)
 {
     rng_value_t rng = LocalRandomSeed(GetRoomSeed());
     u32 type = GetRoomType();
-    bool32 hasCenterObject = (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_BOSS
-                           || type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST || type == ROGUE_ROOM_EVENT);
+    bool32 guarded = IsRoomGuarded(type);
+    bool32 hasCenterObject = (guarded || type == ROGUE_ROOM_SHOP || type == ROGUE_ROOM_REST || type == ROGUE_ROOM_EVENT);
     u32 bx, by, x, y, i, count;
 
     memset(&sPlan, 0, sizeof(sPlan));
+    sPlan.guarded = guarded;
     ChooseDoors(&rng);
 
     // Forest around the room, with an opening for each door
@@ -802,6 +827,8 @@ static void BuildRoomPlan(void)
             AddObject(OBJ_EVENT_GFX_SCIENTIST_1, 7, 9, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_UnlockShop);
         break;
     case ROGUE_ROOM_WILD:
+        if (guarded)
+            AddTrainerObject();
         count = 1 + (LocalRandom(&rng) % 100 < 35);
         for (i = 0; i < count; i++)
             AddObjectAnywhere(&rng, OBJ_EVENT_MON + PickFloorSpecies(&rng, TYPE_NONE), MOVEMENT_TYPE_LOOK_AROUND, Rogue_Room_EventScript_WildMon);
@@ -821,6 +848,8 @@ static void BuildRoomPlan(void)
         }
         break;
     case ROGUE_ROOM_ITEM:
+        if (guarded)
+            AddTrainerObject();
         count = 2 + LocalRandom(&rng) % 2;
         for (i = 0; i < count; i++)
             AddObjectAnywhere(&rng, OBJ_EVENT_GFX_ITEM_BALL, MOVEMENT_TYPE_NONE, Rogue_Room_EventScript_ItemBall);
@@ -832,9 +861,7 @@ static void BuildRoomPlan(void)
         AddObject(OBJ_EVENT_GFX_NURSE, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Nurse);
         break;
     case ROGUE_ROOM_TRAINER:
-        AddObject(sTrainerKinds[GetTrainerKind()].graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
-        sPlan.objects[0].trainerType = TRAINER_TYPE_NORMAL;
-        sPlan.objects[0].sight = 5;
+        AddTrainerObject();
         break;
     case ROGUE_ROOM_BOSS:
         AddObject(GetCurrentBoss()->graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
@@ -911,10 +938,16 @@ void Rogue_OnTransition(void)
             SetObjectTemplate(i, GetDoorMarkerGraphics(sPlan.doors[i]), sDoorBlockX[i] * 2, 2,
                               MOVEMENT_TYPE_FACE_DOWN, TRAINER_TYPE_NONE, 0, NULL);
         }
-        else if (i >= NUM_MARKERS && i - NUM_MARKERS < sPlan.numObjects)
+        else if (i >= NUM_MARKERS && i < FIRST_THICKET_SLOT && i - NUM_MARKERS < sPlan.numObjects)
         {
             const struct RoomObject *obj = &sPlan.objects[i - NUM_MARKERS];
             SetObjectTemplate(i, obj->graphicsId, obj->x, obj->y, obj->movementType, obj->trainerType, obj->sight, obj->script);
+        }
+        else if (i >= FIRST_THICKET_SLOT && sPlan.guarded && sPlan.doors[(i - FIRST_THICKET_SLOT) / 2] != NO_DOOR)
+        {
+            u32 door = (i - FIRST_THICKET_SLOT) / 2;
+            SetObjectTemplate(i, OBJ_EVENT_GFX_CUTTABLE_TREE, sDoorBlockX[door] * 2 + (i - FIRST_THICKET_SLOT) % 2, 3,
+                              MOVEMENT_TYPE_NONE, TRAINER_TYPE_NONE, 0, Rogue_Room_EventScript_Thicket);
         }
         else
         {
@@ -1054,12 +1087,24 @@ void Rogue_GetRoomIntro(void)
     }
 }
 
+// The room's trainer is beaten: the small trees blocking the doors go
+void Rogue_OpenDoors(void)
+{
+    u32 i;
+    for (i = FIRST_THICKET_SLOT; i < NUM_OBJECT_SLOTS; i++)
+    {
+        FlagSet(gSaveBlock1Ptr->objectEventTemplates[i].flagId);
+        RemoveObjectEventByLocalIdAndMap(i + 1, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup);
+    }
+}
+
 void Rogue_CanLeaveRoom(void)
 {
     u32 type = GetRoomType();
 
+    BuildRoomPlan();
     gSpecialVar_Result = TRUE;
-    if (type == ROGUE_ROOM_TRAINER && !HasTrainerBeenFought(TRAINER_ROGUE_TRAINER))
+    if (type != ROGUE_ROOM_BOSS && sPlan.guarded && !HasTrainerBeenFought(TRAINER_ROGUE_TRAINER))
     {
         gSpecialVar_Result = FALSE;
         StringCopy(gStringVar4, COMPOUND_STRING("The trainer won't let you\nthrough without a battle!"));
@@ -1669,13 +1714,13 @@ static void BuildTrainer(u32 slot, u32 key)
     sTrainers[slot] = *GetTrainerStructFromId(baseId);
     if (boss)
     {
-        size = IsFinale(floor) ? 5 : min(floor + 2, PARTY_SIZE);
+        size = IsFinale(floor) ? 5 : min(floor + 1, 5); // plus the Leader's ace
         level = GetBossLevel();
         iv = min(31, 6 + floor * 4);
     }
     else
     {
-        size = min(floor + (GetRoom() > 3), PARTY_SIZE);
+        size = min(1 + (floor - 1) / 2 + (GetRoom() > ROGUE_ROOMS_PER_FLOOR / 2), PARTY_SIZE);
         level = GetWildLevel() + 1;
         iv = min(31, floor * 3);
     }

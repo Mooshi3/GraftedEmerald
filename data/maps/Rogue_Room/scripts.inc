@@ -220,8 +220,19 @@ Rogue_Room_EventScript_ItemBall::
 	end
 
 Rogue_Room_EventScript_Trainer::
-	trainerbattle_single TRAINER_ROGUE_TRAINER, Rogue_Room_Text_TrainerIntro, Rogue_Room_Text_TrainerDefeat
+	trainerbattle_single TRAINER_ROGUE_TRAINER, Rogue_Room_Text_TrainerIntro, Rogue_Room_Text_TrainerDefeat, Rogue_Room_EventScript_TrainerDefeated
 	msgbox Rogue_Room_Text_TrainerPostBattle, MSGBOX_AUTOCLOSE
+	end
+
+Rogue_Room_EventScript_TrainerDefeated::
+	special Rogue_OpenDoors
+	msgbox Rogue_Room_Text_TrainerPostBattle, MSGBOX_DEFAULT
+	release
+	end
+
+@ The small trees blocking a guarded room's doors
+Rogue_Room_EventScript_Thicket::
+	msgbox Rogue_Room_Text_Thicket, MSGBOX_SIGN
 	end
 
 Rogue_Room_EventScript_Boss::
@@ -230,6 +241,7 @@ Rogue_Room_EventScript_Boss::
 	end
 
 Rogue_Room_EventScript_BossDefeated::
+	special Rogue_OpenDoors
 	special Rogue_OnBossDefeated
 	playfanfare MUS_OBTAIN_BADGE
 	msgbox gStringVar4, MSGBOX_DEFAULT
@@ -444,7 +456,12 @@ Rogue_Room_Text_TrainerDefeat:
 	.string "Fine, go on through.$"
 
 Rogue_Room_Text_TrainerPostBattle:
-	.string "The doors are open now.$"
+	.string "The way is clear. Go on.$"
+
+Rogue_Room_Text_Thicket:
+	.string "Thick brush blocks the path.\n"
+	.string "It'll clear once the trainer here\l"
+	.string "is beaten.$"
 
 Rogue_Room_Text_BossIntro:
 	.string "So you made it this far.\n"

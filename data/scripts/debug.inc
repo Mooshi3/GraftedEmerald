@@ -236,7 +236,7 @@ Debug_EventScript_Script_6::
 
 @ Rogue: the last room before the boss (its only door is the boss's)
 Debug_EventScript_Script_7::
-	setvar VAR_ROGUE_ROOM, 6
+	setvar VAR_ROGUE_ROOM, 10
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD
 	goto Debug_EventScript_RogueWarp
 

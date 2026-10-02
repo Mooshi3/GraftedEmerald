@@ -6,7 +6,7 @@
 struct Trainer;
 struct BoxPokemon;
 
-#define ROGUE_ROOMS_PER_FLOOR 6 // rooms before the floor's boss
+#define ROGUE_ROOMS_PER_FLOOR 10 // rooms before the floor's boss
 #define ROGUE_FLOORS_NORMAL   4
 
 bool32 Rogue_IsRunActive(void);
@@ -29,6 +29,7 @@ void Rogue_OnTransition(void);
 void Rogue_OnLoad(void);
 void Rogue_GetRoomIntro(void);
 void Rogue_CanLeaveRoom(void);
+void Rogue_OpenDoors(void);
 void Rogue_TakeDoor(void);
 void Rogue_PrepareWildMon(void);
 void Rogue_PrepareItemBall(void);
