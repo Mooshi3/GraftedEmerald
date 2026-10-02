@@ -97,7 +97,7 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 
 ## Roadmap / decisions log
 
-Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5428 passed as of 2026-09-30; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
+Test baseline (2026-09-29, after the 1.17.1 merge): full `make check` has 0 failures (5464 passed as of 2026-10-02; the rest are upstream's KNOWN_FAILING/TO_DO/EXPECT_FAILING). Keep it at 0.
 
 
 Done (2026-09-29): save/Hall of Fame overlap fix; mart Cancel row; enemy switch-in grafts; fishing pool overread; Wonder Guard husk; graft regression tests; Graft Knot breeding inheritance; grafted-move relearner history; AI switch logic reading the player's grafts; enemy graft types lost on form change; item descriptions overflowing the Bag; catch script falling into the graft menu.; recorded-battle save overflowing its flash sector (per-battler record buffer is 268 bytes, upstream 388, because recordings store 24 grafted party mons). Done (2026-09-30): battle graft menu drawing leftover text when A was pressed mid-print; Nuzlocke starting before the Pokédex; partner battles in Fainting/Monotype; vanilla obedience. Also: new-game settings screen with shiny odds, level caps, graft limits/gates/rations/harvests, enemy graft levels, Nuzlocke rules, fainting modes, battle items, Force Set, monotype; Splicer category menu showing the last Graft Ball's shuffled categories; Ungrafter; hyper training at the Frontier; Splicer naming the wrong mon in "was released" and leaving the refusal message behind the target prompt.

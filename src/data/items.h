@@ -592,9 +592,9 @@ const struct ItemInfo gItemsInfo[] =
     .price = 1000,
     .holdEffectParam = 0,
     .description = COMPOUND_STRING(
-        "Breaks a party\n"
-        "Pokémon down into\n"
-        "graft pieces."),
+        "Releases a party\n"
+        "Pokémon, breaking\n"
+        "it into pieces."),
     .pocket = POCKET_ITEMS,
     .sortType = ITEM_TYPE_FIELD_USE,
     .type = ITEM_USE_PARTY_MENU,

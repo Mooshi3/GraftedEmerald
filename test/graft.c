@@ -377,6 +377,38 @@ TEST("Graft Limit: Free ignores the stat cap, Strict allows 3 grafts, replacing 
     ResetGraftSettingsForTest();
 }
 
+TEST("Graft Limit counters: Standard counts stats until 5 badges, Budget counts all but moves, Free none")
+{
+    struct Pokemon mon;
+    u32 used = 0, cap = 0, f;
+    ResetGraftSettingsForTest();
+    CreateRandomMonWithIVs(&mon, SPECIES_WOBBUFFET, 50, 0);
+    SetGraftedStatOnMon(&mon, STAT_ATK, 100);
+    SetGraftedAbilityOnMon(&mon, ABILITY_INTIMIDATE);
+    // Standard: stats only
+    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
+    EXPECT_EQ(used, 1);
+    EXPECT_EQ(cap, 1);
+    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_STAT, &used, &cap));
+    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_ABILITY, &used, &cap));
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE05_GET; f++)
+        FlagSet(f);
+    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap)); // uncapped from 5 badges
+    for (f = FLAG_BADGE01_GET; f <= FLAG_BADGE05_GET; f++)
+        FlagClear(f);
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_BUDGET);
+    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
+    EXPECT_EQ(used, 2);
+    EXPECT_EQ(cap, 2);
+    EXPECT(GetGraftLimitCount(&mon.box, GRAFT_MENU_ABILITY, &used, &cap));
+    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_MOVE, &used, &cap));
+
+    SetGraftSetting(GRAFT_SETTING_GRAFT_LIMIT, GRAFT_LIMIT_FREE);
+    EXPECT(!GetGraftLimitCount(&mon.box, GRAFT_MENU_COUNT, &used, &cap));
+    ResetGraftSettingsForTest();
+}
+
 TEST("Enemy Grafts setting scales the enemy graft count")
 {
     ResetGraftSettingsForTest();

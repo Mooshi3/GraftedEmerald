@@ -8694,7 +8694,7 @@ enum SplicerState
     SPLICER_DONE,
 };
 
-static const u8 sText_SplicerSacrifice[] = _("{STR_VAR_1} will be broken down\ninto graft pieces. OK?");
+static const u8 sText_SplicerSacrifice[] = _("Break {STR_VAR_1} into pieces?\nIt will be gone for good.");
 static const u8 sText_SplicerOnlyOneMon[] = _("You only have one\nPokémon!{PAUSE_UNTIL_PRESS}");
 static const u8 sText_SplicerEgg[] = _("Eggs can't be broken\ndown into pieces.{PAUSE_UNTIL_PRESS}");
 static const u8 sText_SplicerBrokenDown[] = _("{STR_VAR_1} was broken down\ninto {STR_VAR_2} pieces!");
