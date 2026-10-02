@@ -983,13 +983,12 @@ static u32 GetRelearnerEggMoves(struct BoxPokemon *mon, u16 *moves)
         species = GetSpeciesPreEvolution(species);
 
     const u16 *eggMoves = GetSpeciesEggMoves(species);
+    // GRAFT: only egg moves this mon has known (hatched with, then forgot)
+    u32 known = GetBoxMonData(mon, MON_DATA_KNOWN_EGG_MOVES);
 
-    if (eggMoves[0] == MOVE_UNAVAILABLE)
-        return 0;
-
-    for (u32 i = 0; eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    for (u32 i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
     {
-        if (!BoxMonKnowsMove(mon, eggMoves[i]))
+        if ((known & (1u << i)) && !BoxMonKnowsMove(mon, eggMoves[i]))
             moves[numMoves++] = eggMoves[i];
     }
 
@@ -1117,13 +1116,11 @@ static bool32 HasRelearnerEggMoves(struct BoxPokemon *boxMon)
         species = GetSpeciesPreEvolution(species);
 
     const u16 *eggMoves = GetSpeciesEggMoves(species);
+    u32 known = GetBoxMonData(boxMon, MON_DATA_KNOWN_EGG_MOVES);
 
-    if (eggMoves[0] == MOVE_UNAVAILABLE)
-        return FALSE;
-
-    for (u32 i = 0; eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    for (u32 i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
     {
-        if (!BoxMonKnowsMove(boxMon, eggMoves[i]))
+        if ((known & (1u << i)) && !BoxMonKnowsMove(boxMon, eggMoves[i]))
             return TRUE;
     }
 

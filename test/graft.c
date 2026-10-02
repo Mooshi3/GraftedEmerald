@@ -1308,3 +1308,38 @@ TEST("Graft recolor repaints only the replaced type's colors")
     for (i = 0; i < 16; i++)
         EXPECT_EQ(dst[i], src[i]);
 }
+
+// The relearner offers only egg moves a mon has known: forgetting one remembers it
+TEST("A forgotten egg move is remembered for the relearner, other moves aren't")
+{
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][0];
+    u32 move;
+    const u16 *eggMoves = GetSpeciesEggMoves(SPECIES_CROAGUNK);
+    CreateMon(mon, SPECIES_TOXICROAK, 30, 0, OTID_STRUCT_PLAYER_ID); // evolved: uses Croagunk's list
+    EXPECT_EQ(GetMonData(mon, MON_DATA_KNOWN_EGG_MOVES), 0);
+
+    move = eggMoves[2];
+    SetMonData(mon, MON_DATA_MOVE1, &move);
+    move = MOVE_TACKLE;
+    SetMonData(mon, MON_DATA_MOVE1, &move); // forgets the egg move
+    SetMonData(mon, MON_DATA_MOVE1, &move); // a plain move leaves nothing
+    EXPECT_EQ(GetMonData(mon, MON_DATA_KNOWN_EGG_MOVES), 1u << 2);
+    EXPECT_EQ(GetMonData(mon, MON_DATA_MOVE1), MOVE_TACKLE); // the bits don't disturb the moves
+    EXPECT_EQ(GetMonData(mon, MON_DATA_SPECIES), SPECIES_TOXICROAK);
+    ZeroPlayerPartyMons();
+}
+
+TEST("Every species' egg move list fits the known-egg-move bits")
+{
+    u32 species, i;
+    for (species = 1; species < NUM_SPECIES; species++)
+    {
+        const u16 *eggMoves;
+        if (!IsSpeciesEnabled(species))
+            continue;
+        eggMoves = GetSpeciesEggMoves(species);
+        for (i = 0; eggMoves[i] != MOVE_UNAVAILABLE; i++)
+            ;
+        EXPECT_LE(i, KNOWN_EGG_MOVES_COUNT);
+    }
+}
