@@ -204,35 +204,52 @@ Debug_EventScript_Text_OffensiveIVs:
 Debug_EventScript_Text_DefensiveIVs:
 	.string "HP IVs: {STR_VAR_1}, DEF IVs: {STR_VAR_2}, SPDEF IVs: {STR_VAR_3}$"
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_1::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_2::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_TRAINER
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_3::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_ITEM
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_4::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_SHOP
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_5::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_REST
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: jump to a room of this type (in a run; the room counter stays)
 Debug_EventScript_Script_6::
-	release
-	end
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_BOSS
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: the last room before the boss (its only door is the boss's)
 Debug_EventScript_Script_7::
-	release
-	end
+	setvar VAR_ROGUE_ROOM, 6
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD
+	goto Debug_EventScript_RogueWarp
 
+@ Rogue: skip to the next floor's first room
 Debug_EventScript_Script_8::
+	addvar VAR_ROGUE_FLOOR, 1
+	setvar VAR_ROGUE_ROOM, 1
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD
+	goto Debug_EventScript_RogueWarp
+
+Debug_EventScript_RogueWarp::
+	warp MAP_ROGUE_ROOM, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y
+	waitstate
 	release
 	end
 

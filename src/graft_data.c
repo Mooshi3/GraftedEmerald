@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "constants/opponents.h"
 #include "pokemon.h"
 #include "graft_data.h"
@@ -668,6 +669,16 @@ u32 GetGraftDonorPoolSize(void)
 void BuildNearbyGraftPool(void)
 {
     sGraftDonorCount = 0;
+    // Rogue rooms have no encounter tables: donors are the current floor's species
+    if (Rogue_IsRunActive())
+    {
+        u16 species[MAX_GRAFT_POOL];
+        u32 i, count = Rogue_GetFloorDonors(species, MAX_GRAFT_POOL / 2);
+        for (i = 0; i < count; i++)
+            AddSpeciesToPool(species[i]);
+        if (sGraftDonorCount != 0)
+            return;
+    }
     // Tier 1: current map
     AddMapEncountersToPool(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     // Tier 2: connected maps

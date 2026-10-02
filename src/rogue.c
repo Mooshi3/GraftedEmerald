@@ -306,6 +306,16 @@ static enum Species PickFloorSpecies(rng_value_t *rng, enum Type type)
     return PickSpecies(rng, minBst, maxBst, GetFloor() == 1 && type == TYPE_NONE, type);
 }
 
+// Enemy-graft donors: species of the current floor's pool, fixed per room
+u32 Rogue_GetFloorDonors(u16 *species, u32 count)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0xD0D0);
+    u32 i;
+    for (i = 0; i < count; i++)
+        species[i] = PickFloorSpecies(&rng, TYPE_NONE);
+    return count;
+}
+
 // A starter: not evolved, evolves, and no stronger than the first-stage starters
 static enum Species PickStarter(rng_value_t *rng)
 {
@@ -839,6 +849,8 @@ void Rogue_TakeDoor(void)
     BuildRoomPlan();
     door = sPlan.doors[gSpecialVar_0x8004 % NUM_DOORS];
     gSpecialVar_Result = ROGUE_DOOR_NEXT_ROOM;
+    if (door == NO_DOOR) // can't happen unless the run state changed under the drawn room
+        door = ROGUE_ROOM_WILD;
 
     if (door == ROGUE_ROOM_START)
     {

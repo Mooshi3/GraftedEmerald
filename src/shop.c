@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "bg.h"
 #include "data.h"
 #include "decompress.h"
@@ -133,6 +134,9 @@ static void Task_BuyMenu(u8 taskId);
 // 0 = always available. Used for graft item gating.
 static u8 GetItemBadgeRequirement(u16 itemId)
 {
+    // ROGUE: a run's shops sell everything they stock from the first floor
+    if (Rogue_IsRunActive())
+        return 0;
     // GRAFT: with rationed graft items, grafting items are never sold
     if (GetGraftSetting(GRAFT_SETTING_GRAFT_SUPPLY) == GRAFT_SUPPLY_RATIONS)
     {

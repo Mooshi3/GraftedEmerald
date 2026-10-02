@@ -92,13 +92,14 @@ int main(int argc, char **argv)
     core->reset(core);
     FILE *s = fopen(argv[2], "r"); char line[256];
     while (fgets(line, sizeof line, s)) {
-        char a[64] = {0}, b[64] = {0}; int n = 0, m = 0;
+        char a[64] = {0}, b[64] = {0}; int n = 0, m = 0; unsigned pokeAddr = 0, pokeValue = 0;
         if (sscanf(line, "wait %d", &n) == 1) frames(n, 0);
         else if (sscanf(line, "mash %63s %d %d", a, &n, &m) == 3) for (int i = 0; i < n; i++) { frames(2, parsekeys(a)); frames(m, 0); }
         else if (sscanf(line, "press %63s %d", a, &n) >= 1) { frames(n ? n : 2, parsekeys(a)); frames(1, 0); }
         else if (sscanf(line, "shot %63s", b) == 1) shot(b);
         else if (sscanf(line, "heap %x", (unsigned *)&n) == 1) heap((uint32_t)n);
         else if (sscanf(line, "save %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_CREAT|O_TRUNC|O_RDWR); mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
+        else if (sscanf(line, "poke16 %x %x", &pokeAddr, &pokeValue) == 2) { core->rawWrite16(core, pokeAddr, -1, pokeValue); }
         else if (sscanf(line, "peek %x", (unsigned *)&n) == 1) { printf("peek %08X = %08X\n", (unsigned)n, core->rawRead32(core, (uint32_t)n, -1)); fflush(stdout); }
         else if (sscanf(line, "hunt %d", &n) == 1) {
             // Step one instruction at a time (up to n) until the PC leaves ROM/RAM/BIOS; print the last 64 PCs

@@ -122,3 +122,25 @@ TEST("A Rogue run starts with a weak unevolved starter")
         EXPECT_EQ(VarGet(VAR_ROGUE_FLOOR), 1);
     }
 }
+
+TEST("A Rogue door leads to the room its sign shows")
+{
+    u32 seed, slot;
+    u8 doors[3];
+    for (seed = 1; seed < 300; seed++)
+    {
+        SetRoom(seed * 2654435761u, 1 + seed % 3, 1 + seed % (ROGUE_ROOMS_PER_FLOOR - 1), ROGUE_ROOM_WILD);
+        Rogue_GetRoomDoors(doors);
+        for (slot = 0; slot < 3; slot++)
+        {
+            if (doors[slot] != 0xFF && doors[slot] != ROGUE_ROOM_MYSTERY)
+                break;
+        }
+        if (slot == 3)
+            continue;
+        gSpecialVar_0x8004 = slot;
+        Rogue_TakeDoor();
+        EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE), doors[slot]);
+        EXPECT_EQ(VarGet(VAR_ROGUE_ROOM), 2 + seed % (ROGUE_ROOMS_PER_FLOOR - 1));
+    }
+}

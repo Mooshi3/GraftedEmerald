@@ -69,3 +69,24 @@ Sleep Clause, Smart Wilds, shiny odds…) plus Rogue's own (meta-progression on/
 2. Floors and bosses: floor pools and level curve, Gym Leaders by type, the finale, Normal/Hard length.
 3. Meta-progression: BP, the unlock shop, the settings.
 4. Polish: events for "?" rooms, room layouts, balance.
+
+## Prototype status (2026-10-02)
+
+Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `test/rogue.c`.
+
+- A new game starts in the start room (Prof. Birch explains, one door starts a run). A run is 4 floors of
+  6 rooms + a boss (Hoenn's 8 Leaders in a per-run shuffled order, a typed party of floor + 2).
+- Rooms are generated: forest border, 2–5 inside trees (never closing off a door, checked by a search),
+  tall grass for looks, 2–3 doors (one boss door after room 6). Signs: Zigzagoon wild, Youngster trainer,
+  item ball, clerk shop, nurse rest, Unown "?" mystery, the Leader for the boss.
+- Wild rooms: 1–2 visible Pokémon from the floor's pool (floor 1: unevolved, BST ≤ 330; then wider);
+  talk to one to battle it; it's gone afterwards either way. Levels: 4 + 9 per floor + room number.
+- Trainer rooms: a generated party (name, class and picture borrowed from a vanilla trainer), sight 5,
+  doors locked until beaten. Enemy grafts draw from the floor's species.
+- The run forces Graft Limit Free, Release on faint, no level cap, harvests Any; shops have no badge
+  gates. Whiteout ends the run. Team cap 3 (only grafting balls work with a full team).
+- Debug: the debug menu's Scripts list jumps to a room type (`rogue_room` in tools/smoke/lib.sh;
+  `tools/smoke/scenarios/rogue.sh` starts a run).
+
+Not done yet: meta-progression, Normal/Hard length, bosses from other generations (sprites), boss aces,
+an Elite Four finale, "?" events, room variety (caves, water), a way to swap team members at the cap.

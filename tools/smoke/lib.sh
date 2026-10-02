@@ -43,3 +43,6 @@ all_badges_on() { flag_toggle 10; }
 toggle_flag() { echo -n "press R+START 3;wait 30;$(R 8 DOWN)press A;wait 20;press A;wait 20;$(N 1 "$1");press A;wait 30;press B;wait 20;press B;wait 20;press B;wait 30;"; }
 # Debug gifts don't set FLAG_SYS_POKEMON_GET (0x860), so START has no POKEMON row until this runs
 pokemon_menu_on() { toggle_flag 2144; }
+# Rogue (branch claude/grafted-rogue): Debug -> Scripts -> slot N (0-based): 0 wild, 1 trainer, 2 items,
+# 3 shop, 4 rest, 5 boss, 6 the last room before the boss, 7 next floor. Only in a run.
+rogue_room() { echo -n "press R+START 3;wait 30;$(R 5 DOWN)press A;wait 20;$(R "$1" DOWN)press A;wait 300;"; }
