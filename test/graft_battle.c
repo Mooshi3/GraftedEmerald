@@ -1,0 +1,54 @@
+// Grafted abilities in real battles. Any ability can be grafted onto any species, including the ones
+// that only make sense with one species' forms; on anything else they must do nothing, not crash.
+#include "global.h"
+#include "graft_data.h"
+#include "test/battle.h"
+
+#define GRAFT_ABILITY(ability) SetGraftedAbilityOnMon(gBattleTestRunnerState->data.currentMon, ability)
+
+SINGLE_BATTLE_TEST("Grafted form-change abilities do nothing on other species")
+{
+    enum Ability ability;
+    PARAMETRIZE { ability = ABILITY_DISGUISE; }
+    PARAMETRIZE { ability = ABILITY_ICE_FACE; }
+    PARAMETRIZE { ability = ABILITY_GULP_MISSILE; }
+    PARAMETRIZE { ability = ABILITY_SCHOOLING; }
+    PARAMETRIZE { ability = ABILITY_ZEN_MODE; }
+    PARAMETRIZE { ability = ABILITY_SHIELDS_DOWN; }
+    PARAMETRIZE { ability = ABILITY_POWER_CONSTRUCT; }
+    PARAMETRIZE { ability = ABILITY_STANCE_CHANGE; }
+    PARAMETRIZE { ability = ABILITY_BATTLE_BOND; }
+    PARAMETRIZE { ability = ABILITY_ZERO_TO_HERO; }
+    PARAMETRIZE { ability = ABILITY_HUNGER_SWITCH; }
+    PARAMETRIZE { ability = ABILITY_FORECAST; }
+    PARAMETRIZE { ability = ABILITY_FLOWER_GIFT; }
+    PARAMETRIZE { ability = ABILITY_COMMANDER; }
+    PARAMETRIZE { ability = ABILITY_MULTITYPE; }
+    PARAMETRIZE { ability = ABILITY_RKS_SYSTEM; }
+    PARAMETRIZE { ability = ABILITY_TERA_SHIFT; }
+    PARAMETRIZE { ability = ABILITY_ILLUSION; }
+    PARAMETRIZE { ability = ABILITY_MIMICRY; }
+    PARAMETRIZE { ability = ABILITY_EMBODY_ASPECT_TEAL_MASK; }
+    GIVEN {
+        PLAYER(SPECIES_WOBBUFFET) { GRAFT_ABILITY(ability); }
+        PLAYER(SPECIES_WYNAUT);
+        OPPONENT(SPECIES_WOBBUFFET) { GRAFT_ABILITY(ability); }
+    } WHEN {
+        TURN { MOVE(opponent, MOVE_SUPER_FANG); MOVE(player, MOVE_TACKLE); }
+        TURN { MOVE(opponent, MOVE_SCRATCH); MOVE(player, MOVE_SUPER_FANG); }
+        TURN { SWITCH(player, 1); MOVE(opponent, MOVE_SCRATCH); }
+        TURN { SWITCH(player, 0); MOVE(opponent, MOVE_SCRATCH); }
+    } SCENE {
+        // Disguise and Ice Face don't block the hits: the damage lands
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_SUPER_FANG, opponent);
+        HP_BAR(player);
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_SCRATCH, opponent);
+        HP_BAR(player);
+        ANIMATION(ANIM_TYPE_MOVE, MOVE_SUPER_FANG, player);
+        HP_BAR(opponent);
+    } THEN {
+        EXPECT_EQ(player->species, SPECIES_WOBBUFFET);
+        EXPECT_EQ(opponent->species, SPECIES_WOBBUFFET);
+        EXPECT_EQ(player->ability, ability); // the graft comes back on switch-in
+    }
+}
