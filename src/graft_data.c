@@ -1216,6 +1216,8 @@ static u8 TryAddBossAce(struct Pokemon *party, u8 count, u16 trainerNum, u8 spec
 
 static void RollTrainerGrafts(struct Pokemon *party, u8 count, u16 trainerNum)
 {
+    if (trainerNum == TRAINER_ROGUE_BOSS)
+        trainerNum = Rogue_GetBossTrainerId(); // the Leader it plays: its ace and specialty
     u8 graftCount = GetEnemyGraftCount();
     u8 aceSlot = 0;
     bool32 boss = IsBossTrainer(trainerNum);

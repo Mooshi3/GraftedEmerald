@@ -46,7 +46,7 @@ TEST("Rogue rooms lead to the boss after the last room of a floor")
     EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS);
     SetRoom(1234, ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR, ROGUE_ROOM_BOSS);
     EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
-    EXPECT_EQ(doors[1], ROGUE_ROOM_HUB); // the last boss: the way out
+    EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS); // the last floor's boss: on to the finale
 }
 
 TEST("Rogue trainers get generated parties scaled by floor")
@@ -143,4 +143,21 @@ TEST("A Rogue door leads to the room its sign shows")
         EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE), doors[slot]);
         EXPECT_EQ(VarGet(VAR_ROGUE_ROOM), 2 + seed % (ROGUE_ROOMS_PER_FLOOR - 1));
     }
+}
+
+TEST("After the last floor's boss comes the Champion, then the way out")
+{
+    u8 doors[3];
+    SetRoom(777, ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
+    EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS);
+    gSpecialVar_0x8004 = 1;
+    Rogue_TakeDoor();
+    EXPECT_EQ(VarGet(VAR_ROGUE_FLOOR), ROGUE_FLOORS_NORMAL + 1);
+    EXPECT_EQ(VarGet(VAR_ROGUE_ROOM), 1);
+    EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE), ROGUE_ROOM_BOSS);
+    EXPECT_EQ(Rogue_GetBossTrainerId(), TRAINER_WALLACE);
+    EXPECT_GE((u32)GetTrainerStructFromId(TRAINER_ROGUE_BOSS)->partySize, 5);
+    EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
+    EXPECT_EQ(doors[1], ROGUE_ROOM_HUB);
 }

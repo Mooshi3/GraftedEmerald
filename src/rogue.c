@@ -120,7 +120,14 @@ static const struct { u16 trainerId; u16 graphicsId; } sTrainerKinds[] =
 };
 
 // Floor bosses, in an order shuffled per run
-static const struct { u16 trainerId; u16 graphicsId; enum Type type; } sBosses[] =
+struct BossInfo
+{
+    u16 trainerId;
+    u16 graphicsId;
+    enum Type type; // TYPE_NONE: any type (the Champion)
+};
+
+static const struct BossInfo sBosses[] =
 {
     {TRAINER_ROXANNE_1,       OBJ_EVENT_GFX_ROXANNE,  TYPE_ROCK},
     {TRAINER_BRAWLY_1,        OBJ_EVENT_GFX_BRAWLY,   TYPE_FIGHTING},
@@ -130,6 +137,21 @@ static const struct { u16 trainerId; u16 graphicsId; enum Type type; } sBosses[]
     {TRAINER_WINONA_1,        OBJ_EVENT_GFX_WINONA,   TYPE_FLYING},
     {TRAINER_TATE_AND_LIZA_1, OBJ_EVENT_GFX_TATE,     TYPE_PSYCHIC},
     {TRAINER_JUAN_1,          OBJ_EVENT_GFX_JUAN,     TYPE_WATER},
+};
+
+// After the last floor: the Champion (Normal), or the Elite Four and then the Champion (Hard)
+static const struct BossInfo sFinaleNormal[] =
+{
+    {TRAINER_WALLACE, OBJ_EVENT_GFX_WALLACE, TYPE_NONE},
+};
+
+static const struct BossInfo sFinaleHard[] =
+{
+    {TRAINER_SIDNEY,  OBJ_EVENT_GFX_SIDNEY,  TYPE_DARK},
+    {TRAINER_PHOEBE,  OBJ_EVENT_GFX_PHOEBE,  TYPE_GHOST},
+    {TRAINER_GLACIA,  OBJ_EVENT_GFX_GLACIA,  TYPE_ICE},
+    {TRAINER_DRAKE,   OBJ_EVENT_GFX_DRAKE,   TYPE_DRAGON},
+    {TRAINER_WALLACE, OBJ_EVENT_GFX_WALLACE, TYPE_NONE},
 };
 
 // What doors lead to, by weight
@@ -258,13 +280,66 @@ static u32 GetFloorBoss(u32 floor)
     return order[(floor - 1) % ARRAY_COUNT(order)];
 }
 
+// Hard mode: the full length (8 floors, then the Elite Four). Unlocked by a win (meta-progression).
+static bool32 IsHardMode(void)
+{
+    return FALSE;
+}
+
+static u32 GetNumFloors(void)
+{
+    return IsHardMode() ? 8 : ROGUE_FLOORS_NORMAL;
+}
+
+static bool32 IsFinale(u32 floor)
+{
+    return floor > GetNumFloors();
+}
+
+static u32 GetFinaleLength(void)
+{
+    return IsHardMode() ? ARRAY_COUNT(sFinaleHard) : ARRAY_COUNT(sFinaleNormal);
+}
+
+// The boss fought in a room: the floor's Leader, or the finale's Elite Four / Champion in order
+static const struct BossInfo *GetBossAt(u32 floor, u32 room)
+{
+    if (IsFinale(floor))
+    {
+        u32 i = min(room, GetFinaleLength()) - 1;
+        return IsHardMode() ? &sFinaleHard[i] : &sFinaleNormal[i];
+    }
+    return &sBosses[GetFloorBoss(floor)];
+}
+
+static const struct BossInfo *GetCurrentBoss(void)
+{
+    return GetBossAt(GetFloor(), GetRoom());
+}
+
+// Where the current room's boss door leads
+static void GetBossDoorDestination(u32 *floor, u32 *room)
+{
+    *floor = GetFloor();
+    *room = GetRoom() + 1;
+    if (GetRoomType() == ROGUE_ROOM_BOSS && *floor == GetNumFloors())
+    {
+        *floor = GetNumFloors() + 1; // into the finale
+        *room = 1;
+    }
+}
+
 static u32 GetWildLevel(void)
 {
+    if (IsFinale(GetFloor()))
+        return 4 + GetNumFloors() * 9;
     return 4 + (GetFloor() - 1) * 9 + GetRoom();
 }
 
 static u32 GetBossLevel(void)
 {
+    if (IsFinale(GetFloor()))
+        return 4 + GetNumFloors() * 9 + 3 + GetRoom();
     return 4 + GetFloor() * 9 + 1;
 }
 
@@ -431,12 +506,13 @@ static void ChooseDoors(rng_value_t *rng)
         sPlan.doors[1] = ROGUE_ROOM_START;
         return;
     }
-    if (type == ROGUE_ROOM_BOSS && GetFloor() >= ROGUE_FLOORS_NORMAL)
+    if (IsFinale(GetFloor()) && GetRoom() >= GetFinaleLength())
     {
-        sPlan.doors[1] = ROGUE_ROOM_HUB; // the run is won: back to the start
+        sPlan.doors[1] = ROGUE_ROOM_HUB; // the Champion is beaten: the run is won
         return;
     }
-    if (type != ROGUE_ROOM_BOSS && GetRoom() >= ROGUE_ROOMS_PER_FLOOR)
+    if ((type == ROGUE_ROOM_BOSS && GetFloor() >= GetNumFloors())
+     || (type != ROGUE_ROOM_BOSS && GetRoom() >= ROGUE_ROOMS_PER_FLOOR))
     {
         sPlan.doors[1] = ROGUE_ROOM_BOSS;
         return;
@@ -601,7 +677,7 @@ static void BuildRoomPlan(void)
         sPlan.objects[0].sight = 5;
         break;
     case ROGUE_ROOM_BOSS:
-        AddObject(sBosses[GetFloorBoss(GetFloor())].graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
+        AddObject(GetCurrentBoss()->graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
         sPlan.objects[0].trainerType = TRAINER_TYPE_NORMAL;
         sPlan.objects[0].sight = 5;
         break;
@@ -632,7 +708,12 @@ static u16 GetDoorMarkerGraphics(u32 doorType)
     case ROGUE_ROOM_SHOP:    return OBJ_EVENT_GFX_MART_EMPLOYEE;
     case ROGUE_ROOM_REST:    return OBJ_EVENT_GFX_NURSE;
     case ROGUE_ROOM_MYSTERY: return OBJ_EVENT_MON + SPECIES_UNOWN_QUESTION;
-    case ROGUE_ROOM_BOSS:    return sBosses[GetFloorBoss(GetFloor() + (GetRoomType() == ROGUE_ROOM_BOSS))].graphicsId;
+    case ROGUE_ROOM_BOSS:
+    {
+        u32 floor, room;
+        GetBossDoorDestination(&floor, &room);
+        return GetBossAt(floor, room)->graphicsId;
+    }
     case ROGUE_ROOM_START:   return OBJ_EVENT_GFX_ITEM_BALL;
     case ROGUE_ROOM_HUB:     return OBJ_EVENT_GFX_PROF_BIRCH;
     }
@@ -760,8 +841,14 @@ void Rogue_GetRoomIntro(void)
     gSpecialVar_Result = TRUE;
     if (type == ROGUE_ROOM_BOSS)
     {
-        StringCopy(gStringVar1, GetTrainerNameFromId(sBosses[GetFloorBoss(GetFloor())].trainerId));
-        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} is waiting at the\nend of the floor!"));
+        const struct BossInfo *boss = GetCurrentBoss();
+        StringCopy(gStringVar1, GetTrainerNameFromId(boss->trainerId));
+        if (boss->trainerId == TRAINER_WALLACE)
+            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("The CHAMPION, {STR_VAR_1}, is waiting!"));
+        else if (IsFinale(GetFloor()))
+            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("The ELITE FOUR's {STR_VAR_1}\nis waiting!"));
+        else
+            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} is waiting at the\nend of the floor!"));
     }
     else if (VarGet(VAR_ROGUE_ROOM_TYPE) & ROOM_TYPE_FROM_MYSTERY)
     {
@@ -884,7 +971,14 @@ void Rogue_TakeDoor(void)
         return;
     }
 
-    if (GetRoomType() == ROGUE_ROOM_BOSS)
+    if (door == ROGUE_ROOM_BOSS)
+    {
+        u32 floor, room;
+        GetBossDoorDestination(&floor, &room);
+        VarSet(VAR_ROGUE_FLOOR, floor);
+        VarSet(VAR_ROGUE_ROOM, room);
+    }
+    else if (GetRoomType() == ROGUE_ROOM_BOSS)
     {
         VarSet(VAR_ROGUE_FLOOR, GetFloor() + 1);
         VarSet(VAR_ROGUE_ROOM, 1);
@@ -930,11 +1024,15 @@ void Rogue_OnBossDefeated(void)
 {
     u32 floor = GetFloor();
 
-    if (floor <= NUM_BADGES)
+    if (!IsFinale(floor) && floor <= NUM_BADGES)
         FlagSet(FLAG_BADGE01_GET + floor - 1);
-    if (floor >= ROGUE_FLOORS_NORMAL)
+    if (IsFinale(floor) && GetRoom() >= GetFinaleLength())
     {
-        StringCopy(gStringVar4, COMPOUND_STRING("That was the last boss!\nThe way out is open."));
+        StringCopy(gStringVar4, COMPOUND_STRING("You beat the CHAMPION!\nThe way out is open."));
+    }
+    else if (IsFinale(floor) || floor == GetNumFloors())
+    {
+        StringCopy(gStringVar4, COMPOUND_STRING("The way to the next challenger\nis open."));
     }
     else
     {
@@ -967,14 +1065,14 @@ static void BuildTrainer(u32 slot, u32 key)
     rng_value_t rng = LocalRandomSeed(key);
     bool32 boss = (slot == 1);
     u32 floor = GetFloor();
-    u16 baseId = boss ? sBosses[GetFloorBoss(floor)].trainerId : sTrainerKinds[GetTrainerKind()].trainerId;
-    enum Type type = boss ? sBosses[GetFloorBoss(floor)].type : TYPE_NONE;
+    u16 baseId = boss ? GetCurrentBoss()->trainerId : sTrainerKinds[GetTrainerKind()].trainerId;
+    enum Type type = boss ? GetCurrentBoss()->type : TYPE_NONE;
     u32 size, level, iv, i;
 
     sTrainers[slot] = *GetTrainerStructFromId(baseId);
     if (boss)
     {
-        size = min(floor + 2, PARTY_SIZE);
+        size = IsFinale(floor) ? 5 : min(floor + 2, PARTY_SIZE);
         level = GetBossLevel();
         iv = min(31, 6 + floor * 4);
     }
@@ -1004,6 +1102,12 @@ static void BuildTrainer(u32 slot, u32 key)
     sTrainers[slot].poolSize = 0;
     sTrainers[slot].overrideTrainer = 0;
     sTrainers[slot].battleType = TRAINER_BATTLE_TYPE_SINGLES;
+}
+
+// The Leader / Elite Four / Champion the current boss is (for its ace, src/graft_data.c)
+u16 Rogue_GetBossTrainerId(void)
+{
+    return GetCurrentBoss()->trainerId;
 }
 
 const struct Trainer *Rogue_GetTrainer(u16 trainerId)
