@@ -32,6 +32,9 @@ Commands, separated by `;`:
 | `mash KEYS COUNT GAP` | press COUNT times, GAP frames apart |
 | `shot NAME.png` | screenshot into `out/` |
 | `reset` | soft reset; the battery save stays. With `SMOKE_ROM` pointing at another build, a state made with one ROM boots the other on its save (save-compatibility checks) |
+| `regs` | print the CPU's pc, lr, sp and r0-r3 |
+| `peek ADDR` | print the 32-bit word at ADDR (hex): a variable from `pokeemerald.map`, an I/O register (0x04000200 is IE) |
+| `hunt N` | step one instruction at a time, up to N, until the PC jumps somewhere invalid; prints the last 64 PCs. Symbolize them with `arm-none-eabi-nm -n pokeemerald.elf` (the map lacks static functions). This is how a crash that only shows up as "Jumped to invalid address" gets traced to a function |
 | `heap ADDR` | print the game's heap: each allocated block with its size and the `file:line` that allocated it, then totals. ADDR is `gHeap`'s address in hex, from `grep " gHeap$" pokeemerald.map` (drop the `0x`). |
 
 Walking one tile is `press DIR 16`. Pressing a direction for 2-4 frames only turns the player.

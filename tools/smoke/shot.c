@@ -1,3 +1,4 @@
+#include <mgba/internal/arm/arm.h>
 #include <mgba/flags.h>
 // Tiny scripted mGBA runner: ./shot rom.gba script.txt
 // Script lines: "wait N" | "press KEYS [hold]" (KEYS like A, START, UP, A+B) | "mash KEY times gap" | "shot file.png"
@@ -98,6 +99,21 @@ int main(int argc, char **argv)
         else if (sscanf(line, "shot %63s", b) == 1) shot(b);
         else if (sscanf(line, "heap %x", (unsigned *)&n) == 1) heap((uint32_t)n);
         else if (sscanf(line, "save %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_CREAT|O_TRUNC|O_RDWR); mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
+        else if (sscanf(line, "peek %x", (unsigned *)&n) == 1) { printf("peek %08X = %08X\n", (unsigned)n, core->rawRead32(core, (uint32_t)n, -1)); fflush(stdout); }
+        else if (sscanf(line, "hunt %d", &n) == 1) {
+            // Step one instruction at a time (up to n) until the PC leaves ROM/RAM/BIOS; print the last 64 PCs
+            struct ARMCore *cpu = core->cpu; uint32_t ring[64], lrs[64]; int k = 0, i;
+            for (i = 0; i < n; i++) {
+                uint32_t pc = cpu->gprs[15]; uint32_t r = pc >> 24;
+                ring[k & 63] = pc; lrs[k & 63] = cpu->gprs[14]; k++;
+                if (!(r == 0 || r == 2 || r == 3 || r == 8 || r == 9) || (r == 0 && pc >= 0x4000)) break;
+                core->step(core);
+            }
+            printf("hunt stopped after %d steps\n", i);
+            for (int j = (k > 64 ? k - 64 : 0); j < k; j++) printf("  pc %08X lr %08X\n", ring[j & 63], lrs[j & 63]);
+            fflush(stdout);
+        }
+        else if (strncmp(line, "regs", 4) == 0) { struct ARMCore *cpu = core->cpu; printf("pc %08X lr %08X sp %08X r0 %08X r1 %08X r2 %08X r3 %08X\n", cpu->gprs[15], cpu->gprs[14], cpu->gprs[13], cpu->gprs[0], cpu->gprs[1], cpu->gprs[2], cpu->gprs[3]); fflush(stdout); }
         else if (strncmp(line, "reset", 5) == 0) core->reset(core); // the battery save stays: boots this ROM on another ROM's save
         else if (sscanf(line, "load %63s", b) == 1) { struct VFile *vf = VFileOpen(b, O_RDONLY); mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA); vf->close(vf); }
     }

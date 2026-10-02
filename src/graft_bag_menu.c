@@ -218,10 +218,11 @@ static void ShowMoveIcons(enum Move move)
     type->x = DESC_X + 4 + 16;
     type->y = DESC_Y + 1 + 8;
     type->invisible = FALSE;
-    StartSpriteAnim(category, GetMoveCategory(move));
     category->x = DESC_X + 38 + 8;
     category->y = DESC_Y + 1 + 8;
-    category->invisible = FALSE;
+    category->invisible = GetMoveCategory(move) == DAMAGE_CATEGORY_NONE; // no icon (and a NULL animation)
+    if (!category->invisible)
+        StartSpriteAnim(category, GetMoveCategory(move));
 }
 
 static void HideMoveIcons(void)
@@ -429,6 +430,9 @@ static void CB2_InitGraftBag(void)
         LoadSpritePalette(&gSpritePal_CategoryIcons);
         sGraftBag->typeIconSpriteId = CreateSprite(&gSpriteTemplate_MoveTypes, 0, 0, 0);
         sGraftBag->categoryIconSpriteId = CreateSprite(&gSpriteTemplate_CategoryIcons, 0, 0, 0);
+        // The category icons' animation 0 (DAMAGE_CATEGORY_NONE) is NULL: the sprite must never sit on it,
+        // or AnimateSprites reads animation commands from address 0 (a crash, depending on what's there)
+        StartSpriteAnim(&gSprites[sGraftBag->categoryIconSpriteId], DAMAGE_CATEGORY_STATUS);
         gSprites[sGraftBag->typeIconSpriteId].oam.priority = 0;
         gSprites[sGraftBag->categoryIconSpriteId].oam.priority = 0;
         HideMoveIcons();

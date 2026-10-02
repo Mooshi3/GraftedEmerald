@@ -651,6 +651,12 @@ TEST("Monotype: off-type party mons can't battle unless nobody has the type; gra
     GraftMonotypeOntoStarter(&gParties[B_TRAINER_PLAYER][0]);
     EXPECT(IsValidForBattle(&gParties[B_TRAINER_PLAYER][0]));
     EXPECT(!IsValidForBattle(&gParties[B_TRAINER_PLAYER][1]));
+    // The only Water mon fainted: the others may battle, or the forced switch has nobody to pick
+    {
+        u16 hp = 0;
+        SetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_HP, &hp);
+        EXPECT(IsValidForBattle(&gParties[B_TRAINER_PLAYER][1]));
+    }
     // Enemy parties are never restricted
     CreateRandomMonWithIVs(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_ZIGZAGOON, 20, 0);
     EXPECT(IsValidForBattle(&gParties[B_TRAINER_OPPONENT_A][0]));

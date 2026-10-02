@@ -317,8 +317,9 @@ static bool32 MonHasMonotype(struct Pokemon *mon, u32 type)
     return GetEffectiveTypeFromMon(mon, 0) == type || GetEffectiveTypeFromMon(mon, 1) == type;
 }
 
-// Monotype: can this player party mon battle? If no party mon has the type at all,
-// everyone may battle, so a party can never be left with nobody to send out.
+// Monotype: can this player party mon battle? If no party mon of the type can still fight,
+// everyone may battle, so a party can never be left with nobody to send out (a fainted or
+// fallen type mon doesn't count: it can't be sent out either).
 bool32 IsMonotypeLegal(struct Pokemon *mon)
 {
     u32 type = GetGraftSetting(GRAFT_SETTING_MONOTYPE);
@@ -336,6 +337,8 @@ bool32 IsMonotypeLegal(struct Pokemon *mon)
     {
         if (GetMonData(&party[i], MON_DATA_SPECIES) != SPECIES_NONE
          && !GetMonData(&party[i], MON_DATA_IS_EGG)
+         && GetMonData(&party[i], MON_DATA_HP) != 0
+         && !IsMonFallen(&party[i])
          && MonHasMonotype(&party[i], type))
             return FALSE;
     }
