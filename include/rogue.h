@@ -13,6 +13,7 @@ bool32 Rogue_IsTeamFull(void);
 void Rogue_OnWhiteOut(void);
 void Rogue_InitNewGame(void);
 const struct Trainer *Rogue_GetTrainer(u16 trainerId);
+u32 Rogue_GetRoomDoors(u8 *doors);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {

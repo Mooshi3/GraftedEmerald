@@ -579,6 +579,20 @@ static void BuildRoomPlan(void)
     }
 }
 
+// For tests: the current room's doors, and whether every one is reachable from the entrance
+u32 Rogue_GetRoomDoors(u8 *doors)
+{
+    u32 i, count = 0;
+    BuildRoomPlan();
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        doors[i] = sPlan.doors[i];
+        if (doors[i] != NO_DOOR)
+            count++;
+    }
+    return AreDoorsReachable() ? count : 0;
+}
+
 static u16 GetDoorMarkerGraphics(u32 doorType)
 {
     switch (doorType)
