@@ -99,6 +99,15 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 - **Wild Pokémon:** Hidden (vanilla random encounters, default) / Visible (the expansion's overworld wild encounters, Let's Go style, `src/wild_encounter_ow.c`; random encounters off) / Both. Always Hidden under Nuzlocke, so a catch can't be scouted (`AreOverworldWildEncountersOn`, `AreRandomWildEncountersOn`). `WE_OW_ENCOUNTERS` is compiled in and gated at runtime. Spawns roll species through `TryGenerateWildMon` (postgame legendaries included); the battle mon is re-created when the battle starts, which is where Wild Grafts are rolled.
 - **Monotype:** any type or Off. Only party mons with that type (natural or grafted) pass `IsValidForBattle` and can switch in; if no party mon of the type can still fight (fainted and fallen ones don't count), everyone may battle, so there's always someone to send out. In partner battles only the player's half of the party is restricted. The starter gets the type grafted as its second type.
 
+## Grafted Rogue (branch `claude/grafted-rogue`)
+
+This branch turns the game into a roguelite; `docs/rogue/DESIGN.md` has Jacob's decisions and the status. Grafted Emerald fixes get merged in from `claude/relaxed-pasteur-sy0rgl`.
+
+- A new game starts in the start room (no truck). Every room is the one map `Rogue_Room`, rebuilt from a seed (run seed mixed with floor and room) by `src/rogue.c`: `Rogue_OnTransition` places objects (door signs, room contents) in the saved templates before they spawn, `Rogue_OnLoad` draws trees, grass, ponds and doors (it runs again after every battle, so everything is recomputed from the seed, nothing stored).
+- Run state is in vars (`VAR_ROGUE_*`, `include/constants/vars.h`); unlocks in `VAR_ROGUE_UNLOCKS` survive runs, BP is the Frontier's `battlePoints`. `StartRun` forces the settings a run needs (`SetForcedSettings`); the settings screen only offers the rest (`sRows`, `src/graft_settings.c`).
+- Generated trainers: `TRAINER_ROGUE_TRAINER` / `TRAINER_ROGUE_BOSS` resolve through `GetTrainerStructFromId` to a RAM `struct Trainer` built per room (`Rogue_GetTrainer`), borrowing a vanilla trainer's name, class and picture. Rogue bosses get their Leader's ace (`RollTrainerGrafts` maps the id). Enemy-graft donors come from the floor's pool.
+- Debug menu > Scripts jumps to a room type; `tools/smoke/scenarios/rogue.sh` starts a run; `rogue_room N` in `tools/smoke/lib.sh`. Tests: `test/rogue.c`.
+
 ## Smoke tests
 
 `tools/smoke/` plays the real ROM in a headless mGBA and takes screenshots (see its README). Use it for menus, scripts and flows the unit tests can't see. To save main-session context, run smoke tests through a subagent on a cheaper model: point it at `tools/smoke/README.md`, name the flows to check, and ask for a report plus a contact sheet of the frames that matter. Decide yourself whether what it found is a real bug.
