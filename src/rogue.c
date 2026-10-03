@@ -2760,6 +2760,10 @@ static void BuildTrainer(u32 slot, u32 key)
     u32 size, level, iv, i;
 
     sTrainers[slot] = *GetTrainerStructFromId(baseId);
+    // Healing items only for the Champion and Hard mode's bosses (Jacob 2026-10-03): the borrowed
+    // trainer's Bag goes otherwise
+    if (!(boss && (IsHardMode() || baseId == TRAINER_WALLACE)))
+        memset(sTrainers[slot].items, 0, sizeof(sTrainers[slot].items));
     if (boss)
     {
         size = IsFinale(floor) ? 5 : min(floor + 1, 5); // plus the Leader's ace

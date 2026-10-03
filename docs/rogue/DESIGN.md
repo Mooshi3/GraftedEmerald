@@ -203,3 +203,5 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   meta-progression off, all of them), plus a silver shield once a run has been won. Prof. Birch is a help
   menu: Runs, Doors, Catching, Grafting, Fainting, Levels, Rest stops, BP & unlocks. The scientist still
   sells unlocks. The exit mat at the bottom starts a run (with a yes/no).
+- Trainer items (2026-10-03): generated trainers borrowed the vanilla trainer's Bag (Roxanne's Potions, a
+  Leader's Hyper Potion). Now only the Champion and Hard mode's bosses keep theirs.

@@ -638,3 +638,22 @@ TEST("Rogue: EXP is boosted below the floor's boss level and stops at it")
     SetRoom(1, 3, 3, ROGUE_ROOM_WILD);
     EXPECT_EQ(Rogue_GetLevelCap(), 27);              // floor 3's boss
 }
+
+TEST("Rogue: trainers and Normal mode's Leaders carry no items")
+{
+    u32 seed, i;
+    const struct Trainer *trainer;
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0); // Normal mode
+    for (seed = 1; seed < 20; seed++)
+    {
+        SetRoom(seed * 7, 1 + seed % ROGUE_FLOORS_NORMAL, 4, ROGUE_ROOM_TRAINER);
+        trainer = GetTrainerStructFromId(TRAINER_ROGUE_TRAINER);
+        for (i = 0; i < MAX_TRAINER_ITEMS; i++)
+            EXPECT_EQ(trainer->items[i], ITEM_NONE);
+        SetRoom(seed * 7, 1 + seed % ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+        trainer = GetTrainerStructFromId(TRAINER_ROGUE_BOSS);
+        for (i = 0; i < MAX_TRAINER_ITEMS; i++)
+            EXPECT_EQ(trainer->items[i], ITEM_NONE);
+    }
+    // (the Champion keeps his: the test build's trainer data gives vanilla Wallace none to check)
+}
