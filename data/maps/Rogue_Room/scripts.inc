@@ -67,7 +67,7 @@ Rogue_Room_EventScript_EnterRoomNoPopUp:
 Rogue_Room_EventScript_EnterRoomEnd:
 	end
 
-@ After a battle: what to do with each Pokémon that fainted
+@ After a battle, with last rites left: whether to break each newly fainted Pokémon down
 Rogue_Room_EventScript_AskFainted::
 	lockall
 	setvar VAR_TEMP_4, 0
@@ -77,7 +77,7 @@ Rogue_Room_EventScript_AskFaintedLoop:
 	message Rogue_Room_Text_AskFainted
 	waitmessage
 	special Rogue_PushFaintedChoices
-	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	dynmultistack 0, 0, TRUE, 2, FALSE, 0, DYN_MULTICHOICE_CB_NONE
 	copyvar VAR_0x8005, VAR_RESULT
 	special Rogue_ResolveFainted
 	msgbox gStringVar4, MSGBOX_DEFAULT
@@ -172,12 +172,16 @@ Rogue_Room_EventScript_StartedRun::
 	msgbox Rogue_Room_Text_ReceivedStarter, MSGBOX_DEFAULT
 	waitfanfare
 	special Rogue_HasHeirloom
-	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_Warp
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_Vault
 	msgbox Rogue_Room_Text_ChooseHeirloom, MSGBOX_DEFAULT
 	special Rogue_PushHeirloomChoices
 	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
 	special Rogue_GiveHeirloom
 	msgbox Rogue_Room_Text_GotHeirloom, MSGBOX_DEFAULT
+Rogue_Room_EventScript_Vault:
+	special Rogue_TakeVaultPiece
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_Warp
+	msgbox Rogue_Room_Text_GotVaultPiece, MSGBOX_DEFAULT
 	goto Rogue_Room_EventScript_Warp
 	end
 
@@ -434,6 +438,10 @@ Rogue_Room_Text_ChooseStarter:
 
 Rogue_Room_Text_ChooseHeirloom:
 	.string "Pick a graft piece to bring along.$"
+
+Rogue_Room_Text_GotVaultPiece:
+	.string "{PLAYER} took {STR_VAR_1} out of\n"
+	.string "the vault.$"
 
 Rogue_Room_Text_GotHeirloom:
 	.string "{STR_VAR_1} was added to the\n"

@@ -99,7 +99,9 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
   (confirmed by Jacob).
 - Fainting (decided with Jacob 2026-10-02): nothing is lost on its own. After a battle, each Pokémon that
   fainted asks: Keep it (stays on the team, fainted, until a Revive; asked again only if it faints again
-  after being revived), Let it go, or Last rites (broken down into graft pieces). Last rites I/II/III
+  after being revived) or Last rites (broken down into graft pieces). Only asked while last rites are left
+  this floor (2026-10-03, Jacob: a fainted Pokémon is worth more than an empty slot, and it can be revived
+  or swapped out for a catch, so "Let it go" was dropped). Last rites I/II/III
   give 1/2/3 uses a floor, so grafting balls and the Splicer stay useful and killing your own Pokémon for
   pieces stays a limited strategy. Per floor or per run is still open (one constant to change).
 
@@ -213,3 +215,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   - **Ace Trainer** rooms (a Cooltrainer door sign; door weight 8, Trainer 22): one more Pokémon,
     2 levels higher, better IVs; 1 of 4 pieces plus a free prize item (not a Mega Stone).
   - Guards in wild and item rooms: 25% (was 50%).
+- Graft vault (2026-10-03, unlock 19, 60 BP): in a run, VAULT in the Graft Bag moves one piece into the
+  vault (the piece it held comes back out); the next run starts with it and the vault empties. Two vars
+  (`VAR_ROGUE_VAULT_KIND`, `VAR_ROGUE_VAULT_VALUE`). Heirloom stays as is (1 of 3 random pieces).
+- Floor weather (2026-10-03): from floor 2, 40% of floors have rain, harsh sun, a sandstorm or snow in
+  their forest and beach rooms (indoor themes have none). It's overworld weather, so battles there start
+  with it. The rest stop's exit names it ("Word is it's raining outdoors on FLOOR 3.").
+- Fainted Pokémon: only asked about with last rites left (see Fainting).
+- Proposed, waiting on Jacob: Hard mode curses and achievements (2026-10-03).

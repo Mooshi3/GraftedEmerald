@@ -659,6 +659,7 @@ def_special Rogue_GiveChosenStarter
 def_special Rogue_HasHeirloom
 def_special Rogue_PushHeirloomChoices
 def_special Rogue_GiveHeirloom
+def_special Rogue_TakeVaultPiece
 def_special Rogue_BufferBP
 def_special Rogue_PushUnlockChoices
 def_special Rogue_DescribeUnlock

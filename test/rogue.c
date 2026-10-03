@@ -5,6 +5,7 @@
 #include "pokemon.h"
 #include "test/test.h"
 #include "constants/rogue.h"
+#include "constants/weather.h"
 #include "constants/move_relearner.h"
 #include "graft_settings.h"
 #include "graft_bag.h"
@@ -282,7 +283,7 @@ static void SetUpFaintedTeam(void)
     ClearBag();
 }
 
-TEST("Rogue: nothing is lost on its own; the player is asked about each fainted Pokemon")
+TEST("Rogue: nothing is lost on its own; with last rites left, the player is asked about each fainted Pokemon")
 {
     SetRoom(99, 1, 2, ROGUE_ROOM_WILD);
     VarSet(VAR_ROGUE_UNLOCKS, 0);
@@ -292,8 +293,13 @@ TEST("Rogue: nothing is lost on its own; the player is asked about each fainted 
     gBattleOutcome = B_OUTCOME_WON;
     Rogue_OnBattleEnd();
     EXPECT_EQ(CalculatePlayerPartyCount(), 2);
-    EXPECT_EQ(VarGet(VAR_TEMP_4), 1);
+    EXPECT_EQ(VarGet(VAR_TEMP_4), 0); // no last rites: nothing to ask
+    Rogue_FindFainted();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
 
+    VarSet(VAR_ROGUE_UNLOCKS, 1 << 6); // Last rites I
+    Rogue_OnBattleEnd();
+    EXPECT_EQ(VarGet(VAR_TEMP_4), 1);
     Rogue_FindFainted();
     EXPECT_EQ(gSpecialVar_Result, TRUE);
     EXPECT_EQ(gSpecialVar_0x8004, 1);
@@ -306,13 +312,7 @@ TEST("Rogue: nothing is lost on its own; the player is asked about each fainted 
     VarSet(VAR_TEMP_4, 0);
     Rogue_OnBattleEnd();
     EXPECT_EQ(VarGet(VAR_TEMP_4), 0);
-
-    SetUpFaintedTeam();
-    Rogue_FindFainted();
-    gSpecialVar_0x8005 = ROGUE_FAINTED_RELEASE;
-    Rogue_ResolveFainted();
-    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
-    EXPECT(IsGraftBagEmpty());
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
 }
 
 TEST("Rogue: last rites break a fainted Pokemon down, a few times a floor")
@@ -328,11 +328,13 @@ TEST("Rogue: last rites break a fainted Pokemon down, a few times a floor")
     EXPECT_EQ(CalculatePlayerPartyCount(), 1);
     EXPECT(!IsGraftBagEmpty());
 
-    SetUpFaintedTeam(); // used up this floor: it's a plain release
+    SetUpFaintedTeam(); // used up this floor: not asked, and the Pokémon stays
     Rogue_FindFainted();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    gSpecialVar_0x8004 = 1;
     gSpecialVar_0x8005 = ROGUE_FAINTED_RITES;
     Rogue_ResolveFainted();
-    EXPECT_EQ(CalculatePlayerPartyCount(), 1);
+    EXPECT_EQ(CalculatePlayerPartyCount(), 2);
     EXPECT(IsGraftBagEmpty());
 
     // The next floor brings it back
@@ -721,4 +723,57 @@ TEST("Rogue: beaten trainers offer pieces of their team; an Ace Trainer adds an 
     Rogue_GiveTrainerPiece();
     EXPECT_EQ(gSpecialVar_0x8005, TRUE);
     gBattleTypeFlags = 0;
+}
+
+TEST("Rogue: the Graft vault keeps one piece for the next run")
+{
+    struct GraftPiece speed = {GRAFT_PIECE_STAT, 3, 120};
+    struct GraftPiece fire = {GRAFT_PIECE_TYPE, 0, TYPE_FIRE};
+    VarSet(VAR_ROGUE_VAULT_KIND, 0);
+    VarSet(VAR_ROGUE_VAULT_VALUE, 0);
+    VarSet(VAR_ROGUE_UNLOCKS_2, 0);
+    SetRoom(5, 1, 2, ROGUE_ROOM_WILD);
+    EXPECT(!Rogue_CanVaultPieces());
+    VarSet(VAR_ROGUE_UNLOCKS_2, 1 << 3); // Graft vault
+    EXPECT(Rogue_CanVaultPieces());
+
+    ClearGraftBag();
+    AddGraftPiece(&speed);
+    AddGraftPiece(&fire);
+    Rogue_VaultPiece(&speed);
+    EXPECT_EQ(GetGraftPieceCount(&speed), 0); // out of this run
+    Rogue_VaultPiece(&fire);                  // swaps: the Speed piece comes back
+    EXPECT_EQ(GetGraftPieceCount(&speed), 1);
+    EXPECT_EQ(GetGraftPieceCount(&fire), 0);
+
+    ClearGraftBag(); // the next run
+    Rogue_TakeVaultPiece();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    EXPECT_EQ(GetGraftPieceCount(&fire), 1);
+    Rogue_TakeVaultPiece(); // emptied
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    EXPECT_EQ(GetGraftPieceCount(&fire), 1);
+    VarSet(VAR_ROGUE_UNLOCKS_2, 0);
+}
+
+TEST("Rogue: some floors after the first have weather")
+{
+    u32 seed, floor, weathered = 0, total = 0;
+    for (seed = 1; seed < 30; seed++)
+    {
+        SetRoom(seed * 7919, 1, 1, ROGUE_ROOM_WILD);
+        EXPECT_EQ(Rogue_GetFloorWeather(1), 0xFF);
+        for (floor = 2; floor <= 8; floor++)
+        {
+            u32 weather = Rogue_GetFloorWeather(floor);
+            total++;
+            if (weather != 0xFF)
+            {
+                weathered++;
+                EXPECT(weather == WEATHER_RAIN || weather == WEATHER_DROUGHT || weather == WEATHER_SANDSTORM || weather == WEATHER_SNOW);
+            }
+        }
+    }
+    EXPECT_GT(weathered, total / 5);
+    EXPECT_LT(weathered, total * 3 / 5);
 }

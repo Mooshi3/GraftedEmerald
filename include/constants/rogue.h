@@ -37,8 +37,7 @@
 
 // Rogue_ResolveFainted's choices
 #define ROGUE_FAINTED_KEEP    0
-#define ROGUE_FAINTED_RELEASE 1
-#define ROGUE_FAINTED_RITES   2
+#define ROGUE_FAINTED_RITES   1
 
 // Where the player arrives in the base between runs (MAP_ROGUE_HOME)
 #define ROGUE_HOME_X 7

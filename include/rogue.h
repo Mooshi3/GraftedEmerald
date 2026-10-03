@@ -60,6 +60,12 @@ void Rogue_DescribeUnlock(void);
 void Rogue_BuyUnlock(void);
 void Rogue_GiveGiftPieces(void);
 void Rogue_OnBattleFinishing(void);
+struct GraftPiece;
+bool32 Rogue_CanVaultPieces(void);
+bool32 Rogue_GetVaultPieceName(u8 *dst);
+void Rogue_VaultPiece(const struct GraftPiece *piece);
+void Rogue_TakeVaultPiece(void);
+u32 Rogue_GetFloorWeather(u32 floor); // a WEATHER_*, or 0xFF for none
 void Rogue_OnBattleEnd(void);
 void Rogue_FindFainted(void);
 void Rogue_PushFaintedChoices(void);

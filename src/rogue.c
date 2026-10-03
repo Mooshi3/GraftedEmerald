@@ -4,6 +4,8 @@
 // it's needed instead of being stored. See docs/rogue/DESIGN.md.
 #include "global.h"
 #include "rogue.h"
+#include "field_weather.h"
+#include "constants/weather.h"
 #include "battle.h"
 #include "battle_setup.h"
 #include "data.h"
@@ -302,6 +304,7 @@ enum
     UNLOCK_DISCOUNT = 16,
     UNLOCK_HARVEST_BONUS,
     UNLOCK_CATCH_BONUS,
+    UNLOCK_VAULT,
     UNLOCK_COUNT,
 };
 
@@ -330,6 +333,7 @@ static const struct
     [UNLOCK_DISCOUNT] = {COMPOUND_STRING("Discount"), COMPOUND_STRING("Shops in a run sell everything\nfor a quarter less."), 40, -1},
     [UNLOCK_HARVEST_BONUS] = {COMPOUND_STRING("Harvest bonus"), COMPOUND_STRING("Pieces broken down from a POKéMON\nsometimes come with a spare copy."), 60, -1},
     [UNLOCK_CATCH_BONUS] = {COMPOUND_STRING("Catch bonus"), COMPOUND_STRING("A POKéMON you catch sometimes\nleaves a graft piece behind too."), 50, -1},
+    [UNLOCK_VAULT] = {COMPOUND_STRING("Graft vault"), COMPOUND_STRING("Put a piece in the vault during a\nrun to start the next run with it."), 60, -1},
     [UNLOCK_FAVORITE] = {COMPOUND_STRING("Favorite"), COMPOUND_STRING("A team member you name in a\nCENTER becomes a starter choice."), 150, -1},
 };
 
@@ -1553,12 +1557,37 @@ static void SetObjectTemplate(u32 slot, u16 graphicsId, u32 x, u32 y, u8 movemen
 }
 
 // ON_TRANSITION: place the room's objects before they spawn, hide the unused ones
+// Floor weather: from floor 2 on, 40% of floors have rain, harsh sun, a sandstorm or snow in their
+// forest and beach rooms. It's overworld weather, so every battle there starts with it too
+// (FIELD_EFFECT_OVERWORLD_WEATHER, battle_util.c). Caves, volcanoes, power plants and buildings are
+// indoors. The rest stop names it before the floor starts.
+#define NO_FLOOR_WEATHER 0xFF
+u32 Rogue_GetFloorWeather(u32 floor)
+{
+    u32 roll;
+    if (!Rogue_IsRunActive() || floor <= 1)
+        return NO_FLOOR_WEATHER;
+    roll = Mix32(GetRunSeed() ^ (floor * 0x9E3779B1) ^ 0x3EA7);
+    if (roll % 100 >= 40)
+        return NO_FLOOR_WEATHER;
+    roll = (roll >> 8) % 100;
+    if (roll < 35)
+        return WEATHER_RAIN;
+    if (roll < 60)
+        return WEATHER_DROUGHT;
+    if (roll < 80)
+        return WEATHER_SANDSTORM;
+    return WEATHER_SNOW;
+}
+
 void Rogue_OnTransition(void)
 {
     u32 i;
     bool32 cave, rocks;
 
     BuildRoomPlan();
+    if (sPlan.kind == ROOM_KIND_OUTDOOR && Rogue_GetFloorWeather(GetFloor()) != NO_FLOOR_WEATHER)
+        SetSavedWeather(Rogue_GetFloorWeather(GetFloor()));
     cave = (sPlan.kind == ROOM_KIND_WALLED && sPlan.biome == BIOME_CAVE);
     rocks = (sPlan.kind == ROOM_KIND_WALLED && sPlan.biome != BIOME_VOLCANO); // a cave's or power plant's doors
     ClearTrainerFlag(TRAINER_ROGUE_TRAINER);
@@ -2510,6 +2539,65 @@ void Rogue_HasHeirloom(void)
     gSpecialVar_Result = HasUnlock(UNLOCK_START_PIECE);
 }
 
+// The Graft vault unlock: one piece kept between runs. Putting a piece in takes one out of the Graft
+// Bag (and puts the piece the vault held back in); the next run starts with it and the vault empties.
+static bool32 GetVaultPiece(struct GraftPiece *piece)
+{
+    u32 kind = VarGet(VAR_ROGUE_VAULT_KIND);
+    if ((kind >> 8) == 0 || (kind >> 8) > GRAFT_PIECE_KIND_COUNT)
+        return FALSE;
+    piece->kind = (kind >> 8) - 1;
+    piece->stat = kind & 0xFF;
+    piece->value = VarGet(VAR_ROGUE_VAULT_VALUE);
+    return TRUE;
+}
+
+static void SetVaultPiece(const struct GraftPiece *piece)
+{
+    VarSet(VAR_ROGUE_VAULT_KIND, piece == NULL ? 0 : ((piece->kind + 1) << 8) | piece->stat);
+    VarSet(VAR_ROGUE_VAULT_VALUE, piece == NULL ? 0 : piece->value);
+}
+
+bool32 Rogue_CanVaultPieces(void)
+{
+    return Rogue_IsRunActive() && HasUnlock(UNLOCK_VAULT);
+}
+
+// Writes the vaulted piece's name to dst, or returns FALSE if the vault is empty
+bool32 Rogue_GetVaultPieceName(u8 *dst)
+{
+    struct GraftPiece piece;
+    if (!GetVaultPiece(&piece))
+        return FALSE;
+    GetGraftPieceName(dst, &piece);
+    return TRUE;
+}
+
+void Rogue_VaultPiece(const struct GraftPiece *piece)
+{
+    struct GraftPiece old;
+    struct GraftPiece new = *piece;
+    if (!RemoveGraftPiece(&new))
+        return;
+    if (GetVaultPiece(&old))
+        AddGraftPiece(&old);
+    SetVaultPiece(&new);
+}
+
+// Run start: VAR_RESULT TRUE and STR_VAR_1 = the piece if the vault gave one
+void Rogue_TakeVaultPiece(void)
+{
+    struct GraftPiece piece;
+    gSpecialVar_Result = FALSE;
+    if (!HasUnlock(UNLOCK_VAULT) || !GetVaultPiece(&piece))
+        return;
+    SetVaultPiece(NULL);
+    GiveGraftBagIfMissing();
+    AddGraftPiece(&piece);
+    GetGraftPieceName(gStringVar1, &piece);
+    gSpecialVar_Result = TRUE;
+}
+
 void Rogue_PushHeirloomChoices(void)
 {
     struct GraftPiece pieces[3];
@@ -2538,9 +2626,9 @@ void Rogue_GiveHeirloom(void)
 // The unlock shop (start room)
 
 // ---------------------------------------------------------------------------------------------
-// Fainted Pokémon. Nothing is lost on its own: after a battle the player is asked about each newly
-// fainted Pokémon: keep it (fainted, until a Revive), let it go, or give it last rites (break it
-// down into graft pieces; a few uses a floor, from the Last rites unlocks).
+// Fainted Pokémon. Nothing is lost on its own: a fainted Pokémon stays in the team until it's revived
+// or swapped out. With last rites left this floor (the Last rites unlocks), the player is asked after a
+// battle whether to break each newly fainted Pokémon down into graft pieces.
 
 static u32 GetLastRitesPerFloor(void)
 {
@@ -2592,7 +2680,7 @@ void Rogue_OnBattleEnd(void)
         struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
         if (GetMonData(mon, MON_DATA_HP) != 0)
             mon->box.graftFlags &= ~GRAFT_FLAG_ROGUE_KEPT; // revived: ask again if it faints again
-        else if (IsUnansweredFainted(mon))
+        else if (IsUnansweredFainted(mon) && GetLastRitesLeft() != 0)
             VarSet(VAR_TEMP_4, 1); // the room asks (Rogue_Room_OnFrame)
     }
 }
@@ -2602,6 +2690,8 @@ void Rogue_FindFainted(void)
 {
     u32 i;
     gSpecialVar_Result = FALSE;
+    if (GetLastRitesLeft() == 0)
+        return;
     for (i = 0; i < PARTY_SIZE; i++)
     {
         if (IsUnansweredFainted(&gParties[B_TRAINER_PLAYER][i]))
@@ -2619,13 +2709,9 @@ void Rogue_PushFaintedChoices(void)
 {
     u8 name[32];
     PushChoice(COMPOUND_STRING("Keep it"), ROGUE_FAINTED_KEEP);
-    PushChoice(COMPOUND_STRING("Let it go"), ROGUE_FAINTED_RELEASE);
-    if (GetLastRitesLeft() != 0)
-    {
-        ConvertIntToDecimalStringN(gStringVar2, GetLastRitesLeft(), STR_CONV_MODE_LEFT_ALIGN, 1);
-        StringExpandPlaceholders(name, COMPOUND_STRING("Last rites ({STR_VAR_2})"));
-        PushChoice(name, ROGUE_FAINTED_RITES);
-    }
+    ConvertIntToDecimalStringN(gStringVar2, GetLastRitesLeft(), STR_CONV_MODE_LEFT_ALIGN, 1);
+    StringExpandPlaceholders(name, COMPOUND_STRING("Last rites ({STR_VAR_2})"));
+    PushChoice(name, ROGUE_FAINTED_RITES);
 }
 
 // VAR_0x8004 = slot, VAR_0x8005 = the choice; the message goes to gStringVar4
@@ -2633,27 +2719,19 @@ void Rogue_ResolveFainted(void)
 {
     struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][gSpecialVar_0x8004 % PARTY_SIZE];
 
-    switch (gSpecialVar_0x8005)
+    if (gSpecialVar_0x8005 != ROGUE_FAINTED_RITES || GetLastRitesLeft() == 0)
     {
-    case ROGUE_FAINTED_RITES:
-        if (GetLastRitesLeft() != 0)
-        {
-            struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
-            u32 lost;
-            HarvestGraftPieces(mon, FALSE, GRAFT_HARVEST_ALL, pieces, &lost);
-            GiveGraftBagIfMissing();
-            SetLastRitesUsed(GetLastRitesPerFloor() - GetLastRitesLeft() + 1);
-            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} was broken down\ninto graft pieces."));
-            break;
-        }
-        // fall through
-    case ROGUE_FAINTED_RELEASE:
-        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} is gone for good."));
-        break;
-    default:
         mon->box.graftFlags |= GRAFT_FLAG_ROGUE_KEPT;
         StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} stays with the team,\nwaiting for a Revive."));
         return;
+    }
+    {
+        struct GraftPiece pieces[GRAFT_PIECES_PER_MON];
+        u32 lost;
+        HarvestGraftPieces(mon, FALSE, GRAFT_HARVEST_ALL, pieces, &lost);
+        GiveGraftBagIfMissing();
+        SetLastRitesUsed(GetLastRitesPerFloor() - GetLastRitesLeft() + 1);
+        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} was broken down\ninto graft pieces."));
     }
     ReleasePartyMon(gSpecialVar_0x8004 % PARTY_SIZE);
     CompactPartySlots();
@@ -2972,15 +3050,37 @@ void Rogue_GivePrize(void)
 }
 
 // STR_VAR_1: where the rest stop's exit leads
+// The rest stop's exit: gStringVar4 = the question, with the next floor's weather if it has any
 void Rogue_BufferNextFloor(void)
 {
+    const u8 *forecast = NULL;
     if (GetFloor() >= GetNumFloors())
     {
         StringCopy(gStringVar1, IsHardMode() ? COMPOUND_STRING("the ELITE FOUR") : COMPOUND_STRING("the CHAMPION"));
-        return;
     }
-    ConvertIntToDecimalStringN(gStringVar2, GetFloor() + 1, STR_CONV_MODE_LEFT_ALIGN, 2);
-    StringExpandPlaceholders(gStringVar1, COMPOUND_STRING("FLOOR {STR_VAR_2}"));
+    else
+    {
+        ConvertIntToDecimalStringN(gStringVar2, GetFloor() + 1, STR_CONV_MODE_LEFT_ALIGN, 2);
+        StringExpandPlaceholders(gStringVar1, COMPOUND_STRING("FLOOR {STR_VAR_2}"));
+        switch (Rogue_GetFloorWeather(GetFloor() + 1))
+        {
+        case WEATHER_RAIN:      forecast = COMPOUND_STRING("Word is it's raining outdoors\non {STR_VAR_1}.\p"); break;
+        case WEATHER_DROUGHT:   forecast = COMPOUND_STRING("Word is the sun is harsh outdoors\non {STR_VAR_1}.\p"); break;
+        case WEATHER_SANDSTORM: forecast = COMPOUND_STRING("Word is a sandstorm is raging\noutdoors on {STR_VAR_1}.\p"); break;
+        case WEATHER_SNOW:      forecast = COMPOUND_STRING("Word is it's snowing outdoors\non {STR_VAR_1}.\p"); break;
+        }
+    }
+    if (forecast != NULL)
+    {
+        StringExpandPlaceholders(gStringVar4, forecast);
+        StringAppend(gStringVar4, COMPOUND_STRING("Leave the rest stop and head on\nto "));
+    }
+    else
+    {
+        StringCopy(gStringVar4, COMPOUND_STRING("Leave the rest stop and head on\nto "));
+    }
+    StringAppend(gStringVar4, gStringVar1);
+    StringAppend(gStringVar4, COMPOUND_STRING("?"));
 }
 
 // Tutor moves bought with BP: (first-stage species << 16) | move, kept between runs in the Battle
@@ -3251,6 +3351,7 @@ static const struct { u8 unlock; u8 x; u8 y; u16 decoration; } sHomeDecorations[
     {UNLOCK_LAST_RITES_3, 4, 8, DECOR_HEAVY_CHAIR},
     {UNLOCK_FAVORITE, 10, 8, DECOR_POKEMON_DESK},
     {UNLOCK_HARVEST_BONUS, 12, 8, DECOR_BIG_PLANT},
+    {UNLOCK_VAULT, 13, 6, DECOR_RED_BRICK},
 };
 
 // ON_LOAD: owned unlocks (all of them with meta-progression off) as decorations; a silver shield once
@@ -3304,11 +3405,12 @@ static const struct { const u8 *topic; const u8 *text; } sHelpTopics[] =
         "Then pick who gets it. In a run\n"
         "there's no limit. Go wild!")},
     {COMPOUND_STRING("Fainting"), COMPOUND_STRING(
-        "After a battle, you choose for each\n"
-        "POKéMON that fainted:\p"
-        "keep it until you can revive it, let\n"
-        "it go, or give it last rites to\l"
-        "break it down into graft pieces.\p"
+        "A POKéMON that faints stays with\n"
+        "you until you revive it, or swap it\l"
+        "out when you catch another.\p"
+        "With the LAST RITES unlock, you can\n"
+        "break it down into graft pieces\l"
+        "instead, a few times a floor.\p"
         "If your whole team faints, the run\n"
         "is over.")},
     {COMPOUND_STRING("Levels"), COMPOUND_STRING(

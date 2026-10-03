@@ -14,6 +14,7 @@
 #include "party_menu.h"
 #include "pokemon.h"
 #include "pokemon_summary_screen.h"
+#include "rogue.h"
 #include "line_break.h"
 #include "graphics.h"
 #include "decompress.h"
@@ -31,7 +32,8 @@
 #include "constants/songs.h"
 
 // ============================================================
-// Graft Bag screen (key item). A tab per piece kind; A on a piece offers Graft / Discard.
+// Graft Bag screen (key item). A tab per piece kind; A on a piece offers Graft / Discard (and, in a
+// Rogue run with the Graft vault unlock, Vault: keep it for the next run, rogue.c).
 // Grafting opens the party menu (PARTY_ACTION_GRAFT_PIECE, party_menu.c), which comes back here.
 // ============================================================
 
@@ -45,13 +47,15 @@ enum
 enum
 {
     MODE_LIST,
-    MODE_ACTION,  // Graft / Discard / Cancel
+    MODE_ACTION,  // Graft / (Vault) / Discard / Cancel
     MODE_DISCARD, // Yes / No
+    MODE_VAULT,   // Yes / No
 };
 
 enum
 {
     ACTION_GRAFT,
+    ACTION_VAULT, // Rogue, with the Graft vault unlock
     ACTION_DISCARD,
     ACTION_CANCEL,
     ACTION_COUNT,
@@ -67,6 +71,8 @@ struct GraftBagMenu
     u16 count;
     u8 mode;
     u8 actionCursor;
+    u8 actions[ACTION_COUNT]; // the actions offered, in order
+    u8 actionCount;
     u8 typeIconSpriteId;     // move pieces: the type and category icons, like the summary screen's
     u8 categoryIconSpriteId;
 };
@@ -91,6 +97,7 @@ static const u8 *const sTabNames[GRAFT_PIECE_KIND_COUNT] =
 static const u8 *const sActionNames[ACTION_COUNT] =
 {
     [ACTION_GRAFT]   = COMPOUND_STRING("GRAFT"),
+    [ACTION_VAULT]   = COMPOUND_STRING("VAULT"),
     [ACTION_DISCARD] = COMPOUND_STRING("DISCARD"),
     [ACTION_CANCEL]  = COMPOUND_STRING("CANCEL"),
 };
@@ -307,27 +314,46 @@ static void DrawDescription(void)
 {
     FillWindowPixelBuffer(WIN_DESC, PIXEL_FILL(1));
     HideMoveIcons();
-    if (sGraftBag->mode == MODE_ACTION || sGraftBag->mode == MODE_DISCARD)
+    if (sGraftBag->mode != MODE_LIST)
     {
-        u32 i, x = 8, count = sGraftBag->mode == MODE_ACTION ? ACTION_COUNT : 2;
+        u32 i, x = 8, font = FONT_NORMAL, gap = sGraftBag->actionCount > 3 ? 14 : 20;
+        u32 count = sGraftBag->mode == MODE_ACTION ? sGraftBag->actionCount : 2;
+        u8 *str;
         if (sGraftBag->mode == MODE_DISCARD)
         {
-            u8 *str = StringCopy(gStringVar4, COMPOUND_STRING("Discard one "));
+            str = StringCopy(gStringVar4, COMPOUND_STRING("Discard one "));
             str = GetGraftPieceName(str, &sGraftBag->pieces[sCursor[sTab]]);
             StringCopy(str, COMPOUND_STRING("?"));
+        }
+        else if (sGraftBag->mode == MODE_VAULT)
+        {
+            // "Vault X?", or "Vault X? (Y comes out)" when the vault holds Y
+            str = StringCopy(gStringVar4, COMPOUND_STRING("Vault "));
+            str = GetGraftPieceName(str, &sGraftBag->pieces[sCursor[sTab]]);
+            str = StringCopy(str, COMPOUND_STRING("?"));
+            if (Rogue_GetVaultPieceName(gStringVar3))
+            {
+                u8 *end = str;
+                str = StringCopy(str, COMPOUND_STRING(" ("));
+                str = StringCopy(str, gStringVar3);
+                StringCopy(str, COMPOUND_STRING(" comes out)"));
+                font = FONT_NARROW;
+                if (GetStringWidth(font, gStringVar4, 0) > 200)
+                    StringCopy(end, COMPOUND_STRING(" (swaps)"));
+            }
         }
         else
         {
             GetGraftPieceName(gStringVar4, &sGraftBag->pieces[sCursor[sTab]]);
         }
-        AddTextPrinterParameterized3(WIN_DESC, FONT_NORMAL, 4, 1, sColors_Normal, TEXT_SKIP_DRAW, gStringVar4);
+        AddTextPrinterParameterized3(WIN_DESC, font, 4, 1, sColors_Normal, TEXT_SKIP_DRAW, gStringVar4);
         for (i = 0; i < count; i++)
         {
-            const u8 *name = sGraftBag->mode == MODE_ACTION ? sActionNames[i] : (i == 0 ? gText_Yes : gText_No);
+            const u8 *name = sGraftBag->mode == MODE_ACTION ? sActionNames[sGraftBag->actions[i]] : (i == 0 ? gText_Yes : gText_No);
             if (i == sGraftBag->actionCursor)
                 AddTextPrinterParameterized3(WIN_DESC, FONT_NORMAL, x - 8, 17, sColors_Accent, TEXT_SKIP_DRAW, gText_SelectorArrow2);
             AddTextPrinterParameterized3(WIN_DESC, FONT_NORMAL, x, 17, i == sGraftBag->actionCursor ? sColors_Accent : sColors_Normal, TEXT_SKIP_DRAW, name);
-            x += GetStringWidth(FONT_NORMAL, name, 0) + 20;
+            x += GetStringWidth(FONT_NORMAL, name, 0) + gap;
         }
     }
     else if (sGraftBag->count != 0 && sGraftBag->pieces[sCursor[sTab]].kind == GRAFT_PIECE_MOVE)
@@ -534,14 +560,20 @@ static void HandleListInput(u8 taskId)
     {
         PlaySE(SE_SELECT);
         sGraftBag->mode = MODE_ACTION;
-        sGraftBag->actionCursor = ACTION_GRAFT;
+        sGraftBag->actionCursor = 0;
+        sGraftBag->actionCount = 0;
+        sGraftBag->actions[sGraftBag->actionCount++] = ACTION_GRAFT;
+        if (Rogue_CanVaultPieces())
+            sGraftBag->actions[sGraftBag->actionCount++] = ACTION_VAULT;
+        sGraftBag->actions[sGraftBag->actionCount++] = ACTION_DISCARD;
+        sGraftBag->actions[sGraftBag->actionCount++] = ACTION_CANCEL;
         DrawDescription();
     }
 }
 
 static void HandleChoiceInput(u8 taskId)
 {
-    u32 count = sGraftBag->mode == MODE_ACTION ? ACTION_COUNT : 2;
+    u32 count = sGraftBag->mode == MODE_ACTION ? sGraftBag->actionCount : 2;
     if (JOY_NEW(DPAD_LEFT) && sGraftBag->actionCursor > 0)
     {
         PlaySE(SE_SELECT);
@@ -565,7 +597,7 @@ static void HandleChoiceInput(u8 taskId)
         PlaySE(SE_SELECT);
         if (sGraftBag->mode == MODE_ACTION)
         {
-            switch (sGraftBag->actionCursor)
+            switch (sGraftBag->actions[sGraftBag->actionCursor])
             {
             case ACTION_GRAFT:
                 gGraftPieceInUse = sGraftBag->pieces[sCursor[sTab]];
@@ -576,17 +608,24 @@ static void HandleChoiceInput(u8 taskId)
                 sGraftBag->mode = MODE_DISCARD;
                 sGraftBag->actionCursor = 1; // default to No
                 break;
+            case ACTION_VAULT:
+                sGraftBag->mode = MODE_VAULT;
+                sGraftBag->actionCursor = 1;
+                break;
             default:
                 sGraftBag->mode = MODE_LIST;
                 break;
             }
             DrawDescription();
         }
-        else // MODE_DISCARD
+        else // MODE_DISCARD, MODE_VAULT
         {
             if (sGraftBag->actionCursor == 0)
             {
-                RemoveGraftPiece(&sGraftBag->pieces[sCursor[sTab]]);
+                if (sGraftBag->mode == MODE_VAULT)
+                    Rogue_VaultPiece(&sGraftBag->pieces[sCursor[sTab]]);
+                else
+                    RemoveGraftPiece(&sGraftBag->pieces[sCursor[sTab]]);
                 LoadTab();
             }
             sGraftBag->mode = MODE_LIST;

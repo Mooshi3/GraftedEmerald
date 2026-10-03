@@ -11,7 +11,7 @@ Rogue_Stop_OnFrame:
 Rogue_Stop_EventScript_Exit::
 	lockall
 	special Rogue_BufferNextFloor
-	msgbox Rogue_Stop_Text_Leave, MSGBOX_YESNO
+	msgbox gStringVar4, MSGBOX_YESNO
 	goto_if_eq VAR_RESULT, NO, Rogue_Stop_EventScript_Stay
 	setvar VAR_0x8004, 1
 	goto Rogue_Room_EventScript_Door
@@ -117,10 +117,6 @@ Rogue_Stop_EventScript_TutorCantPay:
 	msgbox Rogue_Stop_Text_TutorCantPay, MSGBOX_DEFAULT
 	release
 	end
-
-Rogue_Stop_Text_Leave:
-	.string "Leave the rest stop and head on\n"
-	.string "to {STR_VAR_1}?$"
 
 Rogue_Stop_Text_PickPrize:
 	.string "Well done on clearing the floor!\n"
