@@ -5363,6 +5363,7 @@ static void FreeResetData_ReturnToOvOrDoEvolutions(void)
         // The ZeroEnemyPartyMons() call happens in SaveXXXChallenge function (eg. SaveFactoryChallenge)
         if (!(gBattleTypeFlags & (BATTLE_TYPE_FRONTIER | BATTLE_TYPE_ROAMER)))
         {
+            Rogue_OnBattleFinishing(); // ROGUE: reads the enemy party before it's gone
             ZeroEnemyPartyMons();
         }
         ResetDynamicAiFunctions();

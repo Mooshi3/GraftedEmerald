@@ -11,12 +11,23 @@
 #include "graft_challenge.h"
 #include "item.h"
 #include "battle.h"
+#include "battle_setup.h"
 #include "script_pokemon_util.h"
 #include "party_menu.h"
+#include "script_menu.h"
+#include "malloc.h"
 #include "caps.h"
 #include "constants/event_objects.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
+
+// Frees the menu entries a Push special made (the dynamic menu would, on screen)
+static void ClearChoices(void)
+{
+    while (!MultichoiceDynamic_StackEmpty())
+        Free((void *)MultichoiceDynamic_PopElement()->name);
+    MultichoiceDynamic_DestroyStack();
+}
 
 static void SetRoom(u32 seed, u32 floor, u32 room, u32 type)
 {
@@ -568,7 +579,7 @@ TEST("Rogue: Catch bonus sometimes leaves a piece after a real catch, never afte
     for (i = 0; i < 40; i++)
     {
         VarSet(VAR_TEMP_5, 0);
-        Rogue_OnBattleEnd();
+        Rogue_OnBattleFinishing();
         got += VarGet(VAR_TEMP_5);
     }
     EXPECT_GT(got, 0);
@@ -577,7 +588,7 @@ TEST("Rogue: Catch bonus sometimes leaves a piece after a real catch, never afte
     for (i = 0; i < 40; i++)
     {
         VarSet(VAR_TEMP_5, 0);
-        Rogue_OnBattleEnd();
+        Rogue_OnBattleFinishing();
         EXPECT_EQ(VarGet(VAR_TEMP_5), 0);
     }
 }
@@ -656,4 +667,58 @@ TEST("Rogue: trainers and Normal mode's Leaders carry no items")
             EXPECT_EQ(trainer->items[i], ITEM_NONE);
     }
     // (the Champion keeps his: the test build's trainer data gives vanilla Wallace none to check)
+}
+
+TEST("Rogue: trainers pay triple, double again in trainer and Ace rooms")
+{
+    SetRoom(5, 1, 3, ROGUE_ROOM_WILD);
+    EXPECT_EQ(Rogue_ScaleTrainerMoney(TRAINER_ROGUE_TRAINER, 100), 300); // a guard
+    SetRoom(5, 1, 3, ROGUE_ROOM_TRAINER);
+    EXPECT_EQ(Rogue_ScaleTrainerMoney(TRAINER_ROGUE_TRAINER, 100), 600);
+    SetRoom(5, 1, 3, ROGUE_ROOM_ACE);
+    EXPECT_EQ(Rogue_ScaleTrainerMoney(TRAINER_ROGUE_TRAINER, 100), 600);
+    SetRoom(5, 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    EXPECT_EQ(Rogue_ScaleTrainerMoney(TRAINER_ROGUE_BOSS, 100), 300);
+}
+
+TEST("Rogue: beaten trainers offer pieces of their team; an Ace Trainer adds an item")
+{
+    ClearGraftBag();
+    ClearBag();
+    ZeroEnemyPartyMons();
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_MACHOP, 10, 0, OTID_STRUCT_PLAYER_ID);
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][1], SPECIES_ZIGZAGOON, 10, 0, OTID_STRUCT_PLAYER_ID);
+
+    SetRoom(77, 1, 3, ROGUE_ROOM_WILD); // a guard: nothing
+    Rogue_PushTrainerPieces();
+    EXPECT_EQ(gSpecialVar_Result, 0);
+
+    // offers are picked when the battle ends: the opponent party is gone by the post-battle script
+    gBattleTypeFlags = BATTLE_TYPE_TRAINER;
+    gBattleOutcome = B_OUTCOME_WON;
+    TRAINER_BATTLE_PARAM.opponentA = TRAINER_ROGUE_TRAINER;
+    SetRoom(77, 1, 3, ROGUE_ROOM_TRAINER);
+    Rogue_OnBattleFinishing();
+    ZeroEnemyPartyMons(); // as the battle does before the post-battle script
+    Rogue_OnBattleFinishing(); // the battle calls it every frame of its fade out: the offers stay
+    Rogue_PushTrainerPieces();
+    ClearChoices();
+    EXPECT_EQ(gSpecialVar_Result, 3);
+    gSpecialVar_Result = 1;
+    Rogue_GiveTrainerPiece();
+    EXPECT(!IsGraftBagEmpty());
+    EXPECT_EQ(gSpecialVar_0x8005, FALSE);
+
+    SetRoom(77, 1, 3, ROGUE_ROOM_ACE);
+    EXPECT_GE((u32)GetTrainerStructFromId(TRAINER_ROGUE_TRAINER)->partySize, 2); // one more Pokémon
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_MACHOP, 10, 0, OTID_STRUCT_PLAYER_ID);
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][1], SPECIES_ZIGZAGOON, 10, 0, OTID_STRUCT_PLAYER_ID);
+    Rogue_OnBattleFinishing();
+    Rogue_PushTrainerPieces();
+    ClearChoices();
+    EXPECT_EQ(gSpecialVar_Result, 4);
+    gSpecialVar_Result = 3;
+    Rogue_GiveTrainerPiece();
+    EXPECT_EQ(gSpecialVar_0x8005, TRUE);
+    gBattleTypeFlags = 0;
 }

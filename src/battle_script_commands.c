@@ -45,6 +45,7 @@
 #include "battle_setup.h"
 #include "graft_menu.h"
 #include "graft_bag.h"
+#include "rogue.h"
 #include "party_menu.h"
 #include "graft_data.h"
 #include "palette.h"
@@ -4054,7 +4055,7 @@ static u32 GetTrainerMoneyToGive(u16 trainerId)
             moneyReward = 4 * lastMonLevel * gBattleStruct->moneyMultiplier * trainerMoney;
     }
 
-    return moneyReward;
+    return Rogue_ScaleTrainerMoney(trainerId, moneyReward); // ROGUE: runs pay more
 }
 
 static void Cmd_getmoneyreward(void)

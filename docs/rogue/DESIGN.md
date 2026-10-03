@@ -205,3 +205,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   sells unlocks. The exit mat at the bottom starts a run (with a yes/no).
 - Trainer items (2026-10-03): generated trainers borrowed the vanilla trainer's Bag (Roxanne's Potions, a
   Leader's Hyper Potion). Now only the Champion and Hard mode's bosses keep theirs.
+- Trainer rooms worth picking (2026-10-03; with most rooms guarded they had nothing extra):
+  - Prize money is x3 in a run, x6 in Trainer and Ace Trainer rooms (`Rogue_ScaleTrainerMoney`).
+  - Beating a Trainer room's trainer offers 1 of 3 graft pieces from their team (A to take one; B does
+    nothing). The offers are read while the battle ends (`Rogue_OnBattleFinishing`, before the enemy party
+    is zeroed) and shown by the post-battle script.
+  - **Ace Trainer** rooms (a Cooltrainer door sign; door weight 8, Trainer 22): one more Pokémon,
+    2 levels higher, better IVs; 1 of 4 pieces plus a free prize item (not a Mega Stone).
+  - Guards in wild and item rooms: 25% (was 50%).

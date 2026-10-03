@@ -687,3 +687,5 @@ def_special Rogue_BufferCatchBonus
 def_special Rogue_DecorateHome
 def_special Rogue_PushHelpTopics
 def_special Rogue_GetHelpText
+def_special Rogue_PushTrainerPieces
+def_special Rogue_GiveTrainerPiece

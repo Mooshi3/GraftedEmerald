@@ -27,6 +27,9 @@ bool32 Rogue_RollHarvestBonus(void);
 u32 Rogue_CountWonSpecies(void);
 u32 Rogue_GetLevelCap(void);
 u32 Rogue_ScaleExp(u32 level, u32 exp);
+u32 Rogue_ScaleTrainerMoney(u16 trainerId, u32 money);
+void Rogue_PushTrainerPieces(void);
+void Rogue_GiveTrainerPiece(void);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {
@@ -56,6 +59,7 @@ void Rogue_PushUnlockChoices(void);
 void Rogue_DescribeUnlock(void);
 void Rogue_BuyUnlock(void);
 void Rogue_GiveGiftPieces(void);
+void Rogue_OnBattleFinishing(void);
 void Rogue_OnBattleEnd(void);
 void Rogue_FindFainted(void);
 void Rogue_PushFaintedChoices(void);

@@ -243,9 +243,32 @@ Rogue_Room_EventScript_Trainer::
 
 Rogue_Room_EventScript_TrainerDefeated::
 	special Rogue_OpenDoors
+	special Rogue_PushTrainerPieces
+	goto_if_eq VAR_RESULT, 0, Rogue_Room_EventScript_TrainerNoPrize
+	msgbox Rogue_Room_Text_TrainerPrize, MSGBOX_DEFAULT
+	dynmultistack 0, 0, TRUE, 4, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	special Rogue_GiveTrainerPiece
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox Rogue_Room_Text_TrainerPrizeGot, MSGBOX_DEFAULT
+	waitfanfare
+	goto_if_eq VAR_0x8005, FALSE, Rogue_Room_EventScript_TrainerNoPrize
+	msgbox Rogue_Room_Text_AcePrizeGot, MSGBOX_DEFAULT
+Rogue_Room_EventScript_TrainerNoPrize:
 	msgbox Rogue_Room_Text_TrainerPostBattle, MSGBOX_DEFAULT
 	release
 	end
+
+Rogue_Room_Text_TrainerPrize:
+	.string "You beat my team fair and square.\n"
+	.string "Take a piece of it with you!$"
+
+Rogue_Room_Text_TrainerPrizeGot:
+	.string "{STR_VAR_1} was added to the\n"
+	.string "GRAFT BAG.$"
+
+Rogue_Room_Text_AcePrizeGot:
+	.string "And take this too!\p"
+	.string "{PLAYER} received {STR_VAR_2}!$"
 
 @ The small trees blocking a guarded room's doors
 Rogue_Room_EventScript_Thicket::

@@ -203,6 +203,13 @@ static const struct { u16 trainerId; u16 graphicsId; } sTrainerKinds[] =
     {TRAINER_WALTER_1, OBJ_EVENT_GFX_GENTLEMAN},
 };
 
+// Ace Trainer rooms: Cooltrainers
+static const struct { u16 trainerId; u16 graphicsId; } sAceKinds[] =
+{
+    {TRAINER_MARCEL, OBJ_EVENT_GFX_MAN_3},
+    {TRAINER_MARY,   OBJ_EVENT_GFX_WOMAN_5},
+};
+
 // Floor bosses, in an order shuffled per run
 struct BossInfo
 {
@@ -242,7 +249,8 @@ static const struct BossInfo sFinaleHard[] =
 static const u8 sDoorWeights[ROGUE_ROOM_TYPE_COUNT] =
 {
     [ROGUE_ROOM_WILD] = 30,
-    [ROGUE_ROOM_TRAINER] = 26,
+    [ROGUE_ROOM_TRAINER] = 22,
+    [ROGUE_ROOM_ACE] = 8,
     [ROGUE_ROOM_ITEM] = 16,
     [ROGUE_ROOM_SHOP] = 8,
     [ROGUE_ROOM_REST] = 8,
@@ -1281,17 +1289,20 @@ static u32 GetTrainerKind(void)
 // has enough battles to keep the team's levels up with the boss
 static bool32 IsRoomGuarded(u32 type)
 {
-    if (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_BOSS)
+    if (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_ACE || type == ROGUE_ROOM_BOSS)
         return TRUE;
+    // a quarter of the wild and item rooms (half before 2026-10-03: trainer doors had no point)
     if (type == ROGUE_ROOM_WILD || type == ROGUE_ROOM_ITEM)
-        return Mix32(GetRoomSeed() ^ 0x6A7D) % 100 < 50;
+        return Mix32(GetRoomSeed() ^ 0x6A7D) % 100 < 25;
     return FALSE;
 }
 
 static void AddTrainerObject(void)
 {
     // Trainers and bosses don't spot the player: talk to them to battle (Jacob, 2026-10-03)
-    AddObject(sTrainerKinds[GetTrainerKind()].graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
+    u16 graphicsId = (GetRoomType() == ROGUE_ROOM_ACE) ? sAceKinds[GetTrainerKind() % ARRAY_COUNT(sAceKinds)].graphicsId
+                                                       : sTrainerKinds[GetTrainerKind()].graphicsId;
+    AddObject(graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
 }
 
 // Outdoor rooms: the forest border with an opening per door, and trees, ponds or sea inside
@@ -1481,6 +1492,7 @@ static void BuildRoomPlan(void)
             AddObjectAnywhere(&rng, OBJ_EVENT_GFX_ITEM_BALL, MOVEMENT_TYPE_NONE, Rogue_Room_EventScript_ItemBall);
         break;
     case ROGUE_ROOM_TRAINER:
+    case ROGUE_ROOM_ACE:
         AddTrainerObject();
         break;
     }
@@ -1508,6 +1520,7 @@ static u16 GetDoorMarkerGraphics(u32 doorType)
     {
     case ROGUE_ROOM_WILD:    return OBJ_EVENT_MON + SPECIES_ZIGZAGOON;
     case ROGUE_ROOM_TRAINER: return OBJ_EVENT_GFX_YOUNGSTER;
+    case ROGUE_ROOM_ACE:     return OBJ_EVENT_GFX_MAN_3;
     case ROGUE_ROOM_ITEM:    return OBJ_EVENT_GFX_ITEM_BALL;
     case ROGUE_ROOM_SHOP:    return OBJ_EVENT_GFX_MART_EMPLOYEE;
     case ROGUE_ROOM_REST:    return OBJ_EVENT_GFX_NURSE;
@@ -1934,6 +1947,7 @@ static const u8 *const sRoomNames[ROGUE_ROOM_TYPE_COUNT] =
     [ROGUE_ROOM_SHOP] = COMPOUND_STRING("a shop"),
     [ROGUE_ROOM_REST] = COMPOUND_STRING("a place to rest"),
     [ROGUE_ROOM_REST_STOP] = COMPOUND_STRING("the rest stop"),
+    [ROGUE_ROOM_ACE] = COMPOUND_STRING("an Ace Trainer"),
 };
 
 static const u8 *const sEventNames[EVENT_COUNT] =
@@ -2553,13 +2567,26 @@ static bool32 IsUnansweredFainted(struct Pokemon *mon)
 
 // After a battle the player didn't lose (a whiteout ends the run instead)
 static void TryCatchBonus(void);
+static void PickTrainerPieceOffers(void);
+
+// While the enemy party still exists (the battle zeroes it before Rogue_OnBattleEnd): the catch bonus
+// and a beaten trainer's piece offers are read from it. The battle runs this every frame of its fade
+// out, so only the first call (with the party still there) counts.
+void Rogue_OnBattleFinishing(void)
+{
+    if (!Rogue_IsRunActive() || GetMonData(&gParties[B_TRAINER_OPPONENT_A][0], MON_DATA_SPECIES) == SPECIES_NONE)
+        return;
+    TryCatchBonus();
+    if ((gBattleTypeFlags & BATTLE_TYPE_TRAINER) && gBattleOutcome == B_OUTCOME_WON
+     && TRAINER_BATTLE_PARAM.opponentA == TRAINER_ROGUE_TRAINER)
+        PickTrainerPieceOffers();
+}
 
 void Rogue_OnBattleEnd(void)
 {
     u32 i;
     if (!Rogue_IsRunActive() || gBattleOutcome == B_OUTCOME_LOST || gBattleOutcome == B_OUTCOME_DREW)
         return;
-    TryCatchBonus();
     for (i = 0; i < PARTY_SIZE; i++)
     {
         struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
@@ -2755,7 +2782,10 @@ static void BuildTrainer(u32 slot, u32 key)
     rng_value_t rng = LocalRandomSeed(key);
     bool32 boss = (slot == 1);
     u32 floor = GetFloor();
-    u16 baseId = boss ? GetCurrentBoss()->trainerId : sTrainerKinds[GetTrainerKind()].trainerId;
+    bool32 ace = (!boss && GetRoomType() == ROGUE_ROOM_ACE);
+    u16 baseId = boss ? GetCurrentBoss()->trainerId
+               : ace ? sAceKinds[GetTrainerKind() % ARRAY_COUNT(sAceKinds)].trainerId
+               : sTrainerKinds[GetTrainerKind()].trainerId;
     enum Type type = boss ? GetCurrentBoss()->type : TYPE_NONE;
     u32 size, level, iv, i;
 
@@ -2772,9 +2802,9 @@ static void BuildTrainer(u32 slot, u32 key)
     }
     else
     {
-        size = min(1 + (floor - 1) / 2 + (GetRoom() > ROGUE_ROOMS_PER_FLOOR / 2), PARTY_SIZE);
-        level = GetWildLevel() + 1;
-        iv = min(31, floor * 3);
+        size = min(1 + (floor - 1) / 2 + (GetRoom() > ROGUE_ROOMS_PER_FLOOR / 2) + ace, PARTY_SIZE);
+        level = GetWildLevel() + 1 + 2 * ace; // an Ace Trainer: one more Pokémon, two levels higher
+        iv = min(31, floor * 3 + 6 * ace);
     }
     if (size == 0)
         size = 1;
@@ -3324,4 +3354,90 @@ void Rogue_GetHelpText(void)
     }
     StringCopy(gStringVar4, sHelpTopics[gSpecialVar_Result].text);
     gSpecialVar_Result = TRUE;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Trainer rooms' rewards (2026-10-03): prize money x3 in a run (x6 in trainer and Ace rooms), and a
+// graft piece from the beaten team: one of three, one of four plus a prize item from an Ace Trainer
+
+u32 Rogue_ScaleTrainerMoney(u16 trainerId, u32 money)
+{
+    if (!Rogue_IsRunActive())
+        return money;
+    money *= 3;
+    if (trainerId == TRAINER_ROGUE_TRAINER && (GetRoomType() == ROGUE_ROOM_TRAINER || GetRoomType() == ROGUE_ROOM_ACE))
+        money *= 2;
+    return money;
+}
+
+#define MAX_TRAINER_PIECE_OFFERS 4
+static EWRAM_DATA struct GraftPiece sTrainerPieceOffers[MAX_TRAINER_PIECE_OFFERS] = {0};
+static EWRAM_DATA u8 sTrainerPieceOfferCount = 0;
+
+// The beaten team's pieces are picked when the battle ends (Rogue_OnBattleEnd): the opponent's party is
+// gone by the time the room's script runs
+static void PickTrainerPieceOffers(void)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0x51EC);
+    struct GraftPiece all[PARTY_SIZE * GRAFT_PIECES_PER_MON];
+    u32 i, j, count = 0, want;
+
+    sTrainerPieceOfferCount = 0;
+    if (GetRoomType() != ROGUE_ROOM_TRAINER && GetRoomType() != ROGUE_ROOM_ACE)
+        return;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_OPPONENT_A][i];
+        if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE)
+            count += GetMonGraftPieces(mon, FALSE, &all[count]);
+    }
+    want = (GetRoomType() == ROGUE_ROOM_ACE) ? 4 : 3;
+    for (i = 0; i < 100 && sTrainerPieceOfferCount < want && count > 0; i++)
+    {
+        struct GraftPiece *piece = &all[LocalRandom(&rng) % count];
+        for (j = 0; j < sTrainerPieceOfferCount; j++)
+        {
+            if (sTrainerPieceOffers[j].kind == piece->kind && sTrainerPieceOffers[j].stat == piece->stat
+             && sTrainerPieceOffers[j].value == piece->value)
+                break;
+        }
+        if (j == sTrainerPieceOfferCount)
+            sTrainerPieceOffers[sTrainerPieceOfferCount++] = *piece;
+    }
+}
+
+// After a trainer or Ace room's battle: VAR_RESULT = how many pieces were offered (0 for a room
+// that only had a guard)
+void Rogue_PushTrainerPieces(void)
+{
+    u32 i;
+    gSpecialVar_Result = 0;
+    if (GetRoomType() != ROGUE_ROOM_TRAINER && GetRoomType() != ROGUE_ROOM_ACE)
+        return;
+    for (i = 0; i < sTrainerPieceOfferCount; i++)
+    {
+        GetGraftPieceName(gStringVar3, &sTrainerPieceOffers[i]);
+        PushChoice(gStringVar3, i);
+    }
+    gSpecialVar_Result = sTrainerPieceOfferCount;
+}
+
+// VAR_RESULT: the piece taken; STR_VAR_1 its name. An Ace Trainer adds a prize item: VAR_0x8005 TRUE,
+// STR_VAR_2 its name.
+void Rogue_GiveTrainerPiece(void)
+{
+    u32 pick = (gSpecialVar_Result < sTrainerPieceOfferCount) ? gSpecialVar_Result : 0;
+    GiveGraftBagIfMissing();
+    AddGraftPiece(&sTrainerPieceOffers[pick]);
+    GetGraftPieceName(gStringVar1, &sTrainerPieceOffers[pick]);
+    gSpecialVar_0x8005 = FALSE;
+    if (GetRoomType() == ROGUE_ROOM_ACE)
+    {
+        rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0xACE);
+        enum Item item = PickPrize(&rng, LocalRandom(&rng) % (PRIZE_SHELF_COUNT - 1)); // not a Mega Stone
+        AddBagItem(item, 1);
+        GetPrizeName(item, gStringVar2);
+        gSpecialVar_0x8005 = TRUE;
+    }
+    sTrainerPieceOfferCount = 0; // one pick per win
 }
