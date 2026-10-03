@@ -748,6 +748,15 @@ u8 LoadMoveRelearnerMovesList(const struct ListMenuItem *items, u16 numChoices)
     return gMultiuseListMenuTemplate.maxShowed;
 }
 
+static const u8 *const sRelearnerListTitles[MOVE_RELEARNER_COUNT] =
+{
+    [MOVE_RELEARNER_LEVEL_UP_MOVES] = COMPOUND_STRING("LEVEL-UP MOVES"),
+    [MOVE_RELEARNER_EGG_MOVES]      = COMPOUND_STRING("EGG MOVES"),
+    [MOVE_RELEARNER_TM_MOVES]       = COMPOUND_STRING("TM MOVES"),
+    [MOVE_RELEARNER_TUTOR_MOVES]    = COMPOUND_STRING("TUTOR MOVES"),
+    [MOVE_RELEARNER_GRAFT_MOVES]    = COMPOUND_STRING("GRAFT MOVES"),
+};
+
 static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
 {
     s32 x;
@@ -758,7 +767,9 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
         MoveRelearnerShowHideCategoryIcon(chosenMove);
 
     FillWindowPixelBuffer(RELEARNERWIN_DESC_BATTLE, PIXEL_FILL(1));
-    str = gText_MoveRelearnerBattleMoves;
+    // GRAFT: the title names the list being shown (SELECT switches lists), not just "BATTLE MOVES"
+    str = (gRelearnMode == RELEARN_MODE_SCRIPT || gMoveRelearnerState >= MOVE_RELEARNER_COUNT)
+        ? gText_MoveRelearnerBattleMoves : sRelearnerListTitles[gMoveRelearnerState];
     x = GetStringCenterAlignXOffset(FONT_NORMAL, str, 128);
     AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 1, TEXT_SKIP_DRAW, NULL);
 
