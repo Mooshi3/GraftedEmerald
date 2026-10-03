@@ -10,6 +10,8 @@
 #include "graft_challenge.h"
 #include "item.h"
 #include "battle.h"
+#include "script_pokemon_util.h"
+#include "constants/event_objects.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
 
@@ -377,4 +379,54 @@ TEST("Rogue: the Favorite unlock offers the favorite's first stage as a starter"
     Rogue_GiveChosenStarter();
     EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_GIBLE);
     EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_LEVEL), 5);
+}
+
+TEST("Rogue: a caught wild Pokemon has no egg moves it never knew")
+{
+    u32 known;
+    SetRoom(99, 1, 2, ROGUE_ROOM_WILD);
+    ZeroPlayerPartyMons();
+    CreateScriptedWildMon(SPECIES_PANCHAM, 5, ITEM_NONE);
+    GiveCapturedMonToPlayer(&gParties[B_TRAINER_OPPONENT_A][0]);
+    known = GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_KNOWN_EGG_MOVES);
+    EXPECT_EQ(known, 0);
+    known = Rogue_GetEggMoveMask(&gParties[B_TRAINER_PLAYER][0].box, GetSpeciesEggMoves(SPECIES_PANCHAM));
+    EXPECT_LE(__builtin_popcount(known), 2);
+}
+
+TEST("Rogue: wild Pokemon live where the encounter sheet puts their family")
+{
+    EXPECT(Rogue_LivesIn(SPECIES_PANCHAM, 0));     // Route 104's land: forest
+    EXPECT(!Rogue_LivesIn(SPECIES_PANCHAM, 1));
+    EXPECT(Rogue_LivesIn(SPECIES_CLOBBOPUS, 1));   // placed on the beach by hand
+    EXPECT(Rogue_LivesIn(SPECIES_GRAPPLOCT, 1));   // and its evolution with it
+    EXPECT(Rogue_LivesIn(SPECIES_MAKUHITA, 2));    // Granite Cave
+    EXPECT(Rogue_LivesIn(SPECIES_MACHOP, 3));      // Fiery Path
+    EXPECT(Rogue_LivesIn(SPECIES_TENTACOOL, 1));   // surfing
+    EXPECT(!Rogue_LivesIn(SPECIES_TENTACOOL, 0));
+}
+
+TEST("Rogue: every theme has wild Pokemon on every floor")
+{
+    u32 floor, biome, seed;
+    u8 doors[3];
+    for (floor = 1; floor <= ROGUE_FLOORS_NORMAL; floor++)
+    {
+        for (biome = 0; biome < 4; biome++)
+        {
+            for (seed = 1; seed < 6; seed++)
+            {
+                const struct ObjectEventTemplate *template;
+                u16 species;
+                SetRoom(seed * 31337, floor, 3, ROGUE_ROOM_WILD | (biome << 9));
+                Rogue_GetRoomDoors(doors);
+                Rogue_OnTransition();
+                template = &gSaveBlock1Ptr->objectEventTemplates[3]; // the first thing in the room
+                if (template->graphicsId < OBJ_EVENT_MON)
+                    template = &gSaveBlock1Ptr->objectEventTemplates[4]; // after the room's trainer
+                species = template->graphicsId - OBJ_EVENT_MON;
+                EXPECT(Rogue_LivesIn(species, biome));
+            }
+        }
+    }
 }

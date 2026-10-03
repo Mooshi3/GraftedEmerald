@@ -11,6 +11,7 @@
 #include "event_object_movement.h"
 #include "field_screen_effect.h"
 #include "fieldmap.h"
+#include "wild_encounter.h"
 #include "graft_bag.h"
 #include "graft_challenge.h"
 #include "party_menu.h"
@@ -656,26 +657,224 @@ static u32 GetRoomKind(void)
     return ROOM_KIND_OUTDOOR;
 }
 
-// Wild Pokémon fit the room's theme (most of the time)
+// Hoenn maps with encounter tables and the theme of their land Pokémon (BIOME_COUNT: no land table).
+// Surfed and fished Pokémon are beach Pokémon, Rock Smash ones cave Pokémon, wherever they are.
+static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
+{
+    {MAP_ROUTE124, BIOME_COUNT},
+    {MAP_SAFARI_ZONE_SOUTH, BIOME_FOREST},
+    {MAP_UNDERWATER_ROUTE126, BIOME_COUNT},
+    {MAP_ABANDONED_SHIP_ROOMS_B1F, BIOME_COUNT},
+    {MAP_GRANITE_CAVE_B2F, BIOME_CAVE},
+    {MAP_METEOR_FALLS_B1F_2R, BIOME_CAVE},
+    {MAP_ROUTE106, BIOME_COUNT},
+    {MAP_ROUTE107, BIOME_COUNT},
+    {MAP_ROUTE108, BIOME_COUNT},
+    {MAP_ROUTE122, BIOME_COUNT},
+    {MAP_MT_PYRE_2F, BIOME_CAVE},
+    {MAP_MT_PYRE_3F, BIOME_CAVE},
+    {MAP_MT_PYRE_4F, BIOME_CAVE},
+    {MAP_MT_PYRE_5F, BIOME_CAVE},
+    {MAP_MT_PYRE_6F, BIOME_CAVE},
+    {MAP_MT_PYRE_SUMMIT, BIOME_CAVE},
+    {MAP_GRANITE_CAVE_STEVENS_ROOM, BIOME_CAVE},
+    {MAP_ROUTE125, BIOME_COUNT},
+    {MAP_ROUTE126, BIOME_COUNT},
+    {MAP_ROUTE127, BIOME_COUNT},
+    {MAP_ROUTE128, BIOME_COUNT},
+    {MAP_ROUTE129, BIOME_COUNT},
+    {MAP_ROUTE131, BIOME_COUNT},
+    {MAP_ROUTE132, BIOME_COUNT},
+    {MAP_ROUTE133, BIOME_COUNT},
+    {MAP_ROUTE134, BIOME_COUNT},
+    {MAP_ABANDONED_SHIP_HIDDEN_FLOOR_CORRIDORS, BIOME_COUNT},
+    {MAP_SEAFLOOR_CAVERN_ROOM1, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM2, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM3, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM4, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM5, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM6, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM7, BIOME_CAVE},
+    {MAP_SEAFLOOR_CAVERN_ROOM8, BIOME_CAVE},
+    {MAP_CAVE_OF_ORIGIN_ENTRANCE, BIOME_CAVE},
+    {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP1, BIOME_CAVE},
+    {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP2, BIOME_CAVE},
+    {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP3, BIOME_CAVE},
+    {MAP_NEW_MAUVILLE_ENTRANCE, BIOME_CAVE},
+    {MAP_SAFARI_ZONE_SOUTHWEST, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_NORTH, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_NORTHWEST, BIOME_FOREST},
+    {MAP_METEOR_FALLS_1F_2R, BIOME_CAVE},
+    {MAP_SHOAL_CAVE_LOW_TIDE_STAIRS_ROOM, BIOME_CAVE},
+    {MAP_SHOAL_CAVE_LOW_TIDE_LOWER_ROOM, BIOME_CAVE},
+    {MAP_SHOAL_CAVE_LOW_TIDE_INNER_ROOM, BIOME_CAVE},
+    {MAP_LILYCOVE_CITY, BIOME_COUNT},
+    {MAP_DEWFORD_TOWN, BIOME_COUNT},
+    {MAP_SLATEPORT_CITY, BIOME_COUNT},
+    {MAP_MOSSDEEP_CITY, BIOME_COUNT},
+    {MAP_PACIFIDLOG_TOWN, BIOME_COUNT},
+    {MAP_EVER_GRANDE_CITY, BIOME_COUNT},
+    {MAP_PETALBURG_CITY, BIOME_COUNT},
+    {MAP_UNDERWATER_ROUTE124, BIOME_COUNT},
+    {MAP_SHOAL_CAVE_LOW_TIDE_ICE_ROOM, BIOME_CAVE},
+    {MAP_SOOTOPOLIS_CITY, BIOME_COUNT},
+    {MAP_SAFARI_ZONE_SOUTHEAST, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_NORTHEAST, BIOME_FOREST},
+    {MAP_MAGMA_HIDEOUT_2F_1R, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_2F_2R, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_3F_1R, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_3F_2R, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_4F, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_3F_3R, BIOME_VOLCANO},
+    {MAP_MAGMA_HIDEOUT_2F_3R, BIOME_VOLCANO},
+    {MAP_MIRAGE_TOWER_1F, BIOME_CAVE},
+    {MAP_MIRAGE_TOWER_2F, BIOME_CAVE},
+    {MAP_MIRAGE_TOWER_3F, BIOME_CAVE},
+    {MAP_MIRAGE_TOWER_4F, BIOME_CAVE},
+    {MAP_DESERT_UNDERPASS, BIOME_CAVE},
+    {MAP_ARTISAN_CAVE_B1F, BIOME_CAVE},
+    {MAP_ARTISAN_CAVE_1F, BIOME_CAVE},
+    {MAP_ALTERING_CAVE, BIOME_CAVE},
+    {MAP_METEOR_FALLS_STEVENS_CAVE, BIOME_CAVE},
+    {MAP_ROUTE101, BIOME_FOREST},
+    {MAP_ROUTE102, BIOME_FOREST},
+    {MAP_ROUTE103, BIOME_FOREST},
+    {MAP_ROUTE104, BIOME_FOREST},
+    {MAP_PETALBURG_WOODS, BIOME_FOREST},
+    {MAP_RUSTURF_TUNNEL, BIOME_CAVE},
+    {MAP_ROUTE105, BIOME_COUNT},
+    {MAP_ROUTE109, BIOME_COUNT},
+    {MAP_ROUTE110, BIOME_FOREST},
+    {MAP_ROUTE111, BIOME_VOLCANO},
+    {MAP_ROUTE112, BIOME_VOLCANO},
+    {MAP_FIERY_PATH, BIOME_VOLCANO},
+    {MAP_JAGGED_PASS, BIOME_VOLCANO},
+    {MAP_ROUTE113, BIOME_VOLCANO},
+    {MAP_ROUTE114, BIOME_FOREST},
+    {MAP_ROUTE115, BIOME_FOREST},
+    {MAP_METEOR_FALLS_1F_1R, BIOME_CAVE},
+    {MAP_METEOR_FALLS_B1F_1R, BIOME_CAVE},
+    {MAP_ROUTE116, BIOME_FOREST},
+    {MAP_ROUTE117, BIOME_FOREST},
+    {MAP_ROUTE118, BIOME_FOREST},
+    {MAP_ROUTE119, BIOME_FOREST},
+    {MAP_GRANITE_CAVE_1F, BIOME_CAVE},
+    {MAP_GRANITE_CAVE_B1F, BIOME_CAVE},
+    {MAP_MT_CHIMNEY, BIOME_VOLCANO},
+    {MAP_MT_PYRE_EXTERIOR, BIOME_CAVE},
+    {MAP_MT_PYRE_1F, BIOME_CAVE},
+    {MAP_MAGMA_HIDEOUT_1F, BIOME_VOLCANO},
+    {MAP_NEW_MAUVILLE_INSIDE, BIOME_CAVE},
+    {MAP_ROUTE120, BIOME_FOREST},
+    {MAP_ROUTE121, BIOME_FOREST},
+    {MAP_ROUTE123, BIOME_FOREST},
+    {MAP_SHOAL_CAVE_LOW_TIDE_ENTRANCE_ROOM, BIOME_CAVE},
+    {MAP_ROUTE130, BIOME_FOREST},
+    {MAP_SEAFLOOR_CAVERN_ENTRANCE, BIOME_CAVE},
+    {MAP_CAVE_OF_ORIGIN_1F, BIOME_CAVE},
+    {MAP_VICTORY_ROAD_1F, BIOME_CAVE},
+    {MAP_VICTORY_ROAD_B1F, BIOME_CAVE},
+    {MAP_VICTORY_ROAD_B2F, BIOME_CAVE},
+    {MAP_SKY_PILLAR_1F, BIOME_CAVE},
+    {MAP_SKY_PILLAR_3F, BIOME_CAVE},
+    {MAP_SKY_PILLAR_5F, BIOME_CAVE},
+    {MAP_AQUA_HIDEOUT_1F, BIOME_COUNT},
+};
+
+// Families placed by hand where the sheet's maps don't say it (an octopus lives on the beach even
+// if the sheet puts it on a route's land)
+static const struct { u16 species; u8 biome; } sHabitatExtras[] =
+{
+    {SPECIES_CLOBBOPUS, BIOME_BEACH},
+};
+
+// Which families live in each theme: every species on the theme's encounter tables (Jacob's sheet)
+// and everything it evolves into. Built once from the live tables.
+static EWRAM_DATA u8 sHabitats[BIOME_COUNT][(NUM_SPECIES + 7) / 8] = {0};
+static EWRAM_DATA const struct WildPokemonHeader *sHabitatsFrom = NULL;
+
+static void AddToHabitat(u32 biome, enum Species species, u32 depth)
+{
+    const struct Evolution *evos;
+    u32 i;
+    if (species == SPECIES_NONE || species >= NUM_SPECIES || depth > 3)
+        return;
+    sHabitats[biome][species / 8] |= 1 << (species % 8);
+    evos = GetSpeciesEvolutions(species);
+    for (i = 0; evos != NULL && evos[i].method != EVOLUTIONS_END; i++)
+        AddToHabitat(biome, evos[i].targetSpecies, depth + 1);
+}
+
+static void AddTableToHabitat(u32 biome, const struct WildPokemonInfo *info, u32 count)
+{
+    u32 i;
+    if (info == NULL || biome >= BIOME_COUNT)
+        return;
+    for (i = 0; i < count; i++)
+        AddToHabitat(biome, info->wildPokemon[i].species, 0);
+}
+
+static void BuildHabitats(void)
+{
+    const struct WildPokemonHeader *headers = gWildMonHeaders;
+    u32 i, j, t;
+
+    if (sHabitatsFrom == headers)
+        return;
+    memset(sHabitats, 0, sizeof(sHabitats));
+    for (i = 0; headers[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
+    {
+        u16 map = (headers[i].mapGroup << 8) | headers[i].mapNum;
+        for (j = 0; j < ARRAY_COUNT(sHabitatMaps) && sHabitatMaps[j].map != map; j++)
+            ;
+        if (j == ARRAY_COUNT(sHabitatMaps))
+            continue; // not a Hoenn map
+        for (t = 0; t < TIMES_OF_DAY_COUNT; t++)
+        {
+            const struct WildEncounterTypes *types = &headers[i].encounterTypes[t];
+            AddTableToHabitat(sHabitatMaps[j].landBiome, types->landMonsInfo, NUM_LAND_MONS_ENCOUNTER_SLOTS);
+            AddTableToHabitat(BIOME_BEACH, types->waterMonsInfo, NUM_WATER_MONS_ENCOUNTER_SLOTS);
+            AddTableToHabitat(BIOME_BEACH, types->fishingMonsInfo, NUM_FISHING_MONS_ENCOUNTER_SLOTS);
+            AddTableToHabitat(BIOME_CAVE, types->rockSmashMonsInfo, NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS);
+        }
+    }
+    for (i = 0; i < ARRAY_COUNT(sHabitatExtras); i++)
+        AddToHabitat(sHabitatExtras[i].biome, sHabitatExtras[i].species, 0);
+    sHabitatsFrom = headers;
+}
+
+static bool32 LivesIn(enum Species species, u32 biome)
+{
+    return species < NUM_SPECIES && (sHabitats[biome][species / 8] & (1 << (species % 8)));
+}
+
+// For tests: biome 0 forest, 1 beach, 2 cave, 3 volcano
+bool32 Rogue_LivesIn(u16 species, u32 biome)
+{
+    BuildHabitats();
+    return biome < BIOME_COUNT && LivesIn(species, biome);
+}
+
+// Wild Pokémon live where Jacob's encounter sheet puts their family
 static enum Species PickRoomSpecies(rng_value_t *rng)
 {
-    static const u8 sForest[]  = {TYPE_GRASS, TYPE_BUG, TYPE_NORMAL, TYPE_FLYING, TYPE_FAIRY, TYPE_POISON};
-    static const u8 sBeach[]   = {TYPE_WATER, TYPE_GROUND, TYPE_FLYING, TYPE_FIGHTING};
-    static const u8 sCave[]    = {TYPE_ROCK, TYPE_GROUND, TYPE_STEEL, TYPE_DARK, TYPE_GHOST, TYPE_POISON};
-    static const u8 sVolcano[] = {TYPE_FIRE, TYPE_ROCK, TYPE_GROUND, TYPE_DRAGON};
-    const u8 *types;
-    u32 count;
+    u32 biome = GetRoomBiome(), minBst, maxBst, tries;
+    bool32 unevolvedOnly = (GetFloor() == 1);
 
-    if (LocalRandom(rng) % 100 >= 80)
-        return PickFloorSpecies(rng, TYPE_NONE);
-    switch (GetRoomBiome())
+    BuildHabitats();
+    GetFloorBstRange(GetFloor(), &minBst, &maxBst);
+    for (tries = 0; tries < 4000; tries++)
     {
-    case BIOME_BEACH:   types = sBeach;   count = ARRAY_COUNT(sBeach);   break;
-    case BIOME_CAVE:    types = sCave;    count = ARRAY_COUNT(sCave);    break;
-    case BIOME_VOLCANO: types = sVolcano; count = ARRAY_COUNT(sVolcano); break;
-    default:            types = sForest;  count = ARRAY_COUNT(sForest);  break;
+        enum Species species = 1 + LocalRandom(rng) % NATIONAL_DEX_COUNT;
+        u32 bst;
+        if (!LivesIn(species, biome) || !IsSpeciesAllowed(species))
+            continue;
+        bst = GetSpeciesBaseStatTotal(species);
+        if (bst < minBst || bst > maxBst || (unevolvedOnly && GetSpeciesPreEvolution(species) != SPECIES_NONE))
+            continue;
+        return species;
     }
-    return PickFloorSpecies(rng, types[LocalRandom(rng) % count]);
+    return PickFloorSpecies(rng, TYPE_NONE);
 }
 
 // Bosses fight in an Elite Four room that fits their type
@@ -1000,9 +1199,8 @@ static bool32 IsRoomGuarded(u32 type)
 
 static void AddTrainerObject(void)
 {
+    // Trainers and bosses don't spot the player: talk to them to battle (Jacob, 2026-10-03)
     AddObject(sTrainerKinds[GetTrainerKind()].graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
-    sPlan.objects[sPlan.numObjects - 1].trainerType = TRAINER_TYPE_NORMAL;
-    sPlan.objects[sPlan.numObjects - 1].sight = 5;
 }
 
 // Outdoor rooms: the forest border with an opening per door, and trees, ponds or sea inside
@@ -1146,8 +1344,6 @@ static void BuildRoomPlan(void)
     if (sPlan.kind == ROOM_KIND_ARENA)
     {
         AddObject(GetCurrentBoss()->graphicsId, ARENA_BOSS_X, ARENA_BOSS_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
-        sPlan.objects[0].trainerType = TRAINER_TYPE_NORMAL;
-        sPlan.objects[0].sight = 5;
         return;
     }
     if (sPlan.kind == ROOM_KIND_WALLED)

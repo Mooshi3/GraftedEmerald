@@ -19,6 +19,7 @@ u32 Rogue_GetFloorDonors(u16 *species, u32 count);
 u16 Rogue_GetBossTrainerId(void);
 u32 Rogue_GetEggMoveMask(struct BoxPokemon *mon, const u16 *eggMoves);
 bool32 Rogue_GetPopUpName(u8 *dest);
+bool32 Rogue_LivesIn(u16 species, u32 biome);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {

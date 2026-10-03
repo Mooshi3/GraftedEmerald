@@ -129,8 +129,13 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   has a home theme (floor 1 forest, 2 beach, 3 cave, 4 volcano, then around again) that a door's room takes
   55% of the time, 15% for each other theme.
 - A door's opening shows the next room's theme: sand, cave rock, volcanic ground or grass in front of it.
-- Wild Pokémon fit the theme 80% of the time: forest Grass/Bug/Normal/Flying/Fairy/Poison, beach
-  Water/Ground/Flying/Fighting, cave Rock/Ground/Steel/Dark/Ghost/Poison, volcano Fire/Rock/Ground/Dragon.
+- Wild Pokémon live where Jacob's encounter sheet puts their family (2026-10-03, replacing type pools:
+  a fighting-type panda isn't a beach Pokémon). Each Hoenn map with encounters has a theme: caves (Granite,
+  Meteor Falls, Victory Road, Seafloor, Shoal, Mt. Pyre, Sky Pillar, Mirage Tower, New Mauville…), volcano
+  (Fiery Path, Jagged Pass, Mt. Chimney, Magma Hideout, Routes 111-113), forest (the other land routes);
+  everything surfed or fished is a beach Pokémon, Rock Smash ones cave Pokémon. A family counts with all
+  its evolutions. `sHabitatExtras` places families by hand where the maps don't say it (Clobbopus: beach).
+- Trainers and bosses are talk-to-battle (no line of sight); their room's doors stay locked until beaten.
 - Shops and rests are a Poké Mart or a Pokémon Center standing in a forest or beach room; walk in to buy or
   heal, walk out to the same room.
 - Bosses fight in an Elite Four room that fits their type (Sidney's, Phoebe's, Glacia's or Drake's); the
