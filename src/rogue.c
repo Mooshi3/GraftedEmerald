@@ -1511,6 +1511,11 @@ static u16 GetTreeMetatile(s32 x, s32 y)
     return TILE_TREE(IsTreeBlock(bx + 1, by) ? 0x1E5 : 0x1E7);
 }
 
+// Doorway ground for a cave or volcano room behind it: plain mountain ground from the General
+// tileset (no behavior: 0x1A0-0x1A9 looked close but are secret base entrances and warp there)
+#define DOOR_TILE_CAVE    0x07D
+#define DOOR_TILE_VOLCANO 0x06D
+
 // The door openings' ground shows the next room's theme
 static u16 GetDoorGroundMetatile(s32 x, s32 y)
 {
@@ -1527,11 +1532,9 @@ static u16 GetDoorGroundMetatile(s32 x, s32 y)
         case BIOME_BEACH:
             return TILE_GROUND(0x124);
         case BIOME_CAVE:
-            if (y < INNER_Y_MIN - 2)
-                return TILE_TREE(left ? 0x1A0 : 0x1A0);
-            return TILE_GROUND(y == INNER_Y_MIN - 1 ? 0x1A1 : 0x1A1);
+            return TILE_GROUND(DOOR_TILE_CAVE);
         case BIOME_VOLCANO:
-            return TILE_GROUND(0x1A9);
+            return TILE_GROUND(DOOR_TILE_VOLCANO);
         }
         break;
     }
@@ -1664,6 +1667,10 @@ static u16 GetWalledMetatile(s32 x, s32 y)
                     return TILE_GROUND(METATILE_General_Grass);
                 if (sPlan.doorBiomes[i] == BIOME_BEACH)
                     return TILE_GROUND(0x124);
+                if (sPlan.doorBiomes[i] == BIOME_CAVE && sPlan.biome != BIOME_CAVE)
+                    return TILE_GROUND(DOOR_TILE_CAVE);
+                if (sPlan.doorBiomes[i] == BIOME_VOLCANO && sPlan.biome != BIOME_VOLCANO)
+                    return TILE_GROUND(DOOR_TILE_VOLCANO);
             }
         }
         return TILE_GROUND((Mix32(x * 31 + y * 17 + GetRoomSeed()) % 10) ? t->floor : t->floorAlt);
