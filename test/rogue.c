@@ -763,6 +763,7 @@ TEST("Rogue: the Graft vault keeps one piece for the next run")
 TEST("Rogue: some floors after the first have weather")
 {
     u32 seed, floor, weathered = 0, total = 0;
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0); // Normal
     for (seed = 1; seed < 30; seed++)
     {
         SetRoom(seed * 7919, 1, 1, ROGUE_ROOM_WILD);
@@ -775,6 +776,7 @@ TEST("Rogue: some floors after the first have weather")
             {
                 weathered++;
                 EXPECT(weather == WEATHER_RAIN || weather == WEATHER_DROUGHT || weather == WEATHER_SANDSTORM || weather == WEATHER_SNOW);
+                EXPECT_NE(weather, WEATHER_FOG_HORIZONTAL); // Normal mode: no curses, no fog
             }
         }
     }
@@ -928,6 +930,7 @@ TEST("Rogue: the Fog curse turns door signs into question marks")
             break;
     }
     EXPECT_EQ(Rogue_GetFloorCurse(2), ROGUE_CURSE_FOG);
+    EXPECT_EQ(Rogue_GetFloorWeather(2), WEATHER_FOG_HORIZONTAL); // real fog: Misty Terrain in battle
     Rogue_OnTransition();
     for (i = 0; i < 3; i++)
     {

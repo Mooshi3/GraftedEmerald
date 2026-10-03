@@ -223,7 +223,8 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   with it. The rest stop's exit names it ("Word is it's raining outdoors on FLOOR 3.").
 - Fainted Pokémon: only asked about with last rites left (see Fainting).
 - Hard mode curses (approved 2026-10-03): from floor 2, 40% of Hard floors have one, named at the
-  rest stop: Fog (door signs show "?", except the boss), Ambush (every wild and item room guarded), Tough
+  rest stop: Fog (door signs show "?", except the boss; outdoor rooms get fog weather instead of the
+  floor's weather, which starts battles in Misty Terrain), Ambush (every wild and item room guarded), Tough
   crowd (trainers +2 levels), Short supply (no Poké or Great Balls in item rooms), Weary (room Centers heal
   only to half HP; the rest stop still heals fully). `Rogue_GetFloorCurse`, rolled from the run seed.
 - Achievements (approved 2026-10-03; payouts left to Claude: worth a dedicated run, 340 BP in all, well

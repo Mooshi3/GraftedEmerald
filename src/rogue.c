@@ -1566,7 +1566,7 @@ static void SetObjectTemplate(u32 slot, u16 graphicsId, u32 x, u32 y, u8 movemen
 
 // ON_TRANSITION: place the room's objects before they spawn, hide the unused ones
 // Floor weather: from floor 2 on, 40% of floors have rain, harsh sun, a sandstorm or snow in their
-// forest and beach rooms. It's overworld weather, so every battle there starts with it too
+// forest and beach rooms (a Hard floor with the Fog curse has fog instead). It's overworld weather, so every battle there starts with it too
 // (FIELD_EFFECT_OVERWORLD_WEATHER, battle_util.c). Caves, volcanoes, power plants and buildings are
 // indoors. The rest stop names it before the floor starts.
 #define NO_FLOOR_WEATHER 0xFF
@@ -1575,6 +1575,8 @@ u32 Rogue_GetFloorWeather(u32 floor)
     u32 roll;
     if (!Rogue_IsRunActive() || floor <= 1)
         return NO_FLOOR_WEATHER;
+    if (Rogue_GetFloorCurse(floor) == ROGUE_CURSE_FOG)
+        return WEATHER_FOG_HORIZONTAL; // the Fog curse's fog: Misty Terrain in battle (B_OVERWORLD_FOG)
     roll = Mix32(GetRunSeed() ^ (floor * 0x9E3779B1) ^ 0x3EA7);
     if (roll % 100 >= 40)
         return NO_FLOOR_WEATHER;
@@ -3318,7 +3320,7 @@ void Rogue_BufferNextFloor(void)
     {
         static const u8 *const sCurseNews[ROGUE_CURSE_COUNT] =
         {
-            [ROGUE_CURSE_FOG] = COMPOUND_STRING("Word is a fog hides the door signs\non {STR_VAR_1}.\p"),
+            [ROGUE_CURSE_FOG] = COMPOUND_STRING("Word is a fog hides the door signs\non {STR_VAR_1}. It's misty out.\p"),
             [ROGUE_CURSE_AMBUSH] = COMPOUND_STRING("Word is trainers lie in wait in\nevery room on {STR_VAR_1}.\p"),
             [ROGUE_CURSE_TOUGH] = COMPOUND_STRING("Word is the trainers on {STR_VAR_1}\nare tougher than usual.\p"),
             [ROGUE_CURSE_SHORT_SUPPLY] = COMPOUND_STRING("Word is there are no POKé BALLS\nlying around on {STR_VAR_1}.\p"),
@@ -3689,6 +3691,8 @@ static const struct { const u8 *topic; const u8 *text; } sHelpTopics[] =
         "more trainers, tougher trainers, no\l"
         "POKé BALLS lying around, or tired\l"
         "POKéMON CENTERS.\p"
+        "Battles in the fog start with\n"
+        "MISTY TERRAIN.\p"
         "The rest stop hears about it before\n"
         "you head on.")},
     {COMPOUND_STRING("BP & unlocks"), COMPOUND_STRING(
