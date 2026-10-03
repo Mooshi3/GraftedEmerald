@@ -757,6 +757,15 @@ static const u8 *const sRelearnerListTitles[MOVE_RELEARNER_COUNT] =
     [MOVE_RELEARNER_GRAFT_MOVES]    = COMPOUND_STRING("GRAFT MOVES"),
 };
 
+// GRAFT: both views (battle and contest, Left/Right) are titled with the list being shown (SELECT
+// switches lists), so a tutor list doesn't read as egg moves
+static const u8 *GetRelearnerListTitle(const u8 *fallback)
+{
+    if (gRelearnMode == RELEARN_MODE_SCRIPT || gMoveRelearnerState >= MOVE_RELEARNER_COUNT)
+        return fallback;
+    return sRelearnerListTitles[gMoveRelearnerState];
+}
+
 static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
 {
     s32 x;
@@ -767,9 +776,7 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
         MoveRelearnerShowHideCategoryIcon(chosenMove);
 
     FillWindowPixelBuffer(RELEARNERWIN_DESC_BATTLE, PIXEL_FILL(1));
-    // GRAFT: the title names the list being shown (SELECT switches lists), not just "BATTLE MOVES"
-    str = (gRelearnMode == RELEARN_MODE_SCRIPT || gMoveRelearnerState >= MOVE_RELEARNER_COUNT)
-        ? gText_MoveRelearnerBattleMoves : sRelearnerListTitles[gMoveRelearnerState];
+    str = GetRelearnerListTitle(gText_MoveRelearnerBattleMoves);
     x = GetStringCenterAlignXOffset(FONT_NORMAL, str, 128);
     AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 1, TEXT_SKIP_DRAW, NULL);
 
@@ -830,7 +837,7 @@ static void MoveRelearnerMenuLoadContestMoveDescription(u32 chosenMove)
 
     MoveRelearnerShowHideHearts(chosenMove);
     FillWindowPixelBuffer(RELEARNERWIN_DESC_CONTEST, PIXEL_FILL(1));
-    str = gText_MoveRelearnerContestMovesTitle;
+    str = GetRelearnerListTitle(gText_MoveRelearnerContestMovesTitle);
     x = GetStringCenterAlignXOffset(FONT_NORMAL, str, 128);
     AddTextPrinterParameterized(RELEARNERWIN_DESC_CONTEST, FONT_NORMAL, str, x, 1, TEXT_SKIP_DRAW, NULL);
 
