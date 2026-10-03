@@ -18,7 +18,8 @@
 #define ROGUE_ROOM_BOSS    7
 #define ROGUE_ROOM_START   8 // the start room's door: begins a run
 #define ROGUE_ROOM_EVENT   9 // only behind "?" doors: a gift, a rare Pokémon or a merchant
-#define ROGUE_ROOM_TYPE_COUNT 10
+#define ROGUE_ROOM_REST_STOP 10 // after a floor's boss: heal, shop, a free prize and a move tutor
+#define ROGUE_ROOM_TYPE_COUNT 11
 
 // Rogue_TakeDoor's VAR_RESULT
 #define ROGUE_DOOR_NEXT_ROOM   0

@@ -265,6 +265,12 @@ Debug_EventScript_RogueVolcano::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x600
 	goto Debug_EventScript_RogueWarp
 
+@ Rogue: the rest stop after this floor's boss
+Debug_EventScript_RogueRestStop::
+	setvar VAR_ROGUE_ROOM, 11
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_REST_STOP
+	goto Debug_EventScript_RogueWarp
+
 Debug_EventScript_RogueWarp::
 	special Rogue_WarpToRoom
 	release

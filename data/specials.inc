@@ -674,3 +674,12 @@ def_special Rogue_OpenDoors
 def_special Rogue_WarpToRoom, waitstate=1
 def_special Rogue_GetFavorite
 def_special Rogue_SetFavorite
+def_special Rogue_BufferNextFloor
+def_special Rogue_HasTakenPrize
+def_special Rogue_PushPrizeChoices
+def_special Rogue_GivePrize
+def_special Rogue_PushTutorMoves
+def_special Rogue_SelectTutorMove
+def_special Rogue_PushTutorPayments
+def_special Rogue_CanPayTutor
+def_special Rogue_PayTutor

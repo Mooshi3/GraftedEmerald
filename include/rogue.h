@@ -20,6 +20,7 @@ u16 Rogue_GetBossTrainerId(void);
 u32 Rogue_GetEggMoveMask(struct BoxPokemon *mon, const u16 *eggMoves);
 bool32 Rogue_GetPopUpName(u8 *dest);
 bool32 Rogue_LivesIn(u16 species, u32 biome);
+u32 Rogue_GetUnlockedTutorMoves(u16 species, u16 *moves);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {
@@ -58,5 +59,14 @@ void Rogue_PushChallengeChoices(void);
 void Rogue_PushTypeChoices(void);
 void Rogue_GetFavorite(void);
 void Rogue_SetFavorite(void);
+void Rogue_BufferNextFloor(void);
+void Rogue_HasTakenPrize(void);
+void Rogue_PushPrizeChoices(void);
+void Rogue_GivePrize(void);
+void Rogue_PushTutorMoves(void);
+void Rogue_SelectTutorMove(void);
+void Rogue_PushTutorPayments(void);
+void Rogue_CanPayTutor(void);
+void Rogue_PayTutor(void);
 
 #endif // GUARD_ROGUE_H

@@ -53,9 +53,12 @@ TEST("Rogue rooms lead to the boss after the last room of a floor")
     SetRoom(1234, 1, ROGUE_ROOMS_PER_FLOOR, ROGUE_ROOM_WILD);
     EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
     EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS);
-    SetRoom(1234, ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR, ROGUE_ROOM_BOSS);
+    SetRoom(1234, 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
     EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
-    EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS); // the last floor's boss: on to the finale
+    EXPECT_EQ(doors[1], ROGUE_ROOM_REST_STOP); // a boss's room leads to the rest stop
+    SetRoom(1234, ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
+    EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
+    EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS); // the last floor's rest stop: on to the finale
 }
 
 TEST("Rogue trainers get generated parties scaled by floor")
@@ -159,6 +162,12 @@ TEST("After the last floor's boss comes the Champion, then the way out")
 {
     u8 doors[3];
     SetRoom(777, ROGUE_FLOORS_NORMAL, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
+    EXPECT_EQ(doors[1], ROGUE_ROOM_REST_STOP);
+    gSpecialVar_0x8004 = 1;
+    Rogue_TakeDoor();
+    EXPECT_EQ(VarGet(VAR_ROGUE_FLOOR), ROGUE_FLOORS_NORMAL);
+    EXPECT_EQ(VarGet(VAR_ROGUE_ROOM_TYPE) & 0xFF, ROGUE_ROOM_REST_STOP);
     EXPECT_EQ(Rogue_GetRoomDoors(doors), 1);
     EXPECT_EQ(doors[1], ROGUE_ROOM_BOSS);
     gSpecialVar_0x8004 = 1;
@@ -313,7 +322,7 @@ TEST("Rogue: last rites break a fainted Pokemon down, a few times a floor")
     EXPECT(IsGraftBagEmpty());
 
     // The next floor brings it back
-    SetRoom(99, 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
+    SetRoom(99, 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
     gSpecialVar_0x8004 = 0;
     {
         u8 doors[3];
@@ -461,4 +470,43 @@ TEST("Rogue: a starter knows the egg move it rolled")
         }
     }
     EXPECT_GT(checked, 0);
+}
+
+TEST("Rogue: the rest stop's prize is one of three, once")
+{
+    SetRoom(4321, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
+    ClearBag();
+    Rogue_HasTakenPrize();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    gSpecialVar_Result = 2;
+    Rogue_GivePrize();
+    Rogue_HasTakenPrize();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    // leaving clears it for the next rest stop
+    gSpecialVar_0x8004 = 1;
+    Rogue_TakeDoor();
+    EXPECT_EQ(VarGet(VAR_ROGUE_FLOOR), 3);
+    Rogue_HasTakenPrize();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+}
+
+TEST("Rogue: a tutor move bought with BP is relearnable by the family in later runs")
+{
+    u16 moves[8];
+    memset(gSaveBlock2Ptr->frontier.domeMonIds, 0, sizeof(gSaveBlock2Ptr->frontier.domeMonIds));
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    SetRoom(55, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
+    ZeroPlayerPartyMons();
+    CreateMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_MACHOKE, 30, 0, OTID_STRUCT_PLAYER_ID);
+    gSaveBlock2Ptr->frontier.battlePoints = 50;
+    gSpecialVar_0x8005 = MOVE_ICE_PUNCH;
+    gSpecialVar_0x8006 = 1; // BP
+    Rogue_CanPayTutor();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    SetMonMoveSlot(&gParties[B_TRAINER_PLAYER][0], MOVE_ICE_PUNCH, 0); // the party menu teaches it
+    Rogue_PayTutor();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 40);
+    EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_MACHAMP, moves), 1); // the whole family
+    EXPECT_EQ(moves[0], MOVE_ICE_PUNCH);
+    EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_GEODUDE, moves), 0);
 }

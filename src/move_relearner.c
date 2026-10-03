@@ -1046,6 +1046,18 @@ static u32 GetRelearnerTutorMoves(struct BoxPokemon *mon, u16 *moves)
     enum Species species = GetBoxMonData(mon, MON_DATA_SPECIES);
     u32 numMoves = 0;
 
+    if (Rogue_IsRunActive())
+    {
+        u16 unlocked[MAX_RELEARNER_MOVES];
+        u32 i, count = Rogue_GetUnlockedTutorMoves(species, unlocked);
+        for (i = 0; i < count; i++)
+        {
+            if (!BoxMonKnowsMove(mon, unlocked[i]))
+                moves[numMoves++] = unlocked[i];
+        }
+        return numMoves;
+    }
+
     for (u32 i = 0; gTutorMoves[i] != MOVE_UNAVAILABLE; i++)
     {
         enum Move move = gTutorMoves[i];
@@ -1157,6 +1169,11 @@ static bool32 HasRelearnerTMMoves(struct BoxPokemon *boxMon)
 static bool32 HasRelearnerTutorMoves(struct BoxPokemon *boxMon)
 {
     enum Species species = GetBoxMonData(boxMon, MON_DATA_SPECIES);
+    if (Rogue_IsRunActive())
+    {
+        u16 moves[MAX_RELEARNER_MOVES];
+        return GetRelearnerTutorMoves(boxMon, moves) != 0;
+    }
     for (u32 i = 0; gTutorMoves[i] != MOVE_UNAVAILABLE; i++)
     {
         enum Move move = gTutorMoves[i];
@@ -1190,5 +1207,6 @@ static bool32 IsTMMoveRelearnerActive(void)
 // tutors who charge for them (the Battle Frontier's take BP). Only P_FLAG_TUTOR_MOVES can open it.
 static bool32 IsTutorMoveRelearnerActive(void)
 {
-    return P_FLAG_TUTOR_MOVES != 0 && FlagGet(P_FLAG_TUTOR_MOVES);
+    // ROGUE: in a run, the list holds the tutor moves bought with BP for the Pokémon's family
+    return (P_FLAG_TUTOR_MOVES != 0 && FlagGet(P_FLAG_TUTOR_MOVES)) || Rogue_IsRunActive();
 }

@@ -525,6 +525,7 @@ gStdScripts_End::
 	.include "data/maps/Rogue_Arena_Drake/scripts.inc"
 	.include "data/maps/Rogue_Mart/scripts.inc"
 	.include "data/maps/Rogue_Center/scripts.inc"
+	.include "data/maps/Rogue_Stop/scripts.inc"
 	.include "data/maps/BattleFrontier_BattlePyramidTop/scripts.inc"
 	.include "data/maps/BattleFrontier_BattleArenaLobby/scripts.inc"
 	.include "data/maps/BattleFrontier_BattleArenaCorridor/scripts.inc"

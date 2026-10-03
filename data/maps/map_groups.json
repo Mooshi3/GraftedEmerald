@@ -633,7 +633,8 @@
     "Rogue_Arena_Glacia",
     "Rogue_Arena_Drake",
     "Rogue_Mart",
-    "Rogue_Center"
+    "Rogue_Center",
+    "Rogue_Stop"
   ],
   "gMapGroup_IndoorRoute104Prototype": [
     "Route104_Prototype",

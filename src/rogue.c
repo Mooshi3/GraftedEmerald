@@ -101,6 +101,7 @@ enum
     ROOM_KIND_OUTDOOR, // MAP_ROGUE_ROOM: forest or beach
     ROOM_KIND_WALLED,  // MAP_ROGUE_CAVE / MAP_ROGUE_VOLCANO
     ROOM_KIND_ARENA,   // a boss's Elite Four room
+    ROOM_KIND_STOP,    // MAP_ROGUE_STOP: the rest stop between floors
 };
 
 enum
@@ -129,6 +130,10 @@ enum
 #define ARENA_ENTRANCE_Y 12
 #define ARENA_BOSS_X 6
 #define ARENA_BOSS_Y 5
+
+// The rest stop (a Pokémon Center's room): where the player arrives
+#define STOP_ENTRANCE_X 7
+#define STOP_ENTRANCE_Y 7
 
 // Metatiles (gTileset_General), with collision and elevation as Route 101 uses them
 #define TILE_TREE(id)  ((id) | (1 << MAPGRID_COLLISION_SHIFT))
@@ -313,6 +318,7 @@ static const struct
 #define RUN_FLAG_INVERSE  (1 << 1) // challenge: Inverse battles
 #define RUN_FLAG_MONOTYPE (1 << 2) // challenge: Monotype (the type is in the Monotype setting)
 #define RUN_FLAG_CHALLENGE (RUN_FLAG_INVERSE | RUN_FLAG_MONOTYPE)
+#define RUN_FLAG_PRIZE_TAKEN (1 << 3) // the rest stop's free prize is taken (cleared on leaving it)
 
 // Last rites used this floor: VAR_ROGUE_RUN_FLAGS bits 8-11
 #define RUN_FLAG_RITES_SHIFT 8
@@ -493,7 +499,7 @@ static void GetBossDoorDestination(u32 *floor, u32 *room)
 {
     *floor = GetFloor();
     *room = GetRoom() + 1;
-    if (GetRoomType() == ROGUE_ROOM_BOSS && *floor == GetNumFloors())
+    if (GetRoomType() == ROGUE_ROOM_REST_STOP && *floor == GetNumFloors())
     {
         *floor = GetNumFloors() + 1; // into the finale
         *room = 1;
@@ -648,6 +654,8 @@ static u32 GetRoomKind(void)
 {
     if (VarGet(VAR_ROGUE_STATE) == ROGUE_STATE_RUN && GetRoomType() == ROGUE_ROOM_BOSS)
         return ROOM_KIND_ARENA;
+    if (VarGet(VAR_ROGUE_STATE) == ROGUE_STATE_RUN && GetRoomType() == ROGUE_ROOM_REST_STOP)
+        return ROOM_KIND_STOP;
     switch (GetRoomBiome())
     {
     case BIOME_CAVE:
@@ -906,6 +914,8 @@ static u16 GetRoomMap(void)
     {
     case ROOM_KIND_ARENA:
         return GetArenaMap(GetCurrentBoss()->type);
+    case ROOM_KIND_STOP:
+        return MAP_ROGUE_STOP;
     case ROOM_KIND_WALLED:
         return GetRoomBiome() == BIOME_CAVE ? MAP_ROGUE_CAVE : MAP_ROGUE_VOLCANO;
     }
@@ -915,7 +925,8 @@ static u16 GetRoomMap(void)
 static bool32 IsRogueMap(u32 mapGroup, u32 mapNum)
 {
     static const u16 sMaps[] = {MAP_ROGUE_ROOM, MAP_ROGUE_CAVE, MAP_ROGUE_VOLCANO, MAP_ROGUE_ARENA_SIDNEY,
-                                MAP_ROGUE_ARENA_PHOEBE, MAP_ROGUE_ARENA_GLACIA, MAP_ROGUE_ARENA_DRAKE};
+                                MAP_ROGUE_ARENA_PHOEBE, MAP_ROGUE_ARENA_GLACIA, MAP_ROGUE_ARENA_DRAKE,
+                                MAP_ROGUE_STOP};
     u32 i;
     for (i = 0; i < ARRAY_COUNT(sMaps); i++)
     {
@@ -929,9 +940,18 @@ static bool32 IsRogueMap(u32 mapGroup, u32 mapNum)
 void Rogue_WarpToRoom(void)
 {
     u16 map = GetRoomMap();
-    bool32 arena = (GetRoomKind() == ROOM_KIND_ARENA);
-    SetWarpDestination(MAP_GROUP(map), MAP_NUM(map), WARP_ID_NONE,
-                       arena ? ARENA_ENTRANCE_X : ROGUE_ENTRANCE_X, arena ? ARENA_ENTRANCE_Y : ROGUE_ENTRANCE_Y);
+    s32 x = ROGUE_ENTRANCE_X, y = ROGUE_ENTRANCE_Y;
+    if (GetRoomKind() == ROOM_KIND_ARENA)
+    {
+        x = ARENA_ENTRANCE_X;
+        y = ARENA_ENTRANCE_Y;
+    }
+    else if (GetRoomKind() == ROOM_KIND_STOP)
+    {
+        x = STOP_ENTRANCE_X;
+        y = STOP_ENTRANCE_Y;
+    }
+    SetWarpDestination(MAP_GROUP(map), MAP_NUM(map), WARP_ID_NONE, x, y);
     DoWarp();
     ResetInitialPlayerAvatarState();
 }
@@ -1089,7 +1109,7 @@ static void ChooseDoors(rng_value_t *rng)
 {
     u32 type = GetRoomType();
     u32 i, count, used = 0;
-    u32 nextFloor = GetFloor() + (type == ROGUE_ROOM_BOSS);
+    u32 nextFloor = GetFloor() + (type == ROGUE_ROOM_REST_STOP);
 
     for (i = 0; i < NUM_DOORS; i++)
     {
@@ -1107,17 +1127,27 @@ static void ChooseDoors(rng_value_t *rng)
         sPlan.doors[1] = ROGUE_ROOM_HUB; // the Champion is beaten: the run is won
         return;
     }
-    if ((type == ROGUE_ROOM_BOSS && GetFloor() >= GetNumFloors())
-     || (type != ROGUE_ROOM_BOSS && GetRoom() >= ROGUE_ROOMS_PER_FLOOR))
-    {
-        sPlan.doors[1] = ROGUE_ROOM_BOSS;
-        return;
-    }
     if (type == ROGUE_ROOM_BOSS)
     {
-        // An arena has one way out: into the next floor
+        // An arena has one way out: to the rest stop, or in the finale to the next challenger
+        sPlan.doors[1] = IsFinale(GetFloor()) ? ROGUE_ROOM_BOSS : ROGUE_ROOM_REST_STOP;
+        return;
+    }
+    if (type == ROGUE_ROOM_REST_STOP)
+    {
+        // The rest stop leads into the next floor, or after the last floor to the finale
+        if (GetFloor() >= GetNumFloors())
+        {
+            sPlan.doors[1] = ROGUE_ROOM_BOSS;
+            return;
+        }
         sPlan.doors[1] = PickWeighted(rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 0);
         sPlan.doorBiomes[1] = PickBiome(rng, sPlan.doors[1], nextFloor);
+        return;
+    }
+    if (GetRoom() >= ROGUE_ROOMS_PER_FLOOR)
+    {
+        sPlan.doors[1] = ROGUE_ROOM_BOSS;
         return;
     }
 
@@ -1341,6 +1371,8 @@ static void BuildRoomPlan(void)
     sPlan.biome = GetRoomBiome();
     ChooseDoors(&rng);
 
+    if (sPlan.kind == ROOM_KIND_STOP)
+        return; // its people are on the map
     if (sPlan.kind == ROOM_KIND_ARENA)
     {
         AddObject(GetCurrentBoss()->graphicsId, ARENA_BOSS_X, ARENA_BOSS_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Boss);
@@ -1773,6 +1805,7 @@ static const u8 *const sRoomNames[ROGUE_ROOM_TYPE_COUNT] =
     [ROGUE_ROOM_ITEM] = COMPOUND_STRING("items"),
     [ROGUE_ROOM_SHOP] = COMPOUND_STRING("a shop"),
     [ROGUE_ROOM_REST] = COMPOUND_STRING("a place to rest"),
+    [ROGUE_ROOM_REST_STOP] = COMPOUND_STRING("the rest stop"),
 };
 
 static const u8 *const sEventNames[EVENT_COUNT] =
@@ -1837,6 +1870,10 @@ bool32 Rogue_GetPopUpName(u8 *dest)
     if (GetRoomType() == ROGUE_ROOM_BOSS)
     {
         StringExpandPlaceholders(dest, COMPOUND_STRING("FLOOR {STR_VAR_1}  BOSS"));
+    }
+    else if (GetRoomType() == ROGUE_ROOM_REST_STOP)
+    {
+        StringExpandPlaceholders(dest, COMPOUND_STRING("REST STOP"));
     }
     else
     {
@@ -2046,6 +2083,8 @@ void Rogue_TakeDoor(void)
         return;
     }
 
+    if (GetRoomType() == ROGUE_ROOM_REST_STOP)
+        VarSet(VAR_ROGUE_RUN_FLAGS, VarGet(VAR_ROGUE_RUN_FLAGS) & ~RUN_FLAG_PRIZE_TAKEN);
     if (door == ROGUE_ROOM_BOSS)
     {
         u32 floor, room;
@@ -2053,17 +2092,21 @@ void Rogue_TakeDoor(void)
         VarSet(VAR_ROGUE_FLOOR, floor);
         VarSet(VAR_ROGUE_ROOM, room);
     }
-    else if (GetRoomType() == ROGUE_ROOM_BOSS)
+    else if (door == ROGUE_ROOM_REST_STOP)
+    {
+        // same floor and room number: the rest stop belongs to the floor just cleared
+    }
+    else if (GetRoomType() == ROGUE_ROOM_REST_STOP)
     {
         VarSet(VAR_ROGUE_FLOOR, GetFloor() + 1);
         VarSet(VAR_ROGUE_ROOM, 1);
     }
-    if (GetFloor() != floorBefore)
-        SetLastRitesUsed(0); // last rites come back each floor
     else
     {
         VarSet(VAR_ROGUE_ROOM, GetRoom() + 1);
     }
+    if (GetFloor() != floorBefore)
+        SetLastRitesUsed(0); // last rites come back each floor
 
     type = door;
     if (door == ROGUE_ROOM_MYSTERY)
@@ -2571,4 +2614,303 @@ const struct Trainer *Rogue_GetTrainer(u16 trainerId)
         sTrainerKeys[slot] = key;
     }
     return &sTrainers[slot];
+}
+
+// ---------------------------------------------------------------------------------------------
+// The rest stop between floors: a free prize (one of three) and a move tutor
+
+extern const u16 gTutorMoves[];
+
+#define TUTOR_PRICE_MONEY 1500
+#define TUTOR_PRICE_BP    10
+#define NUM_TUTOR_OFFERS  3
+
+enum
+{
+    PRIZE_TM,
+    PRIZE_EVO_ITEM,
+    PRIZE_BATTLE_ITEM,
+    PRIZE_MEGA_STONE,
+    PRIZE_SHELF_COUNT,
+};
+
+static const u16 sPrizeEvoItems[] =
+{
+    ITEM_FIRE_STONE, ITEM_WATER_STONE, ITEM_THUNDER_STONE, ITEM_LEAF_STONE, ITEM_MOON_STONE,
+    ITEM_SUN_STONE, ITEM_SHINY_STONE, ITEM_DUSK_STONE, ITEM_DAWN_STONE, ITEM_ICE_STONE, ITEM_LINKING_CORD,
+};
+
+static const u16 sPrizeBattleItems[] =
+{
+    ITEM_LIFE_ORB, ITEM_CHOICE_BAND, ITEM_CHOICE_SPECS, ITEM_CHOICE_SCARF, ITEM_LEFTOVERS, ITEM_FOCUS_SASH,
+    ITEM_ASSAULT_VEST, ITEM_EXPERT_BELT, ITEM_ROCKY_HELMET, ITEM_EVIOLITE, ITEM_LIGHT_CLAY,
+    ITEM_WEAKNESS_POLICY, ITEM_MUSCLE_BAND, ITEM_WISE_GLASSES, ITEM_SCOPE_LENS, ITEM_SHELL_BELL,
+    ITEM_AIR_BALLOON, ITEM_HEAVY_DUTY_BOOTS, ITEM_BLACK_SLUDGE, ITEM_SITRUS_BERRY,
+};
+
+static enum Item PickPrize(rng_value_t *rng, u32 shelf)
+{
+    u32 i, count, pick;
+    switch (shelf)
+    {
+    case PRIZE_TM:
+        return GetTMHMItemId(1 + LocalRandom(rng) % NUM_TECHNICAL_MACHINES);
+    case PRIZE_EVO_ITEM:
+        return sPrizeEvoItems[LocalRandom(rng) % ARRAY_COUNT(sPrizeEvoItems)];
+    case PRIZE_BATTLE_ITEM:
+        return sPrizeBattleItems[LocalRandom(rng) % ARRAY_COUNT(sPrizeBattleItems)];
+    default:
+        for (i = ITEM_NONE + 1, count = 0; i < ITEMS_COUNT; i++)
+        {
+            if (GetItemHoldEffect(i) == HOLD_EFFECT_MEGA_STONE)
+                count++;
+        }
+        if (count == 0)
+            return ITEM_LIFE_ORB;
+        pick = LocalRandom(rng) % count;
+        for (i = ITEM_NONE + 1; i < ITEMS_COUNT; i++)
+        {
+            if (GetItemHoldEffect(i) == HOLD_EFFECT_MEGA_STONE && pick-- == 0)
+                return i;
+        }
+        return ITEM_LIFE_ORB;
+    }
+}
+
+// Three offers from three different shelves, fixed per rest stop
+static void GetPrizeOffers(enum Item *out)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0x9812);
+    u32 skip = LocalRandom(&rng) % PRIZE_SHELF_COUNT, shelf, n = 0;
+    for (shelf = 0; shelf < PRIZE_SHELF_COUNT; shelf++)
+    {
+        if (shelf != skip)
+            out[n++] = PickPrize(&rng, shelf);
+    }
+}
+
+void Rogue_HasTakenPrize(void)
+{
+    gSpecialVar_Result = (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_PRIZE_TAKEN) != 0;
+}
+
+// A prize's name: a TM shows its move ("TM Swords Dance")
+static void GetPrizeName(enum Item item, u8 *dest)
+{
+    enum Move move = ItemIdToBattleMoveId(item);
+    if (GetItemPocket(item) == POCKET_TM_HM && move != MOVE_NONE)
+    {
+        StringCopy(dest, COMPOUND_STRING("TM "));
+        StringAppend(dest, GetMoveName(move));
+    }
+    else
+    {
+        CopyItemName(item, dest);
+    }
+}
+
+void Rogue_PushPrizeChoices(void)
+{
+    enum Item offers[PRIZE_SHELF_COUNT - 1];
+    u32 i;
+    GetPrizeOffers(offers);
+    for (i = 0; i < ARRAY_COUNT(offers); i++)
+    {
+        GetPrizeName(offers[i], gStringVar3);
+        PushChoice(gStringVar3, i);
+    }
+}
+
+// VAR_RESULT: the offer taken. STR_VAR_1 = its name; VAR_0x8005 = whether a Mega Ring came with it
+void Rogue_GivePrize(void)
+{
+    enum Item offers[PRIZE_SHELF_COUNT - 1];
+    enum Item item;
+
+    GetPrizeOffers(offers);
+    item = offers[gSpecialVar_Result < ARRAY_COUNT(offers) ? gSpecialVar_Result : 0];
+    AddBagItem(item, 1);
+    GetPrizeName(item, gStringVar1);
+    gSpecialVar_0x8005 = FALSE;
+    if (GetItemHoldEffect(item) == HOLD_EFFECT_MEGA_STONE && !CheckBagHasItem(ITEM_MEGA_RING, 1))
+    {
+        AddBagItem(ITEM_MEGA_RING, 1);
+        gSpecialVar_0x8005 = TRUE;
+    }
+    VarSet(VAR_ROGUE_RUN_FLAGS, VarGet(VAR_ROGUE_RUN_FLAGS) | RUN_FLAG_PRIZE_TAKEN);
+}
+
+// STR_VAR_1: where the rest stop's exit leads
+void Rogue_BufferNextFloor(void)
+{
+    if (GetFloor() >= GetNumFloors())
+    {
+        StringCopy(gStringVar1, IsHardMode() ? COMPOUND_STRING("the ELITE FOUR") : COMPOUND_STRING("the CHAMPION"));
+        return;
+    }
+    ConvertIntToDecimalStringN(gStringVar2, GetFloor() + 1, STR_CONV_MODE_LEFT_ALIGN, 2);
+    StringExpandPlaceholders(gStringVar1, COMPOUND_STRING("FLOOR {STR_VAR_2}"));
+}
+
+// Tutor moves bought with BP: (first-stage species << 16) | move, kept between runs in the Battle
+// Dome's saved tournament data, which Rogue never uses
+#define TUTOR_UNLOCKS_COUNT (sizeof(gSaveBlock2Ptr->frontier.domeMonIds) / sizeof(u32))
+#define sTutorUnlocks ((u32 *)gSaveBlock2Ptr->frontier.domeMonIds)
+
+static enum Species GetFirstStage(enum Species species)
+{
+    u32 depth;
+    for (depth = 0; depth < 3 && GetSpeciesPreEvolution(species) != SPECIES_NONE; depth++)
+        species = GetSpeciesPreEvolution(species);
+    return species;
+}
+
+// For the relearner's tutor list in a run: the moves bought with BP for this Pokémon's family
+u32 Rogue_GetUnlockedTutorMoves(u16 species, u16 *moves)
+{
+    u32 i, count = 0;
+    species = GetFirstStage(species);
+    for (i = 0; i < TUTOR_UNLOCKS_COUNT; i++)
+    {
+        u32 entry = sTutorUnlocks[i];
+        if (entry != 0 && (entry >> 16) == species)
+            moves[count++] = entry & 0xFFFF;
+    }
+    return count;
+}
+
+static void UnlockTutorMove(enum Species species, enum Move move)
+{
+    u32 i, entry = (GetFirstStage(species) << 16) | move;
+    for (i = 0; i < TUTOR_UNLOCKS_COUNT; i++)
+    {
+        if (sTutorUnlocks[i] == entry)
+            return;
+        if (sTutorUnlocks[i] == 0)
+        {
+            sTutorUnlocks[i] = entry;
+            return;
+        }
+    }
+    // full: the oldest goes
+    for (i = 0; i + 1 < TUTOR_UNLOCKS_COUNT; i++)
+        sTutorUnlocks[i] = sTutorUnlocks[i + 1];
+    sTutorUnlocks[TUTOR_UNLOCKS_COUNT - 1] = entry;
+}
+
+static bool32 CanTeamLearnTutorMove(enum Move move)
+{
+    u32 i;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        enum Species species = GetMonData(mon, MON_DATA_SPECIES);
+        if (species != SPECIES_NONE && !GetMonData(mon, MON_DATA_IS_EGG)
+         && CanLearnTeachableMove(species, move) && !MonKnowsMove(mon, move))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+// Up to three tutor moves someone on the team can learn, fixed per rest stop (and team)
+static u32 GetTutorOffers(u16 *out)
+{
+    rng_value_t rng = LocalRandomSeed(GetRoomSeed() ^ 0x7070);
+    u32 total, i, count = 0, tries;
+
+    for (total = 0; gTutorMoves[total] != MOVE_UNAVAILABLE; total++)
+        ;
+    for (tries = 0; tries < 400 && count < NUM_TUTOR_OFFERS && total > 0; tries++)
+    {
+        enum Move move = gTutorMoves[LocalRandom(&rng) % total];
+        for (i = 0; i < count && out[i] != move; i++)
+            ;
+        if (i == count && CanTeamLearnTutorMove(move))
+            out[count++] = move;
+    }
+    return count;
+}
+
+// VAR_RESULT: how many offers were pushed
+void Rogue_PushTutorMoves(void)
+{
+    u16 offers[NUM_TUTOR_OFFERS];
+    u32 i, count = GetTutorOffers(offers);
+    for (i = 0; i < count; i++)
+        PushChoice(GetMoveName(offers[i]), i);
+    gSpecialVar_Result = count;
+}
+
+// VAR_RESULT: the offer picked. VAR_0x8005 = the move; STR_VAR_1-3 = its name and prices
+void Rogue_SelectTutorMove(void)
+{
+    u16 offers[NUM_TUTOR_OFFERS];
+    u32 count = GetTutorOffers(offers);
+    gSpecialVar_0x8005 = (gSpecialVar_Result < count) ? offers[gSpecialVar_Result] : offers[0];
+    StringCopy(gStringVar1, GetMoveName(gSpecialVar_0x8005));
+    ConvertIntToDecimalStringN(gStringVar2, TUTOR_PRICE_MONEY, STR_CONV_MODE_LEFT_ALIGN, 5);
+    ConvertIntToDecimalStringN(gStringVar3, TUTOR_PRICE_BP, STR_CONV_MODE_LEFT_ALIGN, 3);
+}
+
+// The choices: pay money (this run), pay BP (all runs; only with meta-progression)
+void Rogue_PushTutorPayments(void)
+{
+    StringCopy(gStringVar3, COMPOUND_STRING("Pay ¥"));
+    ConvertIntToDecimalStringN(gStringVar3 + StringLength(gStringVar3), TUTOR_PRICE_MONEY, STR_CONV_MODE_LEFT_ALIGN, 5);
+    PushChoice(gStringVar3, 0);
+    if (IsMetaOn())
+    {
+        StringCopy(gStringVar3, COMPOUND_STRING("Pay "));
+        ConvertIntToDecimalStringN(gStringVar3 + StringLength(gStringVar3), TUTOR_PRICE_BP, STR_CONV_MODE_LEFT_ALIGN, 3);
+        StringAppend(gStringVar3, COMPOUND_STRING(" BP"));
+        PushChoice(gStringVar3, 1);
+    }
+}
+
+static EWRAM_DATA u8 sTutorKnewMask = 0; // which party slots knew the move before teaching
+
+// VAR_0x8005 = the move, VAR_0x8006 = 0 money / 1 BP; VAR_RESULT = whether the player can pay
+void Rogue_CanPayTutor(void)
+{
+    u32 i;
+    if (gSpecialVar_0x8006 == 1)
+        gSpecialVar_Result = gSaveBlock2Ptr->frontier.battlePoints >= TUTOR_PRICE_BP;
+    else
+        gSpecialVar_Result = IsEnoughMoney(&gSaveBlock1Ptr->money, TUTOR_PRICE_MONEY);
+    sTutorKnewMask = 0;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (MonKnowsMove(&gParties[B_TRAINER_PLAYER][i], gSpecialVar_0x8005))
+            sTutorKnewMask |= 1 << i;
+    }
+}
+
+// After the move was taught: pay, and with BP remember it for the family. Message in gStringVar4.
+void Rogue_PayTutor(void)
+{
+    u32 i;
+    struct Pokemon *learner = NULL;
+
+    StringCopy(gStringVar1, GetMoveName(gSpecialVar_0x8005));
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        if (!(sTutorKnewMask & (1 << i)) && MonKnowsMove(&gParties[B_TRAINER_PLAYER][i], gSpecialVar_0x8005))
+            learner = &gParties[B_TRAINER_PLAYER][i];
+    }
+    if (gSpecialVar_0x8006 == 1)
+    {
+        gSaveBlock2Ptr->frontier.battlePoints -= min(gSaveBlock2Ptr->frontier.battlePoints, TUTOR_PRICE_BP);
+        if (learner != NULL)
+        {
+            UnlockTutorMove(GetMonData(learner, MON_DATA_SPECIES), gSpecialVar_0x8005);
+            StringCopy(gStringVar2, GetSpeciesName(GetFirstStage(GetMonData(learner, MON_DATA_SPECIES))));
+            StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("From now on, every {STR_VAR_2} can\nrelearn {STR_VAR_1}!"));
+            return;
+        }
+    }
+    else
+    {
+        RemoveMoney(&gSaveBlock1Ptr->money, TUTOR_PRICE_MONEY);
+    }
+    StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Use {STR_VAR_1} well!"));
 }
