@@ -234,3 +234,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   (one Pokémon with all five graft kinds) 25, Collector (10 species won with) 30, Curator (50) 60.
   Announced by the map's OnFrame (`VAR_ROGUE_ACHIEVE_SHOW`); Prof. Birch lists them with their rewards.
   Small team comes free on a first win without team slot unlocks; that's why it pays less.
+- Immune walls (2026-10-03, Jacob's Meowth vs a Shuppet guard in the first room): a generated trainer
+  never fields a Pokémon, or takes a type graft, that's immune to every damaging move the team's
+  non-fainted Pokémon know (`Rogue_CanTeamHitTypes`; species rerolled up to 20 times). Bosses are left
+  alone: the player sees them coming. Abilities (Levitate, Wonder Guard) aren't checked.

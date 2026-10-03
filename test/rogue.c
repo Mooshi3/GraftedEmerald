@@ -943,3 +943,35 @@ TEST("Rogue: the Fog curse turns door signs into question marks")
     EXPECT_GT(shown, 0);
     VarSet(VAR_ROGUE_RUN_FLAGS, 0);
 }
+
+TEST("Rogue: generated trainers never field a Pokemon the team can't damage at all")
+{
+    u32 seed, i, checked = 0;
+    struct Pokemon *meowth = &gParties[B_TRAINER_PLAYER][0];
+    u16 scratch = MOVE_SCRATCH, none = MOVE_NONE;
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    ZeroPlayerPartyMons();
+    CreateMon(meowth, SPECIES_MEOWTH, 5, 0, OTID_STRUCT_PLAYER_ID);
+    SetMonData(meowth, MON_DATA_MOVE1, &scratch); // Normal moves only
+    for (i = 1; i < MAX_MON_MOVES; i++)
+        SetMonData(meowth, MON_DATA_MOVE1 + i, &none);
+    CalculateMonStats(meowth); // full HP
+    CalculatePlayerPartyCount();
+    SetRoom(1, 1, 2, ROGUE_ROOM_TRAINER);
+    EXPECT(!Rogue_CanTeamHitTypes(TYPE_GHOST, TYPE_GHOST));
+    EXPECT(!Rogue_CanTeamHitTypes(TYPE_GHOST, TYPE_DARK));
+    EXPECT(Rogue_CanTeamHitTypes(TYPE_FIRE, TYPE_FLYING));
+    for (seed = 1; seed < 200; seed++)
+    {
+        const struct Trainer *trainer;
+        SetRoom(seed * 7, 1 + seed % 4, 2, ROGUE_ROOM_TRAINER | ((seed % 5) << 9));
+        trainer = GetTrainerStructFromId(TRAINER_ROGUE_TRAINER);
+        for (i = 0; i < trainer->partySize; i++)
+        {
+            const struct SpeciesInfo *info = &gSpeciesInfo[trainer->party[i].species];
+            EXPECT(info->types[0] != TYPE_GHOST && info->types[1] != TYPE_GHOST);
+            checked++;
+        }
+    }
+    EXPECT_GT(checked, 200);
+}

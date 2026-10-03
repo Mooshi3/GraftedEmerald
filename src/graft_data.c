@@ -940,6 +940,9 @@ static void ApplyEnemyGrafts(struct Pokemon *mon, u8 graftCount, bool32 forceAbi
 
             if (typeSlotUsed[slot])
                 continue;
+            // Rogue: never a type that makes it immune to everything the player's team can hit with
+            if (!Rogue_CanTeamHitTypes(slot == 0 ? newType : type1, slot == 1 ? newType : type2))
+                continue;
             SetGraftedTypeOnMon(mon, slot, newType);
             typeSlotUsed[slot] = TRUE;
             applied++;

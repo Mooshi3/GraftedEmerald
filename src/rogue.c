@@ -1610,6 +1610,37 @@ static u32 GetCurse(void)
 
 static void CheckGraftAchievement(void);
 
+// Can the player's team damage a Pokémon of these types at all? A generated trainer (who may block the
+// way) never fields one that's immune to every damaging move the team knows, like a Ghost against a
+// starter that only has Normal moves (Jacob, 2026-10-03). Outside a run, or with no damaging moves, yes.
+bool32 Rogue_CanTeamHitTypes(u32 type1, u32 type2)
+{
+    u32 i, j;
+    bool32 anyDamaging = FALSE;
+    if (!Rogue_IsRunActive())
+        return TRUE;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        if (GetMonData(mon, MON_DATA_SPECIES) == SPECIES_NONE || GetMonData(mon, MON_DATA_IS_EGG)
+         || GetMonData(mon, MON_DATA_HP) == 0)
+            continue;
+        for (j = 0; j < MAX_MON_MOVES; j++)
+        {
+            enum Move move = GetMonData(mon, MON_DATA_MOVE1 + j);
+            enum Type moveType;
+            if (move == MOVE_NONE || GetMoveCategory(move) == DAMAGE_CATEGORY_STATUS)
+                continue;
+            anyDamaging = TRUE;
+            moveType = GetMoveType(move);
+            if (GetTypeModifier(moveType, type1) != UQ_4_12(0.0)
+             && (type2 == type1 || GetTypeModifier(moveType, type2) != UQ_4_12(0.0)))
+                return TRUE;
+        }
+    }
+    return !anyDamaging;
+}
+
 void Rogue_OnTransition(void)
 {
     u32 i;
@@ -3113,6 +3144,12 @@ static void BuildTrainer(u32 slot, u32 key)
         struct TrainerMon *mon = &sTrainerMons[slot][i];
         memset(mon, 0, sizeof(*mon));
         mon->species = PickFloorSpecies(&rng, type);
+        if (!boss)
+        {
+            u32 tries;
+            for (tries = 0; tries < 20 && !Rogue_CanTeamHitTypes(gSpeciesInfo[mon->species].types[0], gSpeciesInfo[mon->species].types[1]); tries++)
+                mon->species = PickFloorSpecies(&rng, type);
+        }
         mon->lvl = level + (boss && i == size - 1);
         mon->iv = TRAINER_PARTY_IVS(iv, iv, iv, iv, iv, iv);
         mon->gender = TRAINER_MON_RANDOM_GENDER;

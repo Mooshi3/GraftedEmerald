@@ -66,7 +66,8 @@ bool32 Rogue_GetVaultPieceName(u8 *dst);
 void Rogue_VaultPiece(const struct GraftPiece *piece);
 void Rogue_TakeVaultPiece(void);
 u32 Rogue_GetFloorWeather(u32 floor); // a WEATHER_*, or 0xFF for none
-u32 Rogue_GetFloorCurse(u32 floor);   // a ROGUE_CURSE_*
+u32 Rogue_GetFloorCurse(u32 floor);
+bool32 Rogue_CanTeamHitTypes(u32 type1, u32 type2);   // a ROGUE_CURSE_*
 void Rogue_NurseHeal(void);
 void Rogue_NextAchievement(void);
 void Rogue_PushAchievements(void);
