@@ -42,8 +42,8 @@ TEST("Rogue rooms always have a reachable door")
     {
         for (room = 1; room <= ROGUE_ROOMS_PER_FLOOR; room += 2)
         {
-            // every theme (bits 9-11: forest, beach, cave, volcano)
-            SetRoom(seed * 7919, 1 + seed % ROGUE_FLOORS_NORMAL, room, (ROGUE_ROOM_WILD + seed % 6) | ((room / 2 % 4) << 9));
+            // every theme (bits 9-11: forest, beach, cave, volcano, power plant)
+            SetRoom(seed * 7919, 1 + seed % ROGUE_FLOORS_NORMAL, room, (ROGUE_ROOM_WILD + seed % 6) | (((room / 2 + seed) % 5) << 9));
             EXPECT_GT(Rogue_GetRoomDoors(doors), 0);
         }
     }
@@ -418,6 +418,9 @@ TEST("Rogue: wild Pokemon live where the encounter sheet puts their family")
     EXPECT(Rogue_LivesIn(SPECIES_MACHOP, 3));      // Fiery Path
     EXPECT(Rogue_LivesIn(SPECIES_TENTACOOL, 1));   // surfing
     EXPECT(!Rogue_LivesIn(SPECIES_TENTACOOL, 0));
+    EXPECT(Rogue_LivesIn(SPECIES_MAGNEMITE, 4));   // New Mauville: the power plant
+    EXPECT(Rogue_LivesIn(SPECIES_PAWMI, 4));       // the sheet's Pawmo, by hand
+    EXPECT(!Rogue_LivesIn(SPECIES_MAGNEMITE, 2));
 }
 
 TEST("Rogue: every theme has wild Pokemon on every floor")
@@ -426,7 +429,7 @@ TEST("Rogue: every theme has wild Pokemon on every floor")
     u8 doors[3];
     for (floor = 1; floor <= ROGUE_FLOORS_NORMAL; floor++)
     {
-        for (biome = 0; biome < 4; biome++)
+        for (biome = 0; biome < 5; biome++)
         {
             for (seed = 1; seed < 6; seed++)
             {

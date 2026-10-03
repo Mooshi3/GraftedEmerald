@@ -634,7 +634,8 @@
     "Rogue_Arena_Drake",
     "Rogue_Mart",
     "Rogue_Center",
-    "Rogue_Stop"
+    "Rogue_Stop",
+    "Rogue_PowerPlant"
   ],
   "gMapGroup_IndoorRoute104Prototype": [
     "Route104_Prototype",

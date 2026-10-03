@@ -124,7 +124,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
 
 ### Room themes (2026-10-02)
 
-- Four themes: **forest**, **beach** (sand and a strip of sea along one side, few trees), **cave** (Granite
+- Five themes (the power plant added 2026-10-03: New Mauville's tiles and families, crates for rocks, corridors for doors, floor 5's home on Hard): **forest**, **beach** (sand and a strip of sea along one side, few trees), **cave** (Granite
   Cave walls, rocks, cave mouths as doors) and **volcano** (Fiery Path walls, corridors as doors). Each floor
   has a home theme (floor 1 forest, 2 beach, 3 cave, 4 volcano, then around again) that a door's room takes
   55% of the time, 15% for each other theme.

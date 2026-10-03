@@ -92,6 +92,7 @@ enum
     BIOME_BEACH,
     BIOME_CAVE,
     BIOME_VOLCANO,
+    BIOME_POWER_PLANT,
     BIOME_COUNT,
 };
 #define ROOM_BIOME_SHIFT 9
@@ -100,7 +101,7 @@ enum
 enum
 {
     ROOM_KIND_OUTDOOR, // MAP_ROGUE_ROOM: forest or beach
-    ROOM_KIND_WALLED,  // MAP_ROGUE_CAVE / MAP_ROGUE_VOLCANO
+    ROOM_KIND_WALLED,  // MAP_ROGUE_CAVE / MAP_ROGUE_VOLCANO / MAP_ROGUE_POWER_PLANT
     ROOM_KIND_ARENA,   // a boss's Elite Four room
     ROOM_KIND_STOP,    // MAP_ROGUE_STOP: the rest stop between floors
 };
@@ -659,7 +660,7 @@ static enum Species PickStarter(rng_value_t *rng)
 // their own maps, a rectangle of rock walls) or a boss arena (an Elite Four room). All the room maps
 // are 22x18 with the same inside (tiles 4..17 x 4..13), entrance (10,13) and door columns 6, 10, 14.
 
-static const u8 sFloorHomeBiome[] = {BIOME_FOREST, BIOME_BEACH, BIOME_CAVE, BIOME_VOLCANO};
+static const u8 sFloorHomeBiome[] = {BIOME_FOREST, BIOME_BEACH, BIOME_CAVE, BIOME_VOLCANO, BIOME_POWER_PLANT};
 
 static u32 GetRoomBiome(void)
 {
@@ -676,13 +677,13 @@ static bool32 IsBuildingRoom(u32 type)
 // Each floor has a home theme most rooms take; buildings stand outdoors
 static u32 PickBiome(rng_value_t *rng, u32 type, u32 floor)
 {
-    u8 weights[BIOME_COUNT] = {15, 15, 15, 15};
+    u8 weights[BIOME_COUNT] = {12, 12, 12, 12, 12};
     u32 home = sFloorHomeBiome[(max(floor, 1) - 1) % ARRAY_COUNT(sFloorHomeBiome)];
 
     weights[home] = 55;
     if (IsBuildingRoom(type))
     {
-        weights[BIOME_CAVE] = weights[BIOME_VOLCANO] = 0;
+        weights[BIOME_CAVE] = weights[BIOME_VOLCANO] = weights[BIOME_POWER_PLANT] = 0;
         if (home == BIOME_BEACH)
             weights[BIOME_FOREST] = 15;
         else
@@ -701,6 +702,7 @@ static u32 GetRoomKind(void)
     {
     case BIOME_CAVE:
     case BIOME_VOLCANO:
+    case BIOME_POWER_PLANT:
         return ROOM_KIND_WALLED;
     }
     return ROOM_KIND_OUTDOOR;
@@ -749,7 +751,7 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP1, BIOME_CAVE},
     {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP2, BIOME_CAVE},
     {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP3, BIOME_CAVE},
-    {MAP_NEW_MAUVILLE_ENTRANCE, BIOME_CAVE},
+    {MAP_NEW_MAUVILLE_ENTRANCE, BIOME_POWER_PLANT},
     {MAP_SAFARI_ZONE_SOUTHWEST, BIOME_FOREST},
     {MAP_SAFARI_ZONE_NORTH, BIOME_FOREST},
     {MAP_SAFARI_ZONE_NORTHWEST, BIOME_FOREST},
@@ -813,7 +815,7 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_MT_PYRE_EXTERIOR, BIOME_CAVE},
     {MAP_MT_PYRE_1F, BIOME_CAVE},
     {MAP_MAGMA_HIDEOUT_1F, BIOME_VOLCANO},
-    {MAP_NEW_MAUVILLE_INSIDE, BIOME_CAVE},
+    {MAP_NEW_MAUVILLE_INSIDE, BIOME_POWER_PLANT},
     {MAP_ROUTE120, BIOME_FOREST},
     {MAP_ROUTE121, BIOME_FOREST},
     {MAP_ROUTE123, BIOME_FOREST},
@@ -835,6 +837,8 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
 static const struct { u16 species; u8 biome; } sHabitatExtras[] =
 {
     {SPECIES_CLOBBOPUS, BIOME_BEACH},
+    {SPECIES_PAWMI, BIOME_POWER_PLANT},   // the sheet places Pawmo and Charjabug: their first stages too
+    {SPECIES_GRUBBIN, BIOME_POWER_PLANT},
 };
 
 // Which families live in each theme: every species on the theme's encounter tables (Jacob's sheet)
@@ -958,14 +962,21 @@ static u16 GetRoomMap(void)
     case ROOM_KIND_STOP:
         return MAP_ROGUE_STOP;
     case ROOM_KIND_WALLED:
-        return GetRoomBiome() == BIOME_CAVE ? MAP_ROGUE_CAVE : MAP_ROGUE_VOLCANO;
+        switch (GetRoomBiome())
+        {
+        case BIOME_CAVE:
+            return MAP_ROGUE_CAVE;
+        case BIOME_POWER_PLANT:
+            return MAP_ROGUE_POWER_PLANT;
+        }
+        return MAP_ROGUE_VOLCANO;
     }
     return MAP_ROGUE_ROOM;
 }
 
 static bool32 IsRogueMap(u32 mapGroup, u32 mapNum)
 {
-    static const u16 sMaps[] = {MAP_ROGUE_ROOM, MAP_ROGUE_CAVE, MAP_ROGUE_VOLCANO, MAP_ROGUE_ARENA_SIDNEY,
+    static const u16 sMaps[] = {MAP_ROGUE_ROOM, MAP_ROGUE_CAVE, MAP_ROGUE_VOLCANO, MAP_ROGUE_POWER_PLANT, MAP_ROGUE_ARENA_SIDNEY,
                                 MAP_ROGUE_ARENA_PHOEBE, MAP_ROGUE_ARENA_GLACIA, MAP_ROGUE_ARENA_DRAKE,
                                 MAP_ROGUE_STOP};
     u32 i;
@@ -1523,10 +1534,11 @@ static void SetObjectTemplate(u32 slot, u16 graphicsId, u32 x, u32 y, u8 movemen
 void Rogue_OnTransition(void)
 {
     u32 i;
-    bool32 cave;
+    bool32 cave, rocks;
 
     BuildRoomPlan();
     cave = (sPlan.kind == ROOM_KIND_WALLED && sPlan.biome == BIOME_CAVE);
+    rocks = (sPlan.kind == ROOM_KIND_WALLED && sPlan.biome != BIOME_VOLCANO); // a cave's or power plant's doors
     ClearTrainerFlag(TRAINER_ROGUE_TRAINER);
     ClearTrainerFlag(TRAINER_ROGUE_BOSS);
     // Leaving the room's Mart or Pokémon Center comes back out in front of its door
@@ -1551,7 +1563,7 @@ void Rogue_OnTransition(void)
               && !(cave && (i - FIRST_THICKET_SLOT) % 2))
         {
             u32 door = (i - FIRST_THICKET_SLOT) / 2;
-            SetObjectTemplate(i, cave ? OBJ_EVENT_GFX_BREAKABLE_ROCK : OBJ_EVENT_GFX_CUTTABLE_TREE,
+            SetObjectTemplate(i, rocks ? OBJ_EVENT_GFX_BREAKABLE_ROCK : OBJ_EVENT_GFX_CUTTABLE_TREE,
                               GetDoorX(door) + (i - FIRST_THICKET_SLOT) % 2, 3,
                               MOVEMENT_TYPE_NONE, TRAINER_TYPE_NONE, 0, Rogue_Room_EventScript_Thicket);
         }
@@ -1588,6 +1600,7 @@ static u16 GetTreeMetatile(s32 x, s32 y)
 // tileset (no behavior: 0x1A0-0x1A9 looked close but are secret base entrances and warp there)
 #define DOOR_TILE_CAVE    0x07D
 #define DOOR_TILE_VOLCANO 0x06D
+#define DOOR_TILE_POWER   0x0AF // metal stairs
 
 // The door openings' ground shows the next room's theme
 static u16 GetDoorGroundMetatile(s32 x, s32 y)
@@ -1608,6 +1621,8 @@ static u16 GetDoorGroundMetatile(s32 x, s32 y)
             return TILE_GROUND(DOOR_TILE_CAVE);
         case BIOME_VOLCANO:
             return TILE_GROUND(DOOR_TILE_VOLCANO);
+        case BIOME_POWER_PLANT:
+            return TILE_GROUND(DOOR_TILE_POWER);
         }
         break;
     }
@@ -1720,32 +1735,95 @@ static const struct WallTiles sVolcanoTiles =
     .bottom = 0x30C, .bottomLeft = 0x27F, .bottomRight = 0x27E,
 };
 
+// The ground in front of a walled room's door shows the next room's theme (all from the General
+// tileset, which every room map shares)
+static bool32 GetWalledDoorPreview(s32 x, s32 y, u16 *tile)
+{
+    u32 i;
+    if (y != INNER_Y_MIN)
+        return FALSE;
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        u32 biome = sPlan.doorBiomes[i];
+        if (sPlan.doors[i] == NO_DOOR || x < GetDoorX(i) || x > GetDoorX(i) + (sPlan.biome != BIOME_CAVE))
+            continue;
+        if (biome == BIOME_FOREST && sPlan.doors[i] < ROGUE_ROOM_BOSS && !IsBuildingRoom(sPlan.doors[i]))
+            *tile = TILE_GROUND(METATILE_General_Grass);
+        else if (biome == BIOME_BEACH)
+            *tile = TILE_GROUND(0x124);
+        else if (biome == sPlan.biome)
+            return FALSE;
+        else if (biome == BIOME_CAVE)
+            *tile = TILE_GROUND(DOOR_TILE_CAVE);
+        else if (biome == BIOME_VOLCANO)
+            *tile = TILE_GROUND(DOOR_TILE_VOLCANO);
+        else if (biome == BIOME_POWER_PLANT)
+            *tile = TILE_GROUND(DOOR_TILE_POWER);
+        else
+            return FALSE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+// The power plant (New Mauville's tiles, gTileset_BikeShop): a three-tile top wall, corridors as doors
+static u16 GetPowerPlantMetatile(s32 x, s32 y)
+{
+    u32 i;
+    u16 preview;
+
+    if (x >= INNER_X_MIN && x <= INNER_X_MAX && y >= INNER_Y_MIN && y <= INNER_Y_MAX)
+    {
+        if (sPlan.rock[y][x])
+            return TILE_TREE(((x + y) % 2) ? 0x2C1 : 0x2C0); // crates
+        if (GetWalledDoorPreview(x, y, &preview))
+            return preview;
+        return TILE_GROUND(0x210);
+    }
+    for (i = 0; i < NUM_DOORS; i++)
+    {
+        s32 gx = GetDoorX(i);
+        if (sPlan.doors[i] == NO_DOOR || y >= INNER_Y_MIN)
+            continue;
+        if (x == gx || x == gx + 1)
+            return TILE_GROUND(0x210);
+        if (x == gx - 1)
+            return TILE_TREE(y == 1 ? 0x26A : 0x272);
+        if (x == gx + 2)
+            return TILE_TREE(y == 1 ? 0x268 : 0x270);
+    }
+    if (y >= 1 && y <= 3 && x >= INNER_X_MIN && x <= INNER_X_MAX)
+        return TILE_TREE(y == 1 ? 0x21F : (y == 2 ? 0x227 : 0x22F));
+    if (y == 1 && x == INNER_X_MIN - 1)
+        return TILE_TREE(0x268);
+    if (y == 1 && x == INNER_X_MAX + 1)
+        return TILE_TREE(0x26A);
+    if (y >= 2 && y <= INNER_Y_MAX && x == INNER_X_MIN - 1)
+        return TILE_TREE(0x270);
+    if (y >= 2 && y <= INNER_Y_MAX && x == INNER_X_MAX + 1)
+        return TILE_TREE(0x272);
+    if (y == INNER_Y_MAX + 1 && x >= INNER_X_MIN - 1 && x <= INNER_X_MAX + 1)
+        return TILE_TREE(x == INNER_X_MIN - 1 ? 0x278 : (x == INNER_X_MAX + 1 ? 0x27A : 0x237));
+    if (y == INNER_Y_MAX + 2 && x >= INNER_X_MIN - 1 && x <= INNER_X_MAX + 1)
+        return TILE_TREE(x == INNER_X_MIN - 1 ? 0x280 : (x == INNER_X_MAX + 1 ? 0x282 : 0x227));
+    return TILE_TREE(0x208);
+}
+
 static u16 GetWalledMetatile(s32 x, s32 y)
 {
     const struct WallTiles *t = (sPlan.biome == BIOME_CAVE) ? &sCaveTiles : &sVolcanoTiles;
     u32 i;
+    u16 preview;
+
+    if (sPlan.biome == BIOME_POWER_PLANT)
+        return GetPowerPlantMetatile(x, y);
 
     if (x >= INNER_X_MIN && x <= INNER_X_MAX && y >= INNER_Y_MIN && y <= INNER_Y_MAX)
     {
         if (sPlan.rock[y][x])
             return TILE_TREE(((x + y) % 2) ? t->rock : t->rockAlt);
-        // The ground in front of a door shows the next room's theme
-        if (y == INNER_Y_MIN)
-        {
-            for (i = 0; i < NUM_DOORS; i++)
-            {
-                if (sPlan.doors[i] == NO_DOOR || x < GetDoorX(i) || x > GetDoorX(i) + (sPlan.biome != BIOME_CAVE))
-                    continue;
-                if (sPlan.doorBiomes[i] == BIOME_FOREST && sPlan.doors[i] < ROGUE_ROOM_BOSS && !IsBuildingRoom(sPlan.doors[i]))
-                    return TILE_GROUND(METATILE_General_Grass);
-                if (sPlan.doorBiomes[i] == BIOME_BEACH)
-                    return TILE_GROUND(0x124);
-                if (sPlan.doorBiomes[i] == BIOME_CAVE && sPlan.biome != BIOME_CAVE)
-                    return TILE_GROUND(DOOR_TILE_CAVE);
-                if (sPlan.doorBiomes[i] == BIOME_VOLCANO && sPlan.biome != BIOME_VOLCANO)
-                    return TILE_GROUND(DOOR_TILE_VOLCANO);
-            }
-        }
+        if (GetWalledDoorPreview(x, y, &preview))
+            return preview;
         return TILE_GROUND((Mix32(x * 31 + y * 17 + GetRoomSeed()) % 10) ? t->floor : t->floorAlt);
     }
 

@@ -9358,6 +9358,17 @@
       "layout_version": "emerald"
     },
     {
+      "id": "LAYOUT_ROGUE_POWER_PLANT",
+      "name": "Rogue_PowerPlant_Layout",
+      "width": 22,
+      "height": 18,
+      "primary_tileset": "gTileset_General",
+      "secondary_tileset": "gTileset_BikeShop",
+      "border_filepath": "data/layouts/Rogue_PowerPlant/border.bin",
+      "blockdata_filepath": "data/layouts/Rogue_PowerPlant/map.bin",
+      "layout_version": "emerald"
+    },
+    {
       "id": "LAYOUT_ROGUE_VOLCANO",
       "name": "Rogue_Volcano_Layout",
       "width": 22,

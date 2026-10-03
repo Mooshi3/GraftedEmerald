@@ -271,6 +271,10 @@ Debug_EventScript_RogueRestStop::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_REST_STOP
 	goto Debug_EventScript_RogueWarp
 
+Debug_EventScript_RoguePowerPlant::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x800
+	goto Debug_EventScript_RogueWarp
+
 Debug_EventScript_RogueWarp::
 	special Rogue_WarpToRoom
 	release
