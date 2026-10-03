@@ -285,8 +285,12 @@ enum
     UNLOCK_GOOD_GENES,
     UNLOCK_PEDIGREE,
     UNLOCK_FAVORITE,
-    UNLOCK_SHOP_COUNT,
     UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
+    // VAR_ROGUE_UNLOCKS_2
+    UNLOCK_DISCOUNT = 16,
+    UNLOCK_HARVEST_BONUS,
+    UNLOCK_CATCH_BONUS,
+    UNLOCK_COUNT,
 };
 
 static const struct
@@ -295,7 +299,7 @@ static const struct
     const u8 *description;
     u16 cost;
     s8 requires;
-} sUnlocks[UNLOCK_SHOP_COUNT] =
+} sUnlocks[UNLOCK_COUNT] =
 {
     [UNLOCK_STARTER_CHOICE] = {COMPOUND_STRING("Starter choice"), COMPOUND_STRING("Choose your starter from three."), 30, -1},
     [UNLOCK_TEAM_4] = {COMPOUND_STRING("4th team slot"), COMPOUND_STRING("Your team can hold 4 Pokémon."), 40, -1},
@@ -311,6 +315,9 @@ static const struct
     [UNLOCK_PEDIGREE] = {COMPOUND_STRING("Pedigree"), COMPOUND_STRING("Every Pokémon has an egg move to\nrelearn, some have two."), 80, UNLOCK_GOOD_GENES},
     [UNLOCK_SWITCH_STYLE] = {COMPOUND_STRING("Switch style"), COMPOUND_STRING("You may switch Pokémon when a\nfoe faints (Shift battle style)."), 20, -1},
     [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
+    [UNLOCK_DISCOUNT] = {COMPOUND_STRING("Discount"), COMPOUND_STRING("Shops in a run sell everything\nfor a quarter less."), 40, -1},
+    [UNLOCK_HARVEST_BONUS] = {COMPOUND_STRING("Harvest bonus"), COMPOUND_STRING("Pieces broken down from a POKéMON\nsometimes come with a spare copy."), 60, -1},
+    [UNLOCK_CATCH_BONUS] = {COMPOUND_STRING("Catch bonus"), COMPOUND_STRING("A POKéMON you catch sometimes\nleaves a graft piece behind too."), 50, -1},
     [UNLOCK_FAVORITE] = {COMPOUND_STRING("Favorite"), COMPOUND_STRING("A team member you name in a\nCENTER becomes a starter choice."), 150, -1},
 };
 
@@ -337,9 +344,22 @@ static bool32 IsMetaOn(void)
 }
 
 // With Unlocks Off, everything is open
+// Unlocks 0-15 are VAR_ROGUE_UNLOCKS, 16-31 VAR_ROGUE_UNLOCKS_2
 static bool32 HasUnlock(u32 id)
 {
-    return !IsMetaOn() || ((VarGet(VAR_ROGUE_UNLOCKS) >> id) & 1);
+    if (!IsMetaOn())
+        return TRUE;
+    if (id >= 16)
+        return (VarGet(VAR_ROGUE_UNLOCKS_2) >> (id - 16)) & 1;
+    return (VarGet(VAR_ROGUE_UNLOCKS) >> id) & 1;
+}
+
+static void SetUnlock(u32 id)
+{
+    if (id >= 16)
+        VarSet(VAR_ROGUE_UNLOCKS_2, VarGet(VAR_ROGUE_UNLOCKS_2) | (1 << (id - 16)));
+    else
+        VarSet(VAR_ROGUE_UNLOCKS, VarGet(VAR_ROGUE_UNLOCKS) | (1 << id));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2209,7 +2229,7 @@ void Rogue_OnBossDefeated(void)
     if (IsFinale(floor) && GetRoom() >= GetFinaleLength() && !IsHardMode() && IsMetaOn()
      && !HasUnlock(UNLOCK_HARD_MODE))
     {
-        VarSet(VAR_ROGUE_UNLOCKS, VarGet(VAR_ROGUE_UNLOCKS) | (1 << UNLOCK_HARD_MODE));
+        SetUnlock(UNLOCK_HARD_MODE);
         StringAppend(gStringVar4, COMPOUND_STRING("\pHARD mode is open: eight floors\nand the ELITE FOUR!"));
     }
     if (IsMetaOn())
@@ -2358,11 +2378,14 @@ static bool32 IsUnansweredFainted(struct Pokemon *mon)
 }
 
 // After a battle the player didn't lose (a whiteout ends the run instead)
+static void TryCatchBonus(void);
+
 void Rogue_OnBattleEnd(void)
 {
     u32 i;
     if (!Rogue_IsRunActive() || gBattleOutcome == B_OUTCOME_LOST || gBattleOutcome == B_OUTCOME_DREW)
         return;
+    TryCatchBonus();
     for (i = 0; i < PARTY_SIZE; i++)
     {
         struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
@@ -2494,9 +2517,9 @@ void Rogue_PushUnlockChoices(void)
 {
     u32 i, count = 0;
     u8 name[48];
-    for (i = 0; i < UNLOCK_SHOP_COUNT; i++)
+    for (i = 0; i < UNLOCK_COUNT; i++)
     {
-        if (HasUnlock(i) || (sUnlocks[i].requires >= 0 && !HasUnlock(sUnlocks[i].requires)))
+        if (sUnlocks[i].name == NULL || HasUnlock(i) || (sUnlocks[i].requires >= 0 && !HasUnlock(sUnlocks[i].requires)))
             continue;
         ConvertIntToDecimalStringN(gStringVar2, sUnlocks[i].cost, STR_CONV_MODE_LEFT_ALIGN, 3);
         StringCopy(name, sUnlocks[i].name);
@@ -2511,7 +2534,7 @@ void Rogue_PushUnlockChoices(void)
 
 void Rogue_DescribeUnlock(void)
 {
-    u32 id = gSpecialVar_0x8004 % UNLOCK_SHOP_COUNT;
+    u32 id = gSpecialVar_0x8004 % UNLOCK_COUNT;
     ConvertIntToDecimalStringN(gStringVar2, sUnlocks[id].cost, STR_CONV_MODE_LEFT_ALIGN, 3);
     StringCopy(gStringVar4, sUnlocks[id].description);
     StringExpandPlaceholders(gStringVar3, COMPOUND_STRING("\pUnlock it for {STR_VAR_2} BP?"));
@@ -2520,7 +2543,7 @@ void Rogue_DescribeUnlock(void)
 
 void Rogue_BuyUnlock(void)
 {
-    u32 id = gSpecialVar_0x8004 % UNLOCK_SHOP_COUNT;
+    u32 id = gSpecialVar_0x8004 % UNLOCK_COUNT;
     if (gSaveBlock2Ptr->frontier.battlePoints < sUnlocks[id].cost)
     {
         gSpecialVar_Result = FALSE;
@@ -2528,7 +2551,7 @@ void Rogue_BuyUnlock(void)
         return;
     }
     gSaveBlock2Ptr->frontier.battlePoints -= sUnlocks[id].cost;
-    VarSet(VAR_ROGUE_UNLOCKS, VarGet(VAR_ROGUE_UNLOCKS) | (1 << id));
+    SetUnlock(id);
     gSpecialVar_Result = TRUE;
     StringCopy(gStringVar1, sUnlocks[id].name);
     StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("{STR_VAR_1} unlocked!\nIt's yours from the next run on."));
@@ -2913,4 +2936,44 @@ void Rogue_PayTutor(void)
         RemoveMoney(&gSaveBlock1Ptr->money, TUTOR_PRICE_MONEY);
     }
     StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Use {STR_VAR_1} well!"));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Second-page unlocks' hooks
+
+// Shops in a run: a quarter off with Discount
+u32 Rogue_GetShopPrice(u32 price)
+{
+    if (Rogue_IsRunActive() && HasUnlock(UNLOCK_DISCOUNT))
+        return price - price / 4;
+    return price;
+}
+
+// Each piece broken down from a Pokémon: a 25% chance of a spare copy with Harvest bonus
+bool32 Rogue_RollHarvestBonus(void)
+{
+    return Rogue_IsRunActive() && HasUnlock(UNLOCK_HARVEST_BONUS) && Random() % 100 < 25;
+}
+
+static EWRAM_DATA struct GraftPiece sCatchBonusPiece = {0};
+
+// A real catch (not a grafting ball): a 25% chance of one random piece with Catch bonus. The room
+// says so after the battle (VAR_TEMP_5, Rogue_Room_OnFrame).
+static void TryCatchBonus(void)
+{
+    u32 lost;
+    if (gBattleOutcome != B_OUTCOME_CAUGHT || !HasUnlock(UNLOCK_CATCH_BONUS) || Random() % 100 >= 25)
+        return;
+    if (gLastThrownBall == ITEM_PATCH_BALL || gLastThrownBall == ITEM_GRAFT_BALL || gLastThrownBall == ITEM_SPLICE_BALL)
+        return;
+    GiveGraftBagIfMissing();
+    if (HarvestGraftPieces(&gParties[B_TRAINER_OPPONENT_A][0], TRUE, 1, &sCatchBonusPiece, &lost) != 0)
+        VarSet(VAR_TEMP_5, 1);
+}
+
+// STR_VAR_1: the catch bonus's piece
+void Rogue_BufferCatchBonus(void)
+{
+    VarSet(VAR_TEMP_5, 0);
+    GetGraftPieceName(gStringVar1, &sCatchBonusPiece);
 }

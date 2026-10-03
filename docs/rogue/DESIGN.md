@@ -159,3 +159,20 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   first move. Forgotten, it stays relearnable.
 - No tutor list in the relearner (both games): it taught every tutor move for free. The TM list offers the
   TMs in the Bag. The relearner's title names the list shown (SELECT switches lists).
+
+### Rest stop and the second unlock page (2026-10-03)
+
+- After each floor's boss the arena's door leads to a rest stop (a Pokémon Center room, `Rogue_Stop`) before
+  the next floor (or, after the last floor, before the finale): a nurse, a mart with basics (balls, potions,
+  status cures; the good stock stays in shop rooms), a free prize and a move tutor. Its exit mat leads on.
+- Prize: one of three offers from three different shelves (a TM, an evolution item, a held battle item, a
+  Mega Stone), once per rest stop. The first Mega Stone comes with a Mega Ring.
+- Tutor: up to three random tutor moves someone on the team can learn. ¥1500 teaches it once; 10 BP (with
+  meta-progression) also lets that Pokémon's whole family relearn it in later runs (the relearner's TUTOR
+  MOVES list in a run). Up to 24 such moves are kept, in the Battle Dome's unused saved tournament data
+  (`frontier.domeMonIds`); the oldest goes when full.
+- Second unlock page (`VAR_ROGUE_UNLOCKS_2`, ids 16+): Discount (40 BP: shops a quarter off), Harvest bonus
+  (60 BP: each piece broken down from a Pokémon has a 25% chance of a spare copy; balls, the Splicer, last
+  rites), Catch bonus (50 BP: a real catch has a 25% chance of leaving one random piece).
+- Normal mode getting easy with everything unlocked is fine (Jacob): it's the training wheels for Hard mode,
+  which will scale up.

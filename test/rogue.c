@@ -510,3 +510,63 @@ TEST("Rogue: a tutor move bought with BP is relearnable by the family in later r
     EXPECT_EQ(moves[0], MOVE_ICE_PUNCH);
     EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_GEODUDE, moves), 0);
 }
+
+TEST("Rogue: second-page unlocks are bought like the first page's")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    VarSet(VAR_ROGUE_UNLOCKS_2, 0);
+    gSaveBlock2Ptr->frontier.battlePoints = 100;
+    SetRoom(1, 1, 2, ROGUE_ROOM_SHOP);
+    EXPECT_EQ(Rogue_GetShopPrice(1000), 1000);
+    gSpecialVar_0x8004 = 16; // Discount
+    Rogue_BuyUnlock();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS_2), 1);
+    EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS), 0);
+    EXPECT_EQ(Rogue_GetShopPrice(1000), 750);
+}
+
+TEST("Rogue: Harvest bonus sometimes adds a spare copy of a piece")
+{
+    u32 i, bonus = 0, lost;
+    struct GraftPiece pieces[16];
+    VarSet(VAR_ROGUE_UNLOCKS_2, 1 << 1); // Harvest bonus
+    SetRoom(1, 1, 2, ROGUE_ROOM_WILD);
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_ZIGZAGOON, 10, 0, OTID_STRUCT_PLAYER_ID);
+    for (i = 0; i < 10; i++)
+    {
+        ClearGraftBag();
+        HarvestGraftPieces(&gParties[B_TRAINER_OPPONENT_A][0], TRUE, 13, pieces, &lost);
+        bonus += gGraftHarvestBonus;
+    }
+    EXPECT_GT(bonus, 0);
+    VarSet(VAR_ROGUE_UNLOCKS_2, 0);
+    ClearGraftBag();
+    HarvestGraftPieces(&gParties[B_TRAINER_OPPONENT_A][0], TRUE, 13, pieces, &lost);
+    EXPECT_EQ(gGraftHarvestBonus, 0);
+}
+
+TEST("Rogue: Catch bonus sometimes leaves a piece after a real catch, never after a harvest")
+{
+    u32 i, got = 0;
+    VarSet(VAR_ROGUE_UNLOCKS_2, 1 << 2); // Catch bonus
+    SetRoom(1, 1, 2, ROGUE_ROOM_WILD);
+    CreateMon(&gParties[B_TRAINER_OPPONENT_A][0], SPECIES_ZIGZAGOON, 10, 0, OTID_STRUCT_PLAYER_ID);
+    gBattleOutcome = B_OUTCOME_CAUGHT;
+    gLastThrownBall = ITEM_POKE_BALL;
+    for (i = 0; i < 40; i++)
+    {
+        VarSet(VAR_TEMP_5, 0);
+        Rogue_OnBattleEnd();
+        got += VarGet(VAR_TEMP_5);
+    }
+    EXPECT_GT(got, 0);
+    EXPECT_LT(got, 40);
+    gLastThrownBall = ITEM_GRAFT_BALL;
+    for (i = 0; i < 40; i++)
+    {
+        VarSet(VAR_TEMP_5, 0);
+        Rogue_OnBattleEnd();
+        EXPECT_EQ(VarGet(VAR_TEMP_5), 0);
+    }
+}

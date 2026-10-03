@@ -4349,6 +4349,13 @@ static bool32 BufferHarvestMessage(void)
         StringCopy(gStringVar4, sText_GraftBagFull);
         return TRUE;
     }
+    // ROGUE: the Harvest bonus unlock's extra copies
+    if (index == pieceMessages + (sHarvestLostCount != 0) && gGraftHarvestBonus != 0)
+    {
+        ConvertIntToDecimalStringN(gStringVar2, gGraftHarvestBonus, STR_CONV_MODE_LEFT_ALIGN, 2);
+        StringExpandPlaceholders(gStringVar4, COMPOUND_STRING("Lucky! {STR_VAR_2} of the pieces came\nwith a spare copy!"));
+        return TRUE;
+    }
     return FALSE;
 }
 

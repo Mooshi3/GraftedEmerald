@@ -41,6 +41,7 @@ u32 GetMonGraftPieces(struct Pokemon *mon, bool32 isWild, struct GraftPiece *out
 // Breaking a mon down: Patch Ball = 1 random piece, Graft Ball = 3 different, Splice Ball/Splicer = all.
 // Adds them to the bag; *gotCount/*lostCount report what fit. The pieces taken are written to out.
 #define GRAFT_HARVEST_ALL 0xFF
+extern u8 gGraftHarvestBonus;
 u32 HarvestGraftPieces(struct Pokemon *mon, bool32 isWild, u32 numPieces, struct GraftPiece *out, u32 *lostCount);
 
 void GiveGraftBagIfMissing(void);

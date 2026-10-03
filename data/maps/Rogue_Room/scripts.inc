@@ -22,7 +22,22 @@ Rogue_Room_OnFrame:
 	map_script_2 VAR_ROGUE_INTRO, 0, Rogue_Room_EventScript_AskMeta
 	map_script_2 VAR_TEMP_2, 0, Rogue_Room_EventScript_EnterRoom
 	map_script_2 VAR_TEMP_4, 1, Rogue_Room_EventScript_AskFainted
+	map_script_2 VAR_TEMP_5, 1, Rogue_Room_EventScript_CatchBonus
 	.2byte 0
+
+@ The Catch bonus unlock: a caught Pokémon left a graft piece (Rogue_OnBattleEnd)
+Rogue_Room_EventScript_CatchBonus::
+	lockall
+	special Rogue_BufferCatchBonus
+	playfanfare MUS_OBTAIN_ITEM
+	msgbox Rogue_Room_Text_CatchBonus, MSGBOX_DEFAULT
+	waitfanfare
+	releaseall
+	end
+
+Rogue_Room_Text_CatchBonus:
+	.string "The new POKéMON left a graft piece\n"
+	.string "behind: {STR_VAR_1}!$"
 
 @ A new save's first question
 Rogue_Room_EventScript_AskMeta::

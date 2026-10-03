@@ -1,5 +1,6 @@
 #include "global.h"
 #include "graft_bag.h"
+#include "rogue.h"
 #include "battle_main.h"
 #include "graft_data.h"
 #include "pokemon.h"
@@ -253,6 +254,8 @@ u32 GetMonGraftPieces(struct Pokemon *mon, bool32 isWild, struct GraftPiece *out
     return n;
 }
 
+EWRAM_DATA u8 gGraftHarvestBonus = 0; // ROGUE: extra copies from the last harvest
+
 u32 HarvestGraftPieces(struct Pokemon *mon, bool32 isWild, u32 numPieces, struct GraftPiece *out, u32 *lostCount)
 {
     struct GraftPiece all[GRAFT_PIECES_PER_MON];
@@ -271,12 +274,20 @@ u32 HarvestGraftPieces(struct Pokemon *mon, bool32 isWild, u32 numPieces, struct
         numPieces = count;
 
     *lostCount = 0;
+    gGraftHarvestBonus = 0;
     for (i = 0; i < numPieces; i++)
     {
         if (AddGraftPiece(&all[i]))
+        {
             out[got++] = all[i];
+            // ROGUE: the Harvest bonus unlock sometimes adds a second copy
+            if (Rogue_RollHarvestBonus() && AddGraftPiece(&all[i]))
+                gGraftHarvestBonus++;
+        }
         else
+        {
             (*lostCount)++;
+        }
     }
     return got;
 }

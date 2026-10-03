@@ -683,3 +683,4 @@ def_special Rogue_SelectTutorMove
 def_special Rogue_PushTutorPayments
 def_special Rogue_CanPayTutor
 def_special Rogue_PayTutor
+def_special Rogue_BufferCatchBonus
