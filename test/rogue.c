@@ -520,13 +520,16 @@ TEST("Rogue: second-page unlocks are bought like the first page's")
     VarSet(VAR_ROGUE_UNLOCKS_2, 0);
     gSaveBlock2Ptr->frontier.battlePoints = 100;
     SetRoom(1, 1, 2, ROGUE_ROOM_SHOP);
-    EXPECT_EQ(Rogue_GetShopPrice(1000), 1000);
+    EXPECT_EQ(Rogue_GetShopPrice(ITEM_POTION, 1000), 1000);
+    EXPECT_EQ(Rogue_GetShopPrice(ITEM_CHOICE_BAND, 100000), 3000); // nothing over ¥3000 in a run
     gSpecialVar_0x8004 = 16; // Discount
     Rogue_BuyUnlock();
     EXPECT_EQ(gSpecialVar_Result, TRUE);
     EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS_2), 1);
     EXPECT_EQ(VarGet(VAR_ROGUE_UNLOCKS), 0);
-    EXPECT_EQ(Rogue_GetShopPrice(1000), 750);
+    EXPECT_EQ(Rogue_GetShopPrice(ITEM_POTION, 1000), 750);
+    EXPECT_EQ(Rogue_GetShopPrice(ITEM_CHOICE_BAND, 100000), 2250);
+    EXPECT_EQ(GetItemSellPrice(ITEM_CHOICE_BAND), 3000 / ITEM_SELL_FACTOR); // no selling prizes for a fortune
 }
 
 TEST("Rogue: Harvest bonus sometimes adds a spare copy of a piece")

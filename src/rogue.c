@@ -3034,11 +3034,25 @@ void Rogue_PayTutor(void)
 // ---------------------------------------------------------------------------------------------
 // Second-page unlocks' hooks
 
-// Shops in a run: a quarter off with Discount
-u32 Rogue_GetShopPrice(u32 price)
+// Prices in a run: a run's money (about ¥1000-2000 a floor early on) can't pay the main game's prices
+// for held battle items (up to ¥100,000), so nothing costs more than ¥3000; Rare Candy ¥1000. A
+// quarter off with Discount.
+#define RUN_MAX_PRICE 3000
+// An item's worth in a run (selling goes by it too, so a prize can't be sold for a fortune)
+u32 Rogue_GetItemWorth(u16 item, u32 price)
 {
+    if (!Rogue_IsRunActive())
+        return price;
+    if (item == ITEM_RARE_CANDY)
+        return 1000;
+    return min(price, RUN_MAX_PRICE);
+}
+
+u32 Rogue_GetShopPrice(u16 item, u32 price)
+{
+    price = Rogue_GetItemWorth(item, price);
     if (Rogue_IsRunActive() && HasUnlock(UNLOCK_DISCOUNT))
-        return price - price / 4;
+        price -= price / 4;
     return price;
 }
 

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "item.h"
 #include "script.h"
 #include "event_data.h"
@@ -82,7 +83,8 @@ void TryBuildDynamicShopItemList(const u16 **ogItemList, u16 *resultingTotal)
         idx++;
     }
 
-    if (sellsBalls)
+    // ROGUE: a run's marts list their own stock (no Graft Knot: there's no breeding in a run)
+    if (sellsBalls && !Rogue_IsRunActive())
     {
         for (idx = 0; idx < ARRAY_COUNT(sGraftMartItems); idx++)
         {

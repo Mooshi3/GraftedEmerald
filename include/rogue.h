@@ -21,7 +21,8 @@ u32 Rogue_GetEggMoveMask(struct BoxPokemon *mon, const u16 *eggMoves);
 bool32 Rogue_GetPopUpName(u8 *dest);
 bool32 Rogue_LivesIn(u16 species, u32 biome);
 u32 Rogue_GetUnlockedTutorMoves(u16 species, u16 *moves);
-u32 Rogue_GetShopPrice(u32 price);
+u32 Rogue_GetShopPrice(u16 item, u32 price);
+u32 Rogue_GetItemWorth(u16 item, u32 price);
 bool32 Rogue_RollHarvestBonus(void);
 u32 Rogue_CountWonSpecies(void);
 

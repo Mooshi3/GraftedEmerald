@@ -1,4 +1,5 @@
 #include "global.h"
+#include "rogue.h"
 #include "item.h"
 #include "berry.h"
 #include "pokeball.h"
@@ -957,7 +958,7 @@ u32 GetItemStatus1Mask(enum Item itemId)
 
 u32 GetItemSellPrice(enum Item itemId)
 {
-    return GetItemPrice(itemId) / ITEM_SELL_FACTOR;
+    return Rogue_GetItemWorth(itemId, GetItemPrice(itemId)) / ITEM_SELL_FACTOR; // ROGUE: run prices
 }
 
 bool32 IsHoldEffectChoice(enum HoldEffect holdEffect)

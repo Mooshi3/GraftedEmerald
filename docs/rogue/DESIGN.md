@@ -171,6 +171,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   meta-progression) also lets that Pokémon's whole family relearn it in later runs (the relearner's TUTOR
   MOVES list in a run). Up to 295 such moves are kept, in the Battle Tower's unused saved record-mixing opponents
   (`frontier.towerRecords`; the first builds used the Battle Dome's data, moved over on first use); the oldest goes when full.
+- Prices in a run: nothing costs more than ¥3000 (Rare Candy ¥1000), and selling goes by the same worth (`Rogue_GetItemWorth`), so held battle items (up to ¥100,000 in the main game) are buyable and prizes can't be sold for a fortune. A run's marts list their own stock: the main game's graft items (Graft Knot: no breeding in a run) aren't appended.
 - Second unlock page (`VAR_ROGUE_UNLOCKS_2`, ids 16+): Discount (40 BP: shops a quarter off), Harvest bonus
   (60 BP: each piece broken down from a Pokémon has a 25% chance of a spare copy; balls, the Splicer, last
   rites), Catch bonus (50 BP: a real catch has a 25% chance of leaving one random piece).
