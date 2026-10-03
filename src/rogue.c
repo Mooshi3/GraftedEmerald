@@ -2207,6 +2207,56 @@ static u32 GetBossBP(void)
     return bp;
 }
 
+// Species the player has won a run with, one bit per National Dex number, kept between runs in the
+// Battle Tower's e-Reader trainer slot (only the Battle Tower, Mystery Gift and Mystery Events touch
+// it; Rogue has none of them)
+#define sWonSpecies ((u8 *)&gSaveBlock2Ptr->frontier.ereaderTrainer)
+STATIC_ASSERT(sizeof(gSaveBlock2Ptr->frontier.ereaderTrainer) * 8 > NATIONAL_DEX_COUNT, WonSpeciesFit);
+
+#define NEW_SPECIES_BP 3
+
+static bool32 HasWonWith(u32 dexNum)
+{
+    return dexNum != 0 && dexNum <= NATIONAL_DEX_COUNT && (sWonSpecies[dexNum / 8] & (1 << (dexNum % 8)));
+}
+
+static u32 GetSpeciesDexNum(enum Species species)
+{
+    return SpeciesToNationalPokedexNum(GET_BASE_SPECIES_ID(species));
+}
+
+// For the start room and tests: how many species the player has won with
+u32 Rogue_CountWonSpecies(void)
+{
+    u32 i, count = 0;
+    for (i = 1; i <= NATIONAL_DEX_COUNT; i++)
+    {
+        if (HasWonWith(i))
+            count++;
+    }
+    return count;
+}
+
+// The run is won: mark the team's species; returns how many are new
+static u32 RecordWonSpecies(void)
+{
+    u32 i, newCount = 0;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        enum Species species = GetMonData(mon, MON_DATA_SPECIES);
+        u32 dexNum;
+        if (species == SPECIES_NONE || GetMonData(mon, MON_DATA_IS_EGG))
+            continue;
+        dexNum = GetSpeciesDexNum(species);
+        if (dexNum == 0 || dexNum > NATIONAL_DEX_COUNT || HasWonWith(dexNum))
+            continue;
+        sWonSpecies[dexNum / 8] |= 1 << (dexNum % 8);
+        newCount++;
+    }
+    return newCount;
+}
+
 void Rogue_OnBossDefeated(void)
 {
     u32 floor = GetFloor();
@@ -2232,6 +2282,22 @@ void Rogue_OnBossDefeated(void)
     {
         SetUnlock(UNLOCK_HARD_MODE);
         StringAppend(gStringVar4, COMPOUND_STRING("\pHARD mode is open: eight floors\nand the ELITE FOUR!"));
+    }
+    // The run is won: a bonus for each species on the team never won with before
+    if (IsFinale(floor) && GetRoom() >= GetFinaleLength())
+    {
+        u32 newSpecies = RecordWonSpecies();
+        if (newSpecies != 0)
+        {
+            ConvertIntToDecimalStringN(gStringVar2, newSpecies, STR_CONV_MODE_LEFT_ALIGN, 2);
+            ConvertIntToDecimalStringN(gStringVar1, Rogue_CountWonSpecies(), STR_CONV_MODE_LEFT_ALIGN, 4);
+            StringAppend(gStringVar4, COMPOUND_STRING("\p"));
+            StringExpandPlaceholders(gStringVar3, newSpecies == 1
+                ? COMPOUND_STRING("A first win with this species!\nSpecies won with: {STR_VAR_1}")
+                : COMPOUND_STRING("{STR_VAR_2} species won with for the first\ntime! Species won with: {STR_VAR_1}"));
+            StringAppend(gStringVar4, gStringVar3);
+            bp += newSpecies * NEW_SPECIES_BP;
+        }
     }
     if (IsMetaOn())
     {

@@ -237,6 +237,7 @@ TEST("With Unlocks Off, a run starts with everything unlocked")
 
 TEST("Beating the Champion pays BP and opens Hard mode")
 {
+    ZeroPlayerPartyMons(); // no team: no new-species bonus
     VarSet(VAR_ROGUE_UNLOCKS, 0);
     VarSet(VAR_ROGUE_RUN_FLAGS, 0);
     gSaveBlock2Ptr->frontier.battlePoints = 0;
@@ -588,4 +589,27 @@ TEST("Rogue: hundreds of tutor moves can be kept, and old saves' are moved over"
         ((u32 *)gSaveBlock2Ptr->frontier.towerRecords)[i + 1] = ((SPECIES_CHIKORITA + i) << 16) | MOVE_SWIFT;
     EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_MACHOP, moves), 1);
     EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_CHIKORITA + 249, moves), 1);
+}
+
+TEST("Rogue: winning with a species for the first time pays a bonus, once")
+{
+    memset(&gSaveBlock2Ptr->frontier.ereaderTrainer, 0, sizeof(gSaveBlock2Ptr->frontier.ereaderTrainer));
+    VarSet(VAR_ROGUE_UNLOCKS, 1 << 15); // Hard mode already open: no message about it
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    ZeroPlayerPartyMons();
+    CreateMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_GARCHOMP, 50, 0, OTID_STRUCT_PLAYER_ID);
+    CreateMon(&gParties[B_TRAINER_PLAYER][1], SPECIES_SLOWPOKE_GALAR, 50, 0, OTID_STRUCT_PLAYER_ID);
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+    SetRoom(4242, ROGUE_FLOORS_NORMAL + 1, 1, ROGUE_ROOM_BOSS); // the Champion
+    Rogue_OnBossDefeated();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 20 + 2 * 3);
+    EXPECT_EQ(Rogue_CountWonSpecies(), 2);
+
+    // the same team again: no bonus; Slowpoke's regular form counts as the same species
+    CreateMon(&gParties[B_TRAINER_PLAYER][1], SPECIES_SLOWPOKE, 50, 0, OTID_STRUCT_PLAYER_ID);
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+    Rogue_OnBossDefeated();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 20);
+    EXPECT_EQ(Rogue_CountWonSpecies(), 2);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
 }

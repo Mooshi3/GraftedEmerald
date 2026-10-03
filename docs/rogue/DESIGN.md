@@ -176,3 +176,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   rites), Catch bonus (50 BP: a real catch has a 25% chance of leaving one random piece).
 - Normal mode getting easy with everything unlocked is fine (Jacob): it's the training wheels for Hard mode,
   which will scale up.
+
+### Species won with (2026-10-03)
+
+- Every species on the team when the Champion falls is recorded (as it is then: a Garchomp marks Garchomp;
+  forms count as their base species), one bit per National Dex number in the Battle Tower's e-Reader
+  trainer slot (`frontier.ereaderTrainer`, unused in Rogue). Each species won with for the first time pays
+  3 BP more. A bonus, not a penalty for reusing one (that would fight the Favorite unlock).
+- For later: a start room count, marks in the Pokédex, milestone rewards, "win with every starter" goals.
