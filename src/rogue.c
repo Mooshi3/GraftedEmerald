@@ -1939,9 +1939,31 @@ static u32 GetStarterCandidates(enum Species *out)
     return count;
 }
 
+// A Pokémon's rolled egg moves (Rogue_GetEggMoveMask) are known from the start: in a free slot, else
+// in place of its first (oldest) move. They stay relearnable if forgotten.
+static void TeachRolledEggMoves(struct Pokemon *mon)
+{
+    enum Species base = GetMonData(mon, MON_DATA_SPECIES);
+    const u16 *eggMoves;
+    u32 mask, i, depth;
+
+    for (depth = 0; depth < 3 && GetSpeciesPreEvolution(base) != SPECIES_NONE; depth++)
+        base = GetSpeciesPreEvolution(base);
+    eggMoves = GetSpeciesEggMoves(base);
+    mask = Rogue_GetEggMoveMask(&mon->box, eggMoves);
+    for (i = 0; i < KNOWN_EGG_MOVES_COUNT && eggMoves[i] != MOVE_UNAVAILABLE; i++)
+    {
+        if (!(mask & (1u << i)) || MonKnowsMove(mon, eggMoves[i]))
+            continue;
+        if (GiveMoveToMon(mon, eggMoves[i]) == MON_HAS_MAX_MOVES)
+            SetMonMoveSlot(mon, eggMoves[i], 0);
+    }
+}
+
 static void GiveStarter(enum Species species)
 {
     ScriptGiveMon(species, 5, ITEM_NONE);
+    TeachRolledEggMoves(&gParties[B_TRAINER_PLAYER][0]);
     GraftMonotypeOntoStarter(&gParties[B_TRAINER_PLAYER][0]);
     StringCopy(gStringVar1, GetSpeciesName(species));
 }
@@ -2064,6 +2086,7 @@ void Rogue_PrepareWildMon(void)
     enum Species species = template->graphicsId - OBJ_EVENT_MON;
 
     CreateScriptedWildMon(species, GetWildLevel(), ITEM_NONE);
+    TeachRolledEggMoves(&gParties[B_TRAINER_OPPONENT_A][0]);
     PlayCry_Script(species, CRY_MODE_ENCOUNTER);
 }
 

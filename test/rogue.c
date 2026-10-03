@@ -11,6 +11,7 @@
 #include "item.h"
 #include "battle.h"
 #include "script_pokemon_util.h"
+#include "party_menu.h"
 #include "constants/event_objects.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
@@ -429,4 +430,35 @@ TEST("Rogue: every theme has wild Pokemon on every floor")
             }
         }
     }
+}
+
+TEST("Rogue: a starter knows the egg move it rolled")
+{
+    u32 i, j, checked = 0;
+    VarSet(VAR_ROGUE_UNLOCKS, (1 << 12) | (1 << 13)); // Good genes, Pedigree: everyone rolls one
+    for (i = 0; i < 20; i++)
+    {
+        enum Species base;
+        const u16 *eggMoves;
+        u32 mask;
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][0];
+        ZeroPlayerPartyMons();
+        VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
+        VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+        gSpecialVar_0x8004 = 1;
+        gSpecialVar_0x8006 = ROGUE_CHALLENGE_NONE;
+        Rogue_TakeDoor();
+        base = GetMonData(mon, MON_DATA_SPECIES);
+        eggMoves = GetSpeciesEggMoves(base);
+        mask = Rogue_GetEggMoveMask(&mon->box, eggMoves);
+        for (j = 0; j < 19 && eggMoves[j] != MOVE_UNAVAILABLE; j++)
+        {
+            if (mask & (1u << j))
+            {
+                EXPECT(MonKnowsMove(mon, eggMoves[j]));
+                checked++;
+            }
+        }
+    }
+    EXPECT_GT(checked, 0);
 }

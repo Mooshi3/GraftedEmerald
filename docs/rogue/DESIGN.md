@@ -151,3 +151,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   your team your favorite (any time, replacing the old one). From then on every run offers its first stage
   (a Garchomp makes Gible a choice) next to the random starter(s), at level 5 with nothing grafted.
   Stored in `VAR_ROGUE_FAVORITE`; `VAR_ROGUE_UNLOCKS` has no free bits left (14 is Favorite, 15 Hard mode).
+
+### Egg moves and the relearner (2026-10-03)
+
+- A rolled egg move (10%, 35% with Good genes, one or two with Pedigree) is known from the start: wild and
+  rare Pokémon (they can use it against you) and starters learn it in a free slot, else in place of their
+  first move. Forgotten, it stays relearnable.
+- No tutor list in the relearner (both games): it taught every tutor move for free. The TM list offers the
+  TMs in the Bag. The relearner's title names the list shown (SELECT switches lists).

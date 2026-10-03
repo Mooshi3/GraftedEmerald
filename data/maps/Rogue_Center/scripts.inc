@@ -15,7 +15,6 @@ Rogue_Center_EventScript_PokefanAsk:
 	goto_if_eq VAR_RESULT, NO, Rogue_Center_EventScript_PokefanDecline
 	msgbox Rogue_Center_Text_WhichOne, MSGBOX_DEFAULT
 	special ChoosePartyMon
-	waitstate
 	goto_if_ge VAR_0x8004, PARTY_SIZE, Rogue_Center_EventScript_PokefanDecline
 	special Rogue_SetFavorite
 	msgbox Rogue_Center_Text_FavoriteSet, MSGBOX_DEFAULT
