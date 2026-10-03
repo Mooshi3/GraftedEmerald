@@ -25,6 +25,8 @@ u32 Rogue_GetShopPrice(u16 item, u32 price);
 u32 Rogue_GetItemWorth(u16 item, u32 price);
 bool32 Rogue_RollHarvestBonus(void);
 u32 Rogue_CountWonSpecies(void);
+u32 Rogue_GetLevelCap(void);
+u32 Rogue_ScaleExp(u32 level, u32 exp);
 
 static inline bool32 IsRogueTrainerId(u16 trainerId)
 {

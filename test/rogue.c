@@ -13,6 +13,7 @@
 #include "battle.h"
 #include "script_pokemon_util.h"
 #include "party_menu.h"
+#include "caps.h"
 #include "constants/event_objects.h"
 
 // Grafted Rogue: generated rooms and trainers (src/rogue.c)
@@ -358,7 +359,8 @@ TEST("Rogue: challenges last one run and pay more BP")
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_MONOTYPE), TYPE_GHOST);
     EXPECT(IsMonotypeLegal(&gParties[B_TRAINER_PLAYER][0])); // the starter got Ghost grafted on
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_SET_MODE), TRUE); // no Switch style yet
-    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_EXP_SHARE), 0);
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_EXP_SHARE), 1); // the whole team always learns in a run
+    EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_LEVEL_CAP), GRAFT_LEVEL_CAP_HARD);
 
     gSaveBlock2Ptr->frontier.battlePoints = 0;
     SetRoom(GetGraftSetting(GRAFT_SETTING_MONOTYPE), 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
@@ -615,4 +617,21 @@ TEST("Rogue: winning with a species for the first time pays a bonus, once")
     EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 20);
     EXPECT_EQ(Rogue_CountWonSpecies(), 2);
     VarSet(VAR_ROGUE_UNLOCKS, 0);
+}
+
+TEST("Rogue: EXP is boosted below the floor's boss level and stops at it")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    SetRoom(1, 1, 3, ROGUE_ROOM_WILD);
+    SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_HARD);
+    EXPECT_EQ(Rogue_GetLevelCap(), 11);              // floor 1's boss
+    EXPECT_EQ(GetCurrentLevelCap(), 11);
+    EXPECT_EQ(GetSoftLevelCapExpValue(10, 100), 200); // double EXP
+    EXPECT_EQ(GetSoftLevelCapExpValue(5, 100), 400);  // and double again to catch up
+    EXPECT_EQ(GetSoftLevelCapExpValue(11, 100), 0);   // the cap
+    VarSet(VAR_ROGUE_UNLOCKS, 1 << 10);              // Quick study
+    EXPECT_EQ(GetSoftLevelCapExpValue(10, 100), 300);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    SetRoom(1, 3, 3, ROGUE_ROOM_WILD);
+    EXPECT_EQ(Rogue_GetLevelCap(), 27);              // floor 3's boss
 }

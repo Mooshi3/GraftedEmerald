@@ -185,3 +185,13 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   trainer slot (`frontier.ereaderTrainer`, unused in Rogue). Each species won with for the first time pays
   3 BP more. A bonus, not a penalty for reusing one (that would fight the Favorite unlock).
 - For later: a start room count, marks in the Pokédex, milestone rewards, "win with every starter" goals.
+
+### EXP (2026-10-03, after runs rarely reached the first boss)
+
+- Jacob's runs reached the boss with one Pokémon around level 10 and catches still at 5: only the
+  battler learned (EXP Share Party was an unlock), and catches never caught up.
+- Now the whole team always learns (Gen 6 EXP Share), at double EXP; a Pokémon 5+ levels under the cap
+  gets double that again, so a new catch catches up. A hard level cap at the floor's boss level (the
+  Champion's in the finale; `Rogue_GetLevelCap`, read by `caps.c`) keeps the boost from outleveling the
+  boss; Rare Candy stops there too. The old Team training unlock is now Quick study (+50% EXP).
+- Next lever if trainers still sweep: enemy grafts (Normal now, 2 grafts per Pokémon on floor 1).

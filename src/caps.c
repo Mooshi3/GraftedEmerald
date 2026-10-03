@@ -4,6 +4,7 @@
 #include "caps.h"
 #include "graft_settings.h"
 #include "pokemon.h"
+#include "rogue.h"
 
 
 // GRAFT: level caps are a new-game setting (graft_settings.c), not the compile-time B_EXP_CAP_TYPE.
@@ -27,6 +28,8 @@ u32 GetLevelCapTarget(void)
 
     if (GetGraftSetting(GRAFT_SETTING_LEVEL_CAP) == GRAFT_LEVEL_CAP_OFF)
         return MAX_LEVEL;
+    if (Rogue_IsRunActive()) // ROGUE: the floor's boss level
+        return Rogue_GetLevelCap();
     for (i = 0; i < ARRAY_COUNT(sLevelCapFlagMap); i++)
     {
         if (!FlagGet(sLevelCapFlagMap[i][0]))
@@ -54,6 +57,9 @@ u32 GetSoftLevelCapExpValue(u32 level, u32 expValue)
 
     u32 levelDifference;
     u32 currentLevelCap = GetLevelCapTarget();
+
+    if (Rogue_IsRunActive()) // ROGUE: boosted EXP (Rogue_ScaleExp), still stopped at the cap below
+        expValue = Rogue_ScaleExp(level, expValue);
 
     if (level < currentLevelCap)
         return expValue;

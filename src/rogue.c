@@ -311,7 +311,7 @@ static const struct
     [UNLOCK_LAST_RITES_1] = {COMPOUND_STRING("Last rites I"), COMPOUND_STRING("Once a floor, a fainted Pokémon can\nbe broken down into graft pieces."), 60, -1},
     [UNLOCK_LAST_RITES_2] = {COMPOUND_STRING("Last rites II"), COMPOUND_STRING("Last rites twice a floor."), 90, UNLOCK_LAST_RITES_1},
     [UNLOCK_LAST_RITES_3] = {COMPOUND_STRING("Last rites III"), COMPOUND_STRING("Last rites three times a floor."), 120, UNLOCK_LAST_RITES_2},
-    [UNLOCK_EXP_PARTY] = {COMPOUND_STRING("Team training"), COMPOUND_STRING("The whole team gets EXP from\nevery battle."), 40, -1},
+    [UNLOCK_EXP_PARTY] = {COMPOUND_STRING("Quick study"), COMPOUND_STRING("Your team gains half again as\nmuch EXP."), 40, -1},
     [UNLOCK_GOOD_GENES] = {COMPOUND_STRING("Good genes"), COMPOUND_STRING("More Pokémon have an egg move to\nrelearn (35% instead of 10%)."), 40, -1},
     [UNLOCK_PEDIGREE] = {COMPOUND_STRING("Pedigree"), COMPOUND_STRING("Every Pokémon has an egg move to\nrelearn, some have two."), 80, UNLOCK_GOOD_GENES},
     [UNLOCK_SWITCH_STYLE] = {COMPOUND_STRING("Switch style"), COMPOUND_STRING("You may switch Pokémon when a\nfoe faints (Shift battle style)."), 20, -1},
@@ -541,6 +541,26 @@ static u32 GetBossLevel(void)
     if (IsFinale(GetFloor()))
         return 3 + GetNumFloors() * 8 + 2 + GetRoom();
     return 3 + (GetFloor() - 1) * 8 + 8;
+}
+
+// EXP in a run (decided with Jacob 2026-10-03, after runs rarely reached the first boss): the whole
+// team learns, at double EXP (triple with Quick study), and a Pokémon 5+ levels under the cap gets
+// double that again, so a new catch catches up. The hard cap is the floor's boss level (in the
+// finale, the Champion's), so the boost can't outlevel the boss.
+u32 Rogue_GetLevelCap(void)
+{
+    if (IsFinale(GetFloor()))
+        return 3 + GetNumFloors() * 8 + 2 + GetFinaleLength();
+    return GetBossLevel();
+}
+
+u32 Rogue_ScaleExp(u32 level, u32 exp)
+{
+    u32 cap = Rogue_GetLevelCap();
+    exp = HasUnlock(UNLOCK_EXP_PARTY) ? exp * 3 : exp * 2;
+    if (level + 5 <= cap)
+        exp *= 2;
+    return exp;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1933,10 +1953,10 @@ static void SetForcedSettings(void)
     SetGraftSetting(GRAFT_SETTING_ENCOUNTERS, FALSE);
     SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_NORMAL); // fainted Pokémon: Rogue_OnBattleEnd
     SetGraftSetting(GRAFT_SETTING_WILD_SPAWNS, GRAFT_WILD_SPAWNS_HIDDEN);
-    SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_OFF);
+    SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_HARD); // the floor's boss level (Rogue_GetLevelCap)
     // Set by the run, not chosen on a settings screen (decided with Jacob 2026-10-02)
     SetGraftSetting(GRAFT_SETTING_SHINY_ODDS, GRAFT_SHINY_ODDS_BOOSTED);
-    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, HasUnlock(UNLOCK_EXP_PARTY));
+    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, TRUE); // the whole team learns (Jacob 2026-10-03: runs were too hard)
     SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, IsHardMode() ? GRAFT_ENEMY_GRAFTS_MORE : GRAFT_ENEMY_GRAFTS_NORMAL);
     SetGraftSetting(GRAFT_SETTING_WILD_GRAFTS, GRAFT_WILD_GRAFTS_OFF);
     SetGraftSetting(GRAFT_SETTING_BATTLE_ITEMS, FALSE);
