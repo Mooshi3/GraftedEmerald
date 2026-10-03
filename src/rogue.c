@@ -36,6 +36,7 @@
 #include "constants/items.h"
 #include "constants/layouts.h"
 #include "constants/metatile_labels.h"
+#include "constants/move_relearner.h"
 #include "constants/rogue.h"
 #include "constants/species.h"
 #include "constants/trainer_types.h"
@@ -2776,9 +2777,28 @@ void Rogue_BufferNextFloor(void)
 }
 
 // Tutor moves bought with BP: (first-stage species << 16) | move, kept between runs in the Battle
-// Dome's saved tournament data, which Rogue never uses
-#define TUTOR_UNLOCKS_COUNT (sizeof(gSaveBlock2Ptr->frontier.domeMonIds) / sizeof(u32))
-#define sTutorUnlocks ((u32 *)gSaveBlock2Ptr->frontier.domeMonIds)
+// Tower's saved record-mixing opponents, which only the Battle Tower and link
+// record mixing touch (295 entries); Rogue has neither. Builds from 2026-10-03 kept them in the Battle Dome's data
+// (24 entries): they're moved over on first use.
+#define TUTOR_UNLOCKS_COUNT (sizeof(gSaveBlock2Ptr->frontier.towerRecords) / (sizeof(u32)))
+#define sTutorUnlocks ((u32 *)gSaveBlock2Ptr->frontier.towerRecords)
+#define OLD_TUTOR_UNLOCKS_COUNT (sizeof(gSaveBlock2Ptr->frontier.domeMonIds) / sizeof(u32))
+#define sOldTutorUnlocks ((u32 *)gSaveBlock2Ptr->frontier.domeMonIds)
+
+static void UnlockTutorEntry(u32 entry);
+
+static void MoveOldTutorUnlocks(void)
+{
+    u32 i;
+    for (i = 0; i < OLD_TUTOR_UNLOCKS_COUNT; i++)
+    {
+        if (sOldTutorUnlocks[i] != 0)
+        {
+            UnlockTutorEntry(sOldTutorUnlocks[i]);
+            sOldTutorUnlocks[i] = 0;
+        }
+    }
+}
 
 static enum Species GetFirstStage(enum Species species)
 {
@@ -2792,8 +2812,9 @@ static enum Species GetFirstStage(enum Species species)
 u32 Rogue_GetUnlockedTutorMoves(u16 species, u16 *moves)
 {
     u32 i, count = 0;
+    MoveOldTutorUnlocks();
     species = GetFirstStage(species);
-    for (i = 0; i < TUTOR_UNLOCKS_COUNT; i++)
+    for (i = 0; i < TUTOR_UNLOCKS_COUNT && count < MAX_RELEARNER_MOVES; i++)
     {
         u32 entry = sTutorUnlocks[i];
         if (entry != 0 && (entry >> 16) == species)
@@ -2804,7 +2825,13 @@ u32 Rogue_GetUnlockedTutorMoves(u16 species, u16 *moves)
 
 static void UnlockTutorMove(enum Species species, enum Move move)
 {
-    u32 i, entry = (GetFirstStage(species) << 16) | move;
+    MoveOldTutorUnlocks();
+    UnlockTutorEntry((GetFirstStage(species) << 16) | move);
+}
+
+static void UnlockTutorEntry(u32 entry)
+{
+    u32 i;
     for (i = 0; i < TUTOR_UNLOCKS_COUNT; i++)
     {
         if (sTutorUnlocks[i] == entry)

@@ -5,6 +5,7 @@
 #include "pokemon.h"
 #include "test/test.h"
 #include "constants/rogue.h"
+#include "constants/move_relearner.h"
 #include "graft_settings.h"
 #include "graft_bag.h"
 #include "graft_challenge.h"
@@ -494,6 +495,7 @@ TEST("Rogue: a tutor move bought with BP is relearnable by the family in later r
 {
     u16 moves[8];
     memset(gSaveBlock2Ptr->frontier.domeMonIds, 0, sizeof(gSaveBlock2Ptr->frontier.domeMonIds));
+    memset(gSaveBlock2Ptr->frontier.towerRecords, 0, sizeof(gSaveBlock2Ptr->frontier.towerRecords));
     VarSet(VAR_ROGUE_UNLOCKS, 0);
     SetRoom(55, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
     ZeroPlayerPartyMons();
@@ -569,4 +571,21 @@ TEST("Rogue: Catch bonus sometimes leaves a piece after a real catch, never afte
         Rogue_OnBattleEnd();
         EXPECT_EQ(VarGet(VAR_TEMP_5), 0);
     }
+}
+
+TEST("Rogue: hundreds of tutor moves can be kept, and old saves' are moved over")
+{
+    u16 moves[MAX_RELEARNER_MOVES];
+    u32 i;
+    memset(gSaveBlock2Ptr->frontier.towerRecords, 0, sizeof(gSaveBlock2Ptr->frontier.towerRecords));
+    // an entry saved by the first rest stop builds, in the Battle Dome's data
+    ((u32 *)gSaveBlock2Ptr->frontier.domeMonIds)[0] = (SPECIES_MACHOP << 16) | MOVE_ICE_PUNCH;
+    EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_MACHAMP, moves), 1);
+    EXPECT_EQ(((u32 *)gSaveBlock2Ptr->frontier.domeMonIds)[0], 0);
+    EXPECT_GE(sizeof(gSaveBlock2Ptr->frontier.towerRecords) / (sizeof(u32)), 295);
+    // 250 different families each keep theirs
+    for (i = 0; i < 250; i++)
+        ((u32 *)gSaveBlock2Ptr->frontier.towerRecords)[i + 1] = ((SPECIES_CHIKORITA + i) << 16) | MOVE_SWIFT;
+    EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_MACHOP, moves), 1);
+    EXPECT_EQ(Rogue_GetUnlockedTutorMoves(SPECIES_CHIKORITA + 249, moves), 1);
 }
