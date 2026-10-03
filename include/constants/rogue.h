@@ -39,6 +39,10 @@
 #define ROGUE_FAINTED_RELEASE 1
 #define ROGUE_FAINTED_RITES   2
 
+// Where the player arrives in the base between runs (MAP_ROGUE_HOME)
+#define ROGUE_HOME_X 7
+#define ROGUE_HOME_Y 8
+
 // Where the player arrives in every room
 #define ROGUE_ENTRANCE_X 10
 #define ROGUE_ENTRANCE_Y 13

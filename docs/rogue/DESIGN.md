@@ -195,3 +195,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   Champion's in the finale; `Rogue_GetLevelCap`, read by `caps.c`) keeps the boost from outleveling the
   boss; Rare Candy stops there too. The old Team training unlock is now Quick study (+50% EXP).
 - Next lever if trainers still sweep: enemy grafts (Normal now, 2 grafts per Pokémon on floor 1).
+
+### The base (2026-10-03)
+
+- Between runs the player is in a secret base (`Rogue_Home`, brown cave tiles, built as one open room)
+  instead of a forest room. Each unlock owned shows as a decoration (`sHomeDecorations`; with
+  meta-progression off, all of them), plus a silver shield once a run has been won. Prof. Birch is a help
+  menu: Runs, Doors, Catching, Grafting, Fainting, Levels, Rest stops, BP & unlocks. The scientist still
+  sells unlocks. The exit mat at the bottom starts a run (with a yes/no).

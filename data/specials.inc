@@ -684,3 +684,6 @@ def_special Rogue_PushTutorPayments
 def_special Rogue_CanPayTutor
 def_special Rogue_PayTutor
 def_special Rogue_BufferCatchBonus
+def_special Rogue_DecorateHome
+def_special Rogue_PushHelpTopics
+def_special Rogue_GetHelpText

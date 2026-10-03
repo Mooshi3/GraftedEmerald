@@ -9369,6 +9369,17 @@
       "layout_version": "emerald"
     },
     {
+      "id": "LAYOUT_ROGUE_HOME",
+      "name": "Rogue_Home_Layout",
+      "width": 15,
+      "height": 11,
+      "primary_tileset": "gTileset_SecretBase",
+      "secondary_tileset": "gTileset_SecretBaseBrownCave",
+      "border_filepath": "data/layouts/Rogue_Home/border.bin",
+      "blockdata_filepath": "data/layouts/Rogue_Home/map.bin",
+      "layout_version": "emerald"
+    },
+    {
       "id": "LAYOUT_ROGUE_VOLCANO",
       "name": "Rogue_Volcano_Layout",
       "width": 22,

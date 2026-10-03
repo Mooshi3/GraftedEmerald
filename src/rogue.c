@@ -9,6 +9,7 @@
 #include "data.h"
 #include "event_data.h"
 #include "event_object_movement.h"
+#include "decoration.h"
 #include "field_screen_effect.h"
 #include "fieldmap.h"
 #include "wild_encounter.h"
@@ -32,6 +33,7 @@
 #include "constants/battle_frontier.h"
 #include "constants/event_object_movement.h"
 #include "constants/event_objects.h"
+#include "constants/decorations.h"
 #include "constants/flags.h"
 #include "constants/items.h"
 #include "constants/layouts.h"
@@ -955,6 +957,8 @@ static u16 GetArenaMap(enum Type type)
 
 static u16 GetRoomMap(void)
 {
+    if (VarGet(VAR_ROGUE_STATE) != ROGUE_STATE_RUN)
+        return MAP_ROGUE_HOME;
     switch (GetRoomKind())
     {
     case ROOM_KIND_ARENA:
@@ -1002,6 +1006,11 @@ void Rogue_WarpToRoom(void)
     {
         x = STOP_ENTRANCE_X;
         y = STOP_ENTRANCE_Y;
+    }
+    if (map == MAP_ROGUE_HOME)
+    {
+        x = ROGUE_HOME_X;
+        y = ROGUE_HOME_Y;
     }
     SetWarpDestination(MAP_GROUP(map), MAP_NUM(map), WARP_ID_NONE, x, y);
     DoWarp();
@@ -2728,14 +2737,14 @@ void Rogue_BuyUnlock(void)
 void Rogue_OnWhiteOut(void)
 {
     EndRun(FALSE);
-    SetWarpDestination(MAP_GROUP(MAP_ROGUE_ROOM), MAP_NUM(MAP_ROGUE_ROOM), WARP_ID_NONE, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y);
+    SetWarpDestination(MAP_GROUP(MAP_ROGUE_HOME), MAP_NUM(MAP_ROGUE_HOME), WARP_ID_NONE, ROGUE_HOME_X, ROGUE_HOME_Y);
 }
 
 void Rogue_InitNewGame(void)
 {
     ClearRunProgress();
     VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
-    SetWarpDestination(MAP_GROUP(MAP_ROGUE_ROOM), MAP_NUM(MAP_ROGUE_ROOM), WARP_ID_NONE, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y);
+    SetWarpDestination(MAP_GROUP(MAP_ROGUE_HOME), MAP_NUM(MAP_ROGUE_HOME), WARP_ID_NONE, ROGUE_HOME_X, ROGUE_HOME_Y);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3181,4 +3190,134 @@ void Rogue_BufferCatchBonus(void)
 {
     VarSet(VAR_TEMP_5, 0);
     GetGraftPieceName(gStringVar1, &sCatchBonusPiece);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The base between runs (MAP_ROGUE_HOME): unlocks show as decorations, Prof. Birch answers questions
+
+static const struct { u8 unlock; u8 x; u8 y; u16 decoration; } sHomeDecorations[] =
+{
+    // (x, y) is the bottom-left tile; tall ones lean on the back wall like in a real base
+    {UNLOCK_STARTER_CHOICE, 1, 1, DECOR_PRETTY_FLOWERS},
+    {UNLOCK_TEAM_4, 13, 1, DECOR_RED_PLANT},
+    {UNLOCK_TEAM_5, 3, 1, DECOR_TROPICAL_PLANT},
+    {UNLOCK_TEAM_6, 11, 2, DECOR_COLORFUL_PLANT},
+    {UNLOCK_MORE_BALLS, 2, 0, DECOR_BALL_POSTER},
+    {UNLOCK_REVIVES, 4, 0, DECOR_RED_POSTER},
+    {UNLOCK_GOOD_GENES, 9, 0, DECOR_PIKA_POSTER},
+    {UNLOCK_PEDIGREE, 12, 0, DECOR_BLUE_POSTER},
+    {UNLOCK_HARD_MODE, 7, 1, DECOR_GOLD_SHIELD},
+    {UNLOCK_DISCOUNT, 1, 3, DECOR_YELLOW_BRICK},
+    {UNLOCK_EXP_PARTY, 1, 5, DECOR_SMALL_DESK},
+    {UNLOCK_SWITCH_STYLE, 13, 4, DECOR_TV},
+    {UNLOCK_CATCH_BONUS, 11, 5, DECOR_TIRE},
+    {UNLOCK_START_PIECE, 1, 8, DECOR_GLASS_ORNAMENT},
+    {UNLOCK_LAST_RITES_1, 2, 8, DECOR_SMALL_CHAIR},
+    {UNLOCK_LAST_RITES_2, 3, 8, DECOR_POKEMON_CHAIR},
+    {UNLOCK_LAST_RITES_3, 4, 8, DECOR_HEAVY_CHAIR},
+    {UNLOCK_FAVORITE, 10, 8, DECOR_POKEMON_DESK},
+    {UNLOCK_HARVEST_BONUS, 12, 8, DECOR_BIG_PLANT},
+};
+
+// ON_LOAD: owned unlocks (all of them with meta-progression off) as decorations; a silver shield once
+// any run has been won
+void Rogue_DecorateHome(void)
+{
+    u32 i;
+    for (i = 0; i < ARRAY_COUNT(sHomeDecorations); i++)
+    {
+        if (HasUnlock(sHomeDecorations[i].unlock))
+            ShowDecorationOnMap(sHomeDecorations[i].x + MAP_OFFSET, sHomeDecorations[i].y + MAP_OFFSET, sHomeDecorations[i].decoration);
+    }
+    if (Rogue_CountWonSpecies() != 0)
+        ShowDecorationOnMap(8 + MAP_OFFSET, 1 + MAP_OFFSET, DECOR_SILVER_SHIELD);
+}
+
+static const struct { const u8 *topic; const u8 *text; } sHelpTopics[] =
+{
+    {COMPOUND_STRING("Runs"), COMPOUND_STRING(
+        "A run is four floors of rooms. Each\n"
+        "floor ends with a GYM LEADER.\p"
+        "Beat the CHAMPION after the last\n"
+        "floor to win the run.\p"
+        "A win opens HARD mode: eight floors\n"
+        "and the ELITE FOUR.")},
+    {COMPOUND_STRING("Doors"), COMPOUND_STRING(
+        "Every room has a few doors. The sign\n"
+        "over each one tells what's behind it:\p"
+        "wild POKéMON, a trainer, items, a\n"
+        "shop, a place to rest, or the boss.\p"
+        "A “?” door could be anything, even\n"
+        "an event you won't find elsewhere.\p"
+        "The ground in a doorway shows the\n"
+        "next room: grass, sand, cave rock,\l"
+        "volcanic rock or metal stairs.\p"
+        "A trainer keeps the doors shut\n"
+        "until you beat them.")},
+    {COMPOUND_STRING("Catching"), COMPOUND_STRING(
+        "Talk to a wild POKéMON to battle it.\n"
+        "A POKé BALL catches it.\p"
+        "Grafting balls break it down into\n"
+        "graft pieces instead: a PATCH BALL\l"
+        "gives one, a GRAFT BALL three and a\l"
+        "SPLICE BALL all of them.\p"
+        "Your team holds three POKéMON at\n"
+        "first. Unlocks add more slots.")},
+    {COMPOUND_STRING("Grafting"), COMPOUND_STRING(
+        "Open the GRAFT BAG and pick a piece:\n"
+        "a move, an ability, a type, a nature\l"
+        "or a base stat.\p"
+        "Then pick who gets it. In a run\n"
+        "there's no limit. Go wild!")},
+    {COMPOUND_STRING("Fainting"), COMPOUND_STRING(
+        "After a battle, you choose for each\n"
+        "POKéMON that fainted:\p"
+        "keep it until you can revive it, let\n"
+        "it go, or give it last rites to\l"
+        "break it down into graft pieces.\p"
+        "If your whole team faints, the run\n"
+        "is over.")},
+    {COMPOUND_STRING("Levels"), COMPOUND_STRING(
+        "Your whole team gets EXP from every\n"
+        "battle, and POKéMON that fall behind\l"
+        "catch up fast.\p"
+        "Nobody grows past the floor boss's\n"
+        "level until the boss is beaten.")},
+    {COMPOUND_STRING("Rest stops"), COMPOUND_STRING(
+        "After each boss comes a rest stop:\n"
+        "heal up, shop, and pick one prize\l"
+        "for free.\p"
+        "The tutor there teaches moves. Pay\n"
+        "money for this run, or BP and every\l"
+        "POKéMON of that kind can relearn it\l"
+        "in later runs too.")},
+    {COMPOUND_STRING("BP & unlocks"), COMPOUND_STRING(
+        "Bosses pay BP. A win pays more, and\n"
+        "so do HARD mode and challenges.\p"
+        "Winning with a species for the first\n"
+        "time pays extra too.\p"
+        "My assistant here trades BP for\n"
+        "unlocks that help every run after.\p"
+        "Each one you own shows up here in\n"
+        "the base!")},
+};
+
+void Rogue_PushHelpTopics(void)
+{
+    u32 i;
+    for (i = 0; i < ARRAY_COUNT(sHelpTopics); i++)
+        PushChoice(sHelpTopics[i].topic, i);
+    PushChoice(COMPOUND_STRING("That's all"), ARRAY_COUNT(sHelpTopics));
+}
+
+// VAR_RESULT: the topic picked; the text goes to gStringVar4. VAR_RESULT FALSE: done.
+void Rogue_GetHelpText(void)
+{
+    if (gSpecialVar_Result >= ARRAY_COUNT(sHelpTopics))
+    {
+        gSpecialVar_Result = FALSE;
+        return;
+    }
+    StringCopy(gStringVar4, sHelpTopics[gSpecialVar_Result].text);
+    gSpecialVar_Result = TRUE;
 }

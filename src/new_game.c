@@ -144,7 +144,7 @@ static void WarpToTruck(void)
     if (IS_FRLG)
         SetWarpDestination(MAP_GROUP(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), MAP_NUM(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), WARP_ID_NONE, 6, 6);
     else // ROGUE: a new game starts in the start room, not the truck
-        SetWarpDestination(MAP_GROUP(MAP_ROGUE_ROOM), MAP_NUM(MAP_ROGUE_ROOM), WARP_ID_NONE, ROGUE_ENTRANCE_X, ROGUE_ENTRANCE_Y);
+        SetWarpDestination(MAP_GROUP(MAP_ROGUE_HOME), MAP_NUM(MAP_ROGUE_HOME), WARP_ID_NONE, ROGUE_HOME_X, ROGUE_HOME_Y);
     WarpIntoMap();
 }
 

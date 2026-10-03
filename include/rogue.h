@@ -75,5 +75,8 @@ void Rogue_PushTutorPayments(void);
 void Rogue_CanPayTutor(void);
 void Rogue_PayTutor(void);
 void Rogue_BufferCatchBonus(void);
+void Rogue_DecorateHome(void);
+void Rogue_PushHelpTopics(void);
+void Rogue_GetHelpText(void);
 
 #endif // GUARD_ROGUE_H
