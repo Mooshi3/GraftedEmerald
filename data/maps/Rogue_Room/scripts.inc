@@ -23,6 +23,7 @@ Rogue_Room_OnFrame:
 	map_script_2 VAR_TEMP_2, 0, Rogue_Room_EventScript_EnterRoom
 	map_script_2 VAR_TEMP_4, 1, Rogue_Room_EventScript_AskFainted
 	map_script_2 VAR_TEMP_5, 1, Rogue_Room_EventScript_CatchBonus
+	map_script_2 VAR_ROGUE_ACHIEVE_SHOW, 1, Rogue_Room_EventScript_Achievement
 	.2byte 0
 
 @ The Catch bonus unlock: a caught Pokémon left a graft piece (Rogue_OnBattleEnd)
@@ -323,11 +324,31 @@ Rogue_Room_EventScript_Nurse::
 	faceplayer
 	msgbox Rogue_Room_Text_NurseHeal, MSGBOX_DEFAULT
 	closemessage
-	special HealPlayerParty
+	special Rogue_NurseHeal
 	playfanfare MUS_HEAL
 	waitfanfare
+	goto_if_eq VAR_RESULT, TRUE, Rogue_Room_EventScript_NurseWeary
 	msgbox Rogue_Room_Text_NurseDone, MSGBOX_DEFAULT
 	release
+	end
+
+Rogue_Room_EventScript_NurseWeary:
+	msgbox Rogue_Room_Text_NurseWeary, MSGBOX_DEFAULT
+	release
+	end
+
+@ An achievement was earned (VAR_ROGUE_ACHIEVE_SHOW): announce each new one
+Rogue_Room_EventScript_Achievement::
+	lockall
+Rogue_Room_EventScript_AchievementLoop:
+	special Rogue_NextAchievement
+	goto_if_eq VAR_RESULT, FALSE, Rogue_Room_EventScript_AchievementEnd
+	playfanfare MUS_OBTAIN_SYMBOL
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	waitfanfare
+	goto Rogue_Room_EventScript_AchievementLoop
+Rogue_Room_EventScript_AchievementEnd:
+	releaseall
 	end
 
 Rogue_Room_EventScript_UnlockShop::
@@ -524,6 +545,11 @@ Rogue_Room_Text_BossPostBattle:
 Rogue_Room_Text_NurseHeal:
 	.string "You look tired.\n"
 	.string "Let me heal your team.$"
+
+Rogue_Room_Text_NurseWeary:
+	.string "We're low on supplies on this floor…\n"
+	.string "Your POKéMON are only half healed.\p"
+	.string "We hope to see you again!$"
 
 Rogue_Room_Text_NurseDone:
 	.string "Your team is back in shape.\n"

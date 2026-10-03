@@ -660,6 +660,10 @@ def_special Rogue_HasHeirloom
 def_special Rogue_PushHeirloomChoices
 def_special Rogue_GiveHeirloom
 def_special Rogue_TakeVaultPiece
+def_special Rogue_NurseHeal
+def_special Rogue_NextAchievement
+def_special Rogue_PushAchievements
+def_special Rogue_GetAchievementText
 def_special Rogue_BufferBP
 def_special Rogue_PushUnlockChoices
 def_special Rogue_DescribeUnlock

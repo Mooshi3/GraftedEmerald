@@ -5,6 +5,7 @@
 #include "global.h"
 #include "rogue.h"
 #include "field_weather.h"
+#include "graft_data.h"
 #include "constants/weather.h"
 #include "battle.h"
 #include "battle_setup.h"
@@ -343,6 +344,11 @@ static const struct
 #define RUN_FLAG_CHALLENGE (RUN_FLAG_INVERSE | RUN_FLAG_MONOTYPE)
 #define RUN_FLAG_PRIZE_TAKEN (1 << 3) // the rest stop's free prize is taken (cleared on leaving it)
 
+// Ace Trainers beaten this run (for the Ace hunter achievement): bits 4-5
+#define RUN_FLAG_ACES_SHIFT 4
+#define RUN_FLAG_ACES_MASK  (0x3 << RUN_FLAG_ACES_SHIFT)
+#define RUN_FLAG_FINALE_FAINT (1 << 6) // a Pokémon fainted in a finale battle (Flawless finale)
+
 // Last rites used this floor: VAR_ROGUE_RUN_FLAGS bits 8-11
 #define RUN_FLAG_RITES_SHIFT 8
 #define RUN_FLAG_RITES_MASK  (0xF << RUN_FLAG_RITES_SHIFT)
@@ -414,6 +420,7 @@ enum
 
 static u32 Mix32(u32 x);
 static u32 GetRoomSeed(void);
+static u32 GetCurse(void);
 
 static u32 GetEventKind(void)
 {
@@ -1295,9 +1302,10 @@ static bool32 IsRoomGuarded(u32 type)
 {
     if (type == ROGUE_ROOM_TRAINER || type == ROGUE_ROOM_ACE || type == ROGUE_ROOM_BOSS)
         return TRUE;
-    // a quarter of the wild and item rooms (half before 2026-10-03: trainer doors had no point)
+    // a quarter of the wild and item rooms (half before 2026-10-03: trainer doors had no point), all of
+    // them under the Ambush curse
     if (type == ROGUE_ROOM_WILD || type == ROGUE_ROOM_ITEM)
-        return Mix32(GetRoomSeed() ^ 0x6A7D) % 100 < 25;
+        return GetCurse() == ROGUE_CURSE_AMBUSH || Mix32(GetRoomSeed() ^ 0x6A7D) % 100 < 25;
     return FALSE;
 }
 
@@ -1580,6 +1588,26 @@ u32 Rogue_GetFloorWeather(u32 floor)
     return WEATHER_SNOW;
 }
 
+// Hard mode curses: from floor 2, 40% of floors have one, rolled from the run seed like the weather and
+// named at the rest stop before the floor (Jacob, 2026-10-03)
+u32 Rogue_GetFloorCurse(u32 floor)
+{
+    u32 roll;
+    if (!Rogue_IsRunActive() || !IsHardMode() || floor <= 1)
+        return ROGUE_CURSE_NONE;
+    roll = Mix32(GetRunSeed() ^ (floor * 0x85EBCA6B) ^ 0xC0E5);
+    if (roll % 100 >= 40)
+        return ROGUE_CURSE_NONE;
+    return ROGUE_CURSE_NONE + 1 + (roll >> 8) % (ROGUE_CURSE_COUNT - 1);
+}
+
+static u32 GetCurse(void)
+{
+    return Rogue_GetFloorCurse(GetFloor());
+}
+
+static void CheckGraftAchievement(void);
+
 void Rogue_OnTransition(void)
 {
     u32 i;
@@ -1602,7 +1630,10 @@ void Rogue_OnTransition(void)
         bool32 doorShown = sPlan.kind != ROOM_KIND_ARENA;
         if (i < NUM_MARKERS && doorShown && sPlan.doors[i] != NO_DOOR)
         {
-            SetObjectTemplate(i, GetDoorMarkerGraphics(sPlan.doors[i]), GetDoorX(i), cave ? 1 : 2,
+            u32 sign = sPlan.doors[i];
+            if (GetCurse() == ROGUE_CURSE_FOG && sign != ROGUE_ROOM_BOSS && sign != ROGUE_ROOM_HUB)
+                sign = ROGUE_ROOM_MYSTERY; // the Fog curse: every sign but the boss's is a "?"
+            SetObjectTemplate(i, GetDoorMarkerGraphics(sign), GetDoorX(i), cave ? 1 : 2,
                               MOVEMENT_TYPE_FACE_DOWN, TRAINER_TYPE_NONE, 0, NULL);
         }
         else if (i >= NUM_MARKERS && i < FIRST_THICKET_SLOT && i - NUM_MARKERS < sPlan.numObjects)
@@ -2334,7 +2365,12 @@ void Rogue_PrepareItemBall(void)
     u32 i, pick;
 
     for (i = 0; i < ARRAY_COUNT(sItemBallItems); i++)
+    {
         weights[i] = GetFloor() >= sItemBallItems[i].minFloor ? sItemBallItems[i].weight : 0;
+        if (GetCurse() == ROGUE_CURSE_SHORT_SUPPLY
+         && (sItemBallItems[i].item == ITEM_POKE_BALL || sItemBallItems[i].item == ITEM_GREAT_BALL))
+            weights[i] = 0;
+    }
     pick = PickWeighted(&rng, weights, ARRAY_COUNT(sItemBallItems), 0);
     gSpecialVar_0x8000 = sItemBallItems[pick].item;
     gSpecialVar_0x8001 = sItemBallItems[pick].quantity;
@@ -2407,6 +2443,169 @@ static u32 RecordWonSpecies(void)
     return newCount;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Achievements (Jacob, 2026-10-03): each pays BP once. Worth building a run around, but all of them
+// together (340 BP) buy well under half of the unlock shop. Earned ones are announced by the map's
+// OnFrame (VAR_ROGUE_ACHIEVE_SHOW), so they can come from anywhere: a battle, the Graft Bag, a boss.
+enum
+{
+    ACH_FIRST_BOSS,
+    ACH_UNDERDOG,
+    ACH_MONOTYPE,
+    ACH_INVERSE,
+    ACH_FLAWLESS,
+    ACH_SMALL_TEAM,
+    ACH_ACE_HUNTER,
+    ACH_PATCHWORK,
+    ACH_COLLECTOR,
+    ACH_CURATOR,
+    ACH_COUNT,
+};
+
+static const struct { const u8 *name; const u8 *description; u8 bp; } sAchievements[ACH_COUNT] =
+{
+    [ACH_FIRST_BOSS] = {COMPOUND_STRING("First badge"), COMPOUND_STRING("Beat your first boss."), 10},
+    [ACH_UNDERDOG]   = {COMPOUND_STRING("Underdog"), COMPOUND_STRING("Win a run with a POKéMON whose own\nbase stats total under 300."), 40},
+    [ACH_MONOTYPE]   = {COMPOUND_STRING("One type"), COMPOUND_STRING("Win a MONOTYPE run."), 40},
+    [ACH_INVERSE]    = {COMPOUND_STRING("Upside down"), COMPOUND_STRING("Win an INVERSE run."), 40},
+    [ACH_FLAWLESS]   = {COMPOUND_STRING("Flawless finale"), COMPOUND_STRING("Win without a POKéMON fainting in\nthe final battles."), 40},
+    [ACH_SMALL_TEAM] = {COMPOUND_STRING("Small team"), COMPOUND_STRING("Win a run with three POKéMON or\nfewer on your team."), 30},
+    [ACH_ACE_HUNTER] = {COMPOUND_STRING("Ace hunter"), COMPOUND_STRING("Beat three ACE TRAINERS in one run."), 25},
+    [ACH_PATCHWORK]  = {COMPOUND_STRING("Patchwork"), COMPOUND_STRING("Give one POKéMON a move, ability,\ntype, stat and nature graft."), 25},
+    [ACH_COLLECTOR]  = {COMPOUND_STRING("Collector"), COMPOUND_STRING("Win with 10 different species."), 30},
+    [ACH_CURATOR]    = {COMPOUND_STRING("Curator"), COMPOUND_STRING("Win with 50 different species."), 60},
+};
+
+static bool32 HasAchievement(u32 id)
+{
+    return (VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << id)) != 0;
+}
+
+static void Award(u32 id)
+{
+    if (HasAchievement(id))
+        return;
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, VarGet(VAR_ROGUE_ACHIEVEMENTS) | (1 << id));
+    VarSet(VAR_ROGUE_ACHIEVE_NEW, VarGet(VAR_ROGUE_ACHIEVE_NEW) | (1 << id));
+    VarSet(VAR_ROGUE_ACHIEVE_SHOW, 1);
+    if (IsMetaOn())
+        GiveBP(sAchievements[id].bp);
+}
+
+// The next achievement to announce: gStringVar4 = the message, VAR_RESULT FALSE when there's none
+void Rogue_NextAchievement(void)
+{
+    u32 id, pending = VarGet(VAR_ROGUE_ACHIEVE_NEW);
+    gSpecialVar_Result = FALSE;
+    for (id = 0; id < ACH_COUNT && !(pending & (1 << id)); id++)
+        ;
+    if (id >= ACH_COUNT)
+    {
+        VarSet(VAR_ROGUE_ACHIEVE_NEW, 0);
+        VarSet(VAR_ROGUE_ACHIEVE_SHOW, 0);
+        return;
+    }
+    VarSet(VAR_ROGUE_ACHIEVE_NEW, pending & ~(1 << id));
+    StringCopy(gStringVar1, sAchievements[id].name);
+    ConvertIntToDecimalStringN(gStringVar2, sAchievements[id].bp, STR_CONV_MODE_LEFT_ALIGN, 3);
+    StringExpandPlaceholders(gStringVar4, IsMetaOn()
+        ? COMPOUND_STRING("Achievement: {STR_VAR_1}!\pYou earned {STR_VAR_2} BP!")
+        : COMPOUND_STRING("Achievement: {STR_VAR_1}!"));
+    gSpecialVar_Result = TRUE;
+}
+
+// Prof. Birch's list: done ones are marked
+void Rogue_PushAchievements(void)
+{
+    u8 name[32];
+    u32 i;
+    for (i = 0; i < ACH_COUNT; i++)
+    {
+        StringCopy(name, sAchievements[i].name);
+        if (HasAchievement(i))
+            StringAppend(name, COMPOUND_STRING(" (done)"));
+        PushChoice(name, i);
+    }
+}
+
+// VAR_RESULT = the picked achievement; gStringVar4 = its description and reward
+void Rogue_GetAchievementText(void)
+{
+    u32 id = gSpecialVar_Result % ACH_COUNT;
+    StringCopy(gStringVar1, sAchievements[id].description);
+    ConvertIntToDecimalStringN(gStringVar2, sAchievements[id].bp, STR_CONV_MODE_LEFT_ALIGN, 3);
+    StringExpandPlaceholders(gStringVar4, HasAchievement(id)
+        ? COMPOUND_STRING("{STR_VAR_1}\pDone! It paid {STR_VAR_2} BP.")
+        : COMPOUND_STRING("{STR_VAR_1}\pReward: {STR_VAR_2} BP."));
+}
+
+static u32 GetNaturalBST(enum Species species)
+{
+    const struct SpeciesInfo *info = &gSpeciesInfo[species];
+    return info->baseHP + info->baseAttack + info->baseDefense + info->baseSpeed + info->baseSpAttack + info->baseSpDefense;
+}
+
+static bool32 HasAllGraftKinds(struct BoxPokemon *box)
+{
+    u32 i;
+    bool32 stat = FALSE;
+    for (i = 0; i < NUM_STATS; i++)
+        stat |= (box->graftStatOverrides[i] != 0);
+    return stat && box->graftAbility != GRAFT_ABILITY_NONE
+        && (box->graftTypes[0] != GRAFT_TYPE_NONE || box->graftTypes[1] != GRAFT_TYPE_NONE)
+        && (box->graftFlags & GRAFT_FLAG_NATURE) && (box->graftFlags & GRAFT_FLAG_MOVE);
+}
+
+static void CheckGraftAchievement(void)
+{
+    u32 i;
+    if (!Rogue_IsRunActive() || HasAchievement(ACH_PATCHWORK))
+        return;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE && HasAllGraftKinds(&mon->box))
+            Award(ACH_PATCHWORK);
+    }
+}
+
+// The Graft Bag closed (graft_bag_menu.c): a graft may have completed Patchwork
+void Rogue_OnGraftBagClosed(void)
+{
+    CheckGraftAchievement();
+}
+
+// The run is won (the party is still there)
+static void CheckWinAchievements(void)
+{
+    u32 i, count = 0;
+    bool32 underdog = FALSE;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        enum Species species = GetMonData(mon, MON_DATA_SPECIES);
+        if (species == SPECIES_NONE || GetMonData(mon, MON_DATA_IS_EGG))
+            continue;
+        count++;
+        if (GetNaturalBST(species) < 300)
+            underdog = TRUE;
+    }
+    if (underdog)
+        Award(ACH_UNDERDOG);
+    if (count <= 3)
+        Award(ACH_SMALL_TEAM);
+    if (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_MONOTYPE)
+        Award(ACH_MONOTYPE);
+    if (VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_INVERSE)
+        Award(ACH_INVERSE);
+    if (!(VarGet(VAR_ROGUE_RUN_FLAGS) & RUN_FLAG_FINALE_FAINT))
+        Award(ACH_FLAWLESS);
+    if (Rogue_CountWonSpecies() >= 10)
+        Award(ACH_COLLECTOR);
+    if (Rogue_CountWonSpecies() >= 50)
+        Award(ACH_CURATOR);
+}
+
 void Rogue_OnBossDefeated(void)
 {
     u32 floor = GetFloor();
@@ -2457,6 +2656,9 @@ void Rogue_OnBossDefeated(void)
         StringExpandPlaceholders(gStringVar3, COMPOUND_STRING("You earned {STR_VAR_2} BP!"));
         StringAppend(gStringVar4, gStringVar3);
     }
+    Award(ACH_FIRST_BOSS);
+    if (IsFinale(floor) && GetRoom() >= GetFinaleLength())
+        CheckWinAchievements(); // after RecordWonSpecies, so this win's species count
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2675,6 +2877,21 @@ void Rogue_OnBattleEnd(void)
     u32 i;
     if (!Rogue_IsRunActive() || gBattleOutcome == B_OUTCOME_LOST || gBattleOutcome == B_OUTCOME_DREW)
         return;
+    if (IsFinale(GetFloor()) && (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+     && TRAINER_BATTLE_PARAM.opponentA == TRAINER_ROGUE_BOSS && gBattleResults.playerFaintCounter != 0)
+        VarSet(VAR_ROGUE_RUN_FLAGS, VarGet(VAR_ROGUE_RUN_FLAGS) | RUN_FLAG_FINALE_FAINT);
+    if ((gBattleTypeFlags & BATTLE_TYPE_TRAINER) && gBattleOutcome == B_OUTCOME_WON
+     && TRAINER_BATTLE_PARAM.opponentA == TRAINER_ROGUE_TRAINER && GetRoomType() == ROGUE_ROOM_ACE)
+    {
+        u32 flags = VarGet(VAR_ROGUE_RUN_FLAGS);
+        u32 aces = (flags & RUN_FLAG_ACES_MASK) >> RUN_FLAG_ACES_SHIFT;
+        if (aces < 3)
+            aces++;
+        VarSet(VAR_ROGUE_RUN_FLAGS, (flags & ~RUN_FLAG_ACES_MASK) | (aces << RUN_FLAG_ACES_SHIFT));
+        if (aces >= 3)
+            Award(ACH_ACE_HUNTER);
+    }
+    CheckGraftAchievement();
     for (i = 0; i < PARTY_SIZE; i++)
     {
         struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
@@ -2882,6 +3099,8 @@ static void BuildTrainer(u32 slot, u32 key)
     {
         size = min(1 + (floor - 1) / 2 + (GetRoom() > ROGUE_ROOMS_PER_FLOOR / 2) + ace, PARTY_SIZE);
         level = GetWildLevel() + 1 + 2 * ace; // an Ace Trainer: one more Pokémon, two levels higher
+        if (GetCurse() == ROGUE_CURSE_TOUGH)
+            level += 2;
         iv = min(31, floor * 3 + 6 * ace);
     }
     if (size == 0)
@@ -3050,7 +3269,29 @@ void Rogue_GivePrize(void)
 }
 
 // STR_VAR_1: where the rest stop's exit leads
-// The rest stop's exit: gStringVar4 = the question, with the next floor's weather if it has any
+// A room's Pokémon Center nurse (and the rest stop's): the Weary curse heals rooms' Centers only to
+// half HP. VAR_RESULT TRUE if it did.
+void Rogue_NurseHeal(void)
+{
+    u16 hp[PARTY_SIZE];
+    u32 i;
+    gSpecialVar_Result = (GetCurse() == ROGUE_CURSE_WEARY && GetRoomType() != ROGUE_ROOM_REST_STOP);
+    for (i = 0; i < PARTY_SIZE; i++)
+        hp[i] = GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_HP);
+    HealPlayerParty();
+    if (!gSpecialVar_Result)
+        return;
+    for (i = 0; i < PARTY_SIZE; i++)
+    {
+        struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][i];
+        u16 half = (GetMonData(mon, MON_DATA_MAX_HP) + 1) / 2;
+        u16 newHp = max(hp[i], half);
+        if (GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE && !GetMonData(mon, MON_DATA_IS_EGG))
+            SetMonData(mon, MON_DATA_HP, &newHp);
+    }
+}
+
+// The rest stop's exit: gStringVar4 = the question, with the next floor's weather and curse if any
 void Rogue_BufferNextFloor(void)
 {
     const u8 *forecast = NULL;
@@ -3070,15 +3311,27 @@ void Rogue_BufferNextFloor(void)
         case WEATHER_SNOW:      forecast = COMPOUND_STRING("Word is it's snowing outdoors\non {STR_VAR_1}.\p"); break;
         }
     }
+    gStringVar4[0] = EOS;
     if (forecast != NULL)
-    {
         StringExpandPlaceholders(gStringVar4, forecast);
-        StringAppend(gStringVar4, COMPOUND_STRING("Leave the rest stop and head on\nto "));
-    }
-    else
+    if (GetFloor() < GetNumFloors())
     {
-        StringCopy(gStringVar4, COMPOUND_STRING("Leave the rest stop and head on\nto "));
+        static const u8 *const sCurseNews[ROGUE_CURSE_COUNT] =
+        {
+            [ROGUE_CURSE_FOG] = COMPOUND_STRING("Word is a fog hides the door signs\non {STR_VAR_1}.\p"),
+            [ROGUE_CURSE_AMBUSH] = COMPOUND_STRING("Word is trainers lie in wait in\nevery room on {STR_VAR_1}.\p"),
+            [ROGUE_CURSE_TOUGH] = COMPOUND_STRING("Word is the trainers on {STR_VAR_1}\nare tougher than usual.\p"),
+            [ROGUE_CURSE_SHORT_SUPPLY] = COMPOUND_STRING("Word is there are no POKé BALLS\nlying around on {STR_VAR_1}.\p"),
+            [ROGUE_CURSE_WEARY] = COMPOUND_STRING("Word is the POKéMON CENTERS on\n{STR_VAR_1} are low on supplies.\p"),
+        };
+        u32 curse = Rogue_GetFloorCurse(GetFloor() + 1);
+        if (curse != ROGUE_CURSE_NONE)
+        {
+            StringExpandPlaceholders(gStringVar3, sCurseNews[curse]);
+            StringAppend(gStringVar4, gStringVar3);
+        }
     }
+    StringAppend(gStringVar4, COMPOUND_STRING("Leave the rest stop and head on\nto "));
     StringAppend(gStringVar4, gStringVar1);
     StringAppend(gStringVar4, COMPOUND_STRING("?"));
 }
@@ -3427,6 +3680,17 @@ static const struct { const u8 *topic; const u8 *text; } sHelpTopics[] =
         "money for this run, or BP and every\l"
         "POKéMON of that kind can relearn it\l"
         "in later runs too.")},
+    {COMPOUND_STRING("Weather"), COMPOUND_STRING(
+        "Some floors have rain, harsh sun,\n"
+        "a sandstorm or snow outdoors. Every\l"
+        "battle there starts with it.\p"
+        "On HARD mode, some floors are\n"
+        "cursed too: fog over the door signs,\l"
+        "more trainers, tougher trainers, no\l"
+        "POKé BALLS lying around, or tired\l"
+        "POKéMON CENTERS.\p"
+        "The rest stop hears about it before\n"
+        "you head on.")},
     {COMPOUND_STRING("BP & unlocks"), COMPOUND_STRING(
         "Bosses pay BP. A win pays more, and\n"
         "so do HARD mode and challenges.\p"
@@ -3443,12 +3707,19 @@ void Rogue_PushHelpTopics(void)
     u32 i;
     for (i = 0; i < ARRAY_COUNT(sHelpTopics); i++)
         PushChoice(sHelpTopics[i].topic, i);
-    PushChoice(COMPOUND_STRING("That's all"), ARRAY_COUNT(sHelpTopics));
+    PushChoice(COMPOUND_STRING("Achievements"), ARRAY_COUNT(sHelpTopics));
+    PushChoice(COMPOUND_STRING("That's all"), ARRAY_COUNT(sHelpTopics) + 1);
 }
 
 // VAR_RESULT: the topic picked; the text goes to gStringVar4. VAR_RESULT FALSE: done.
+// VAR_RESULT: TRUE with the topic's text in gStringVar4, 2 for the achievements list, FALSE to stop
 void Rogue_GetHelpText(void)
 {
+    if (gSpecialVar_Result == ARRAY_COUNT(sHelpTopics))
+    {
+        gSpecialVar_Result = 2;
+        return;
+    }
     if (gSpecialVar_Result >= ARRAY_COUNT(sHelpTopics))
     {
         gSpecialVar_Result = FALSE;

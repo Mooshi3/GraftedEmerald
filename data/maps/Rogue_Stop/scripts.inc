@@ -6,6 +6,7 @@ Rogue_Stop_MapScripts::
 
 Rogue_Stop_OnFrame:
 	map_script_2 VAR_TEMP_2, 0, Rogue_Room_EventScript_EnterRoom
+	map_script_2 VAR_ROGUE_ACHIEVE_SHOW, 1, Rogue_Room_EventScript_Achievement
 	.2byte 0
 
 Rogue_Stop_EventScript_Exit::

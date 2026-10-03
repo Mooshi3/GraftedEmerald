@@ -13,6 +13,7 @@ Rogue_Home_OnFrame:
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_LOST, Rogue_Room_EventScript_RunLost
 	map_script_2 VAR_ROGUE_STATE, ROGUE_STATE_RUN_WON, Rogue_Room_EventScript_RunWon
 	map_script_2 VAR_ROGUE_INTRO, 0, Rogue_Room_EventScript_AskMeta
+	map_script_2 VAR_ROGUE_ACHIEVE_SHOW, 1, Rogue_Room_EventScript_Achievement
 	.2byte 0
 
 Rogue_Home_EventScript_Exit::
@@ -43,13 +44,28 @@ Rogue_Home_EventScript_BirchTopics:
 	goto_if_eq VAR_RESULT, MULTI_B_PRESSED, Rogue_Home_EventScript_BirchBye
 	special Rogue_GetHelpText
 	goto_if_eq VAR_RESULT, FALSE, Rogue_Home_EventScript_BirchBye
+	goto_if_eq VAR_RESULT, 2, Rogue_Home_EventScript_Achievements
 	msgbox gStringVar4, MSGBOX_DEFAULT
 	goto Rogue_Home_EventScript_BirchTopics
+
+@ The achievements: done ones are marked; picking one shows how to get it and its reward
+Rogue_Home_EventScript_Achievements:
+	special Rogue_PushAchievements
+	message Rogue_Home_Text_BirchAchievements
+	waitmessage
+	dynmultistack 0, 0, FALSE, 6, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	goto_if_eq VAR_RESULT, MULTI_B_PRESSED, Rogue_Home_EventScript_BirchTopics
+	special Rogue_GetAchievementText
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	goto Rogue_Home_EventScript_Achievements
 
 Rogue_Home_EventScript_BirchBye:
 	msgbox Rogue_Home_Text_BirchBye, MSGBOX_DEFAULT
 	release
 	end
+
+Rogue_Home_Text_BirchAchievements:
+	.string "Each of these pays BP once.$"
 
 Rogue_Home_Text_Leave:
 	.string "Head out on a run?$"

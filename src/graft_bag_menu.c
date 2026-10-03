@@ -654,6 +654,7 @@ static void Task_GraftBagExit(u8 taskId)
     {
         DestroyTask(taskId);
         FreeGraftBagScreen();
+        Rogue_OnGraftBagClosed(); // the Patchwork achievement
         SetMainCallback2(sExitCallback);
     }
 }

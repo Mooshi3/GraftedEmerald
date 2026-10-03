@@ -39,6 +39,15 @@
 #define ROGUE_FAINTED_KEEP    0
 #define ROGUE_FAINTED_RITES   1
 
+// Hard mode curses on a floor (Rogue_GetFloorCurse)
+#define ROGUE_CURSE_NONE         0
+#define ROGUE_CURSE_FOG          1 // every door sign but the boss's shows "?"
+#define ROGUE_CURSE_AMBUSH       2 // every wild and item room is guarded
+#define ROGUE_CURSE_TOUGH        3 // trainers are 2 levels higher
+#define ROGUE_CURSE_SHORT_SUPPLY 4 // no Poké or Great Balls in item rooms
+#define ROGUE_CURSE_WEARY        5 // room Pokémon Centers heal only to half HP
+#define ROGUE_CURSE_COUNT        6
+
 // Where the player arrives in the base between runs (MAP_ROGUE_HOME)
 #define ROGUE_HOME_X 7
 #define ROGUE_HOME_Y 8

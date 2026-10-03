@@ -9,6 +9,7 @@
 #include "constants/move_relearner.h"
 #include "graft_settings.h"
 #include "graft_bag.h"
+#include "graft_data.h"
 #include "graft_challenge.h"
 #include "item.h"
 #include "battle.h"
@@ -254,6 +255,7 @@ TEST("Beating the Champion pays BP and opens Hard mode")
     VarSet(VAR_ROGUE_UNLOCKS, 0);
     VarSet(VAR_ROGUE_RUN_FLAGS, 0);
     gSaveBlock2Ptr->frontier.battlePoints = 0;
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, 0xFFFF); // all earned: no achievement BP in this count
     SetRoom(4242, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
     Rogue_OnBossDefeated();
     EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 5);
@@ -376,6 +378,7 @@ TEST("Rogue: challenges last one run and pay more BP")
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_LEVEL_CAP), GRAFT_LEVEL_CAP_HARD);
 
     gSaveBlock2Ptr->frontier.battlePoints = 0;
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, 0xFFFF); // all earned: no achievement BP in this count
     SetRoom(GetGraftSetting(GRAFT_SETTING_MONOTYPE), 1, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_BOSS);
     VarSet(VAR_ROGUE_RUN_FLAGS, 1 << 2);
     Rogue_OnBossDefeated();
@@ -621,6 +624,7 @@ TEST("Rogue: winning with a species for the first time pays a bonus, once")
     CreateMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_GARCHOMP, 50, 0, OTID_STRUCT_PLAYER_ID);
     CreateMon(&gParties[B_TRAINER_PLAYER][1], SPECIES_SLOWPOKE_GALAR, 50, 0, OTID_STRUCT_PLAYER_ID);
     gSaveBlock2Ptr->frontier.battlePoints = 0;
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, 0xFFFF); // all earned: no achievement BP in this count
     SetRoom(4242, ROGUE_FLOORS_NORMAL + 1, 1, ROGUE_ROOM_BOSS); // the Champion
     Rogue_OnBossDefeated();
     EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 20 + 2 * 3);
@@ -776,4 +780,163 @@ TEST("Rogue: some floors after the first have weather")
     }
     EXPECT_GT(weathered, total / 5);
     EXPECT_LT(weathered, total * 3 / 5);
+}
+
+TEST("Rogue: Hard mode floors after the first can be cursed")
+{
+    u32 seed, floor, cursed = 0, total = 0, seen = 0;
+    for (seed = 1; seed < 40; seed++)
+    {
+        SetRoom(seed * 104729, 1, 1, ROGUE_ROOM_WILD);
+        VarSet(VAR_ROGUE_RUN_FLAGS, 0); // Normal: never
+        for (floor = 1; floor <= 8; floor++)
+            EXPECT_EQ(Rogue_GetFloorCurse(floor), ROGUE_CURSE_NONE);
+        VarSet(VAR_ROGUE_RUN_FLAGS, 1); // Hard
+        EXPECT_EQ(Rogue_GetFloorCurse(1), ROGUE_CURSE_NONE);
+        for (floor = 2; floor <= 8; floor++)
+        {
+            u32 curse = Rogue_GetFloorCurse(floor);
+            total++;
+            EXPECT_LT(curse, ROGUE_CURSE_COUNT);
+            if (curse != ROGUE_CURSE_NONE)
+            {
+                cursed++;
+                seen |= 1 << curse;
+            }
+        }
+    }
+    EXPECT_GT(cursed, total / 5);
+    EXPECT_LT(cursed, total * 3 / 5);
+    EXPECT_EQ(seen, ((1 << ROGUE_CURSE_COUNT) - 1) & ~1); // every curse shows up
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+}
+
+TEST("Rogue: the Weary curse heals a room's Center only halfway; the rest stop heals fully")
+{
+    u32 seed, hp, maxHp;
+    VarSet(VAR_ROGUE_RUN_FLAGS, 1); // Hard
+    for (seed = 1; seed < 2000; seed++)
+    {
+        SetRoom(seed, 2, 3, ROGUE_ROOM_REST);
+        if (Rogue_GetFloorCurse(2) == ROGUE_CURSE_WEARY)
+            break;
+    }
+    EXPECT_EQ(Rogue_GetFloorCurse(2), ROGUE_CURSE_WEARY);
+    SetUpFaintedTeam(); // Pikachu fainted
+    Rogue_NurseHeal();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    hp = GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP);
+    maxHp = GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_MAX_HP);
+    EXPECT_EQ(hp, (maxHp + 1) / 2);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_HP), GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_MAX_HP));
+
+    SetRoom(seed, 2, ROGUE_ROOMS_PER_FLOOR + 1, ROGUE_ROOM_REST_STOP);
+    SetUpFaintedTeam();
+    Rogue_NurseHeal();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][1], MON_DATA_HP), maxHp);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+}
+
+TEST("Rogue: achievements pay BP once and are announced")
+{
+    struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][0];
+    u32 i;
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, 0);
+    VarSet(VAR_ROGUE_ACHIEVE_NEW, 0);
+    VarSet(VAR_ROGUE_ACHIEVE_SHOW, 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    VarSet(VAR_ROGUE_UNLOCKS, 0);
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+
+    // Patchwork: one Pokémon with all five graft kinds
+    SetRoom(31, 1, 3, ROGUE_ROOM_WILD);
+    ZeroPlayerPartyMons();
+    CreateMon(mon, SPECIES_PIKACHU, 10, 0, OTID_STRUCT_PLAYER_ID);
+    mon->box.graftTypes[0] = TYPE_FIRE;
+    mon->box.graftAbility = ABILITY_LEVITATE;
+    mon->box.graftFlags |= GRAFT_FLAG_NATURE | GRAFT_FLAG_MOVE;
+    Rogue_OnGraftBagClosed();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 0); // no stat graft yet
+    mon->box.graftStatOverrides[0] = 100;
+    Rogue_OnGraftBagClosed();
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 25);
+    EXPECT_EQ(VarGet(VAR_ROGUE_ACHIEVE_SHOW), 1);
+    Rogue_OnGraftBagClosed(); // once only
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 25);
+    Rogue_NextAchievement();
+    EXPECT_EQ(gSpecialVar_Result, TRUE);
+    Rogue_NextAchievement();
+    EXPECT_EQ(gSpecialVar_Result, FALSE);
+    EXPECT_EQ(VarGet(VAR_ROGUE_ACHIEVE_SHOW), 0);
+
+    // Ace hunter: three Ace Trainers in one run
+    gBattleTypeFlags = BATTLE_TYPE_TRAINER;
+    gBattleOutcome = B_OUTCOME_WON;
+    TRAINER_BATTLE_PARAM.opponentA = TRAINER_ROGUE_TRAINER;
+    for (i = 0; i < 3; i++)
+    {
+        EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 25);
+        SetRoom(31, 1, 3 + i, ROGUE_ROOM_ACE);
+        Rogue_OnBattleEnd();
+    }
+    EXPECT_EQ(gSaveBlock2Ptr->frontier.battlePoints, 50);
+
+    // A finale battle where a Pokémon fainted: no Flawless finale
+    gBattleResults.playerFaintCounter = 1;
+    TRAINER_BATTLE_PARAM.opponentA = TRAINER_ROGUE_BOSS;
+    SetRoom(31, ROGUE_FLOORS_NORMAL + 1, 1, ROGUE_ROOM_BOSS);
+    Rogue_OnBattleEnd();
+    gBattleResults.playerFaintCounter = 0;
+    gBattleTypeFlags = 0;
+
+    // The win, with one Pikachu (BST 320), in a Monotype run: First badge 10, Small team 30, One type 40;
+    // no Underdog (320), no Flawless finale, no Inverse
+    VarSet(VAR_ROGUE_RUN_FLAGS, VarGet(VAR_ROGUE_RUN_FLAGS) | (1 << 2));
+    memset(&gSaveBlock2Ptr->frontier.ereaderTrainer, 0, sizeof(gSaveBlock2Ptr->frontier.ereaderTrainer));
+    gSaveBlock2Ptr->frontier.battlePoints = 0;
+    Rogue_OnBossDefeated();
+    EXPECT(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 0)); // First badge
+    EXPECT(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 2)); // One type
+    EXPECT(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 5)); // Small team
+    EXPECT(!(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 1))); // Underdog
+    EXPECT(!(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 3))); // Upside down
+    EXPECT(!(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 4))); // Flawless finale
+
+    // A Pichu (BST 205) wins the next run: Underdog
+    CreateMon(mon, SPECIES_PICHU, 10, 0, OTID_STRUCT_PLAYER_ID);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    Rogue_OnBossDefeated();
+    EXPECT(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 1));
+    EXPECT(VarGet(VAR_ROGUE_ACHIEVEMENTS) & (1 << 4)); // and no faint this time
+
+    VarSet(VAR_ROGUE_ACHIEVEMENTS, 0);
+    VarSet(VAR_ROGUE_ACHIEVE_NEW, 0);
+    VarSet(VAR_ROGUE_ACHIEVE_SHOW, 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    memset(&gSaveBlock2Ptr->frontier.ereaderTrainer, 0, sizeof(gSaveBlock2Ptr->frontier.ereaderTrainer));
+}
+
+TEST("Rogue: the Fog curse turns door signs into question marks")
+{
+    u32 seed, i, shown = 0;
+    VarSet(VAR_ROGUE_RUN_FLAGS, 1); // Hard
+    for (seed = 1; seed < 2000; seed++)
+    {
+        SetRoom(seed, 2, 3, ROGUE_ROOM_WILD);
+        if (Rogue_GetFloorCurse(2) == ROGUE_CURSE_FOG)
+            break;
+    }
+    EXPECT_EQ(Rogue_GetFloorCurse(2), ROGUE_CURSE_FOG);
+    Rogue_OnTransition();
+    for (i = 0; i < 3; i++)
+    {
+        const struct ObjectEventTemplate *template = &gSaveBlock1Ptr->objectEventTemplates[i];
+        if (FlagGet(template->flagId))
+            continue; // no door here
+        shown++;
+        EXPECT_EQ(template->graphicsId, OBJ_EVENT_MON + SPECIES_UNOWN_QUESTION);
+    }
+    EXPECT_GT(shown, 0);
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
 }

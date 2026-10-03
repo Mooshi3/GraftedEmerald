@@ -222,4 +222,14 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   their forest and beach rooms (indoor themes have none). It's overworld weather, so battles there start
   with it. The rest stop's exit names it ("Word is it's raining outdoors on FLOOR 3.").
 - Fainted Pokémon: only asked about with last rites left (see Fainting).
-- Proposed, waiting on Jacob: Hard mode curses and achievements (2026-10-03).
+- Hard mode curses (approved 2026-10-03): from floor 2, 40% of Hard floors have one, named at the
+  rest stop: Fog (door signs show "?", except the boss), Ambush (every wild and item room guarded), Tough
+  crowd (trainers +2 levels), Short supply (no Poké or Great Balls in item rooms), Weary (room Centers heal
+  only to half HP; the rest stop still heals fully). `Rogue_GetFloorCurse`, rolled from the run seed.
+- Achievements (approved 2026-10-03; payouts left to Claude: worth a dedicated run, 340 BP in all, well
+  under half the unlock shop): First badge 10, Underdog (win with a Pokémon under 300 natural BST) 40,
+  One type (Monotype win) 40, Upside down (Inverse win) 40, Flawless finale (no faint in the finale's
+  battles) 40, Small team (win with 3 or fewer) 30, Ace hunter (3 Ace Trainers in a run) 25, Patchwork
+  (one Pokémon with all five graft kinds) 25, Collector (10 species won with) 30, Curator (50) 60.
+  Announced by the map's OnFrame (`VAR_ROGUE_ACHIEVE_SHOW`); Prof. Birch lists them with their rewards.
+  Small team comes free on a first win without team slot unlocks; that's why it pays less.
