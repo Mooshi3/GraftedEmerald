@@ -356,3 +356,25 @@ TEST("Rogue: challenges last one run and pay more BP")
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_MONOTYPE), TYPE_NONE);
     EXPECT_EQ(GetGraftSetting(GRAFT_SETTING_INVERSE), FALSE);
 }
+
+TEST("Rogue: the Favorite unlock offers the favorite's first stage as a starter")
+{
+    VarSet(VAR_ROGUE_UNLOCKS, (1 << 14)); // UNLOCK_FAVORITE
+    ZeroPlayerPartyMons();
+    CreateMon(&gParties[B_TRAINER_PLAYER][0], SPECIES_GARCHOMP, 50, 0, OTID_STRUCT_PLAYER_ID);
+    gSpecialVar_0x8004 = 0;
+    Rogue_SetFavorite();
+    EXPECT_EQ(VarGet(VAR_ROGUE_FAVORITE), SPECIES_GIBLE);
+
+    VarSet(VAR_ROGUE_STATE, ROGUE_STATE_HUB);
+    VarSet(VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_HUB);
+    gSpecialVar_0x8004 = 1;
+    gSpecialVar_0x8006 = ROGUE_CHALLENGE_NONE;
+    Rogue_TakeDoor();
+    EXPECT_EQ(gSpecialVar_Result, ROGUE_DOOR_CHOOSE_STARTER); // a random starter or the favorite
+    EXPECT_EQ(CalculatePlayerPartyCount(), 0);
+    gSpecialVar_Result = 1; // the second choice: the favorite
+    Rogue_GiveChosenStarter();
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_SPECIES), SPECIES_GIBLE);
+    EXPECT_EQ(GetMonData(&gParties[B_TRAINER_PLAYER][0], MON_DATA_LEVEL), 5);
+}

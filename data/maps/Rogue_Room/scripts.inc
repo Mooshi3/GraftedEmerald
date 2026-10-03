@@ -147,7 +147,7 @@ Rogue_Room_EventScript_AskChallenge::
 Rogue_Room_EventScript_ChooseStarter::
 	msgbox Rogue_Room_Text_ChooseStarter, MSGBOX_DEFAULT
 	special Rogue_PushStarterChoices
-	dynmultistack 0, 0, TRUE, 3, FALSE, 0, DYN_MULTICHOICE_CB_NONE
+	dynmultistack 0, 0, TRUE, 4, FALSE, 0, DYN_MULTICHOICE_CB_NONE
 	special Rogue_GiveChosenStarter
 	goto Rogue_Room_EventScript_StartedRun
 	end

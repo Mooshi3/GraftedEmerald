@@ -672,3 +672,5 @@ def_special Rogue_PushChallengeChoices
 def_special Rogue_PushTypeChoices
 def_special Rogue_OpenDoors
 def_special Rogue_WarpToRoom, waitstate=1
+def_special Rogue_GetFavorite
+def_special Rogue_SetFavorite

@@ -139,3 +139,10 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   volcanoes have their own maps (`Rogue_Cave`, `Rogue_Volcano`) with the same size, inside and door columns;
   `Rogue_WarpToRoom` picks the map. Debug menu > Scripts has Beach / Cave / Volcano jumps.
   `tools/rogue/render.py` draws a layout or a tileset sheet with metatile ids, for finding tiles.
+
+### Favorite (2026-10-03)
+
+- Unlock **Favorite** (150 BP), Rogue Legacy style: a Pokéfan in the run's Pokémon Centers makes one of
+  your team your favorite (any time, replacing the old one). From then on every run offers its first stage
+  (a Garchomp makes Gible a choice) next to the random starter(s), at level 5 with nothing grafted.
+  Stored in `VAR_ROGUE_FAVORITE`; `VAR_ROGUE_UNLOCKS` has no free bits left (14 is Favorite, 15 Hard mode).

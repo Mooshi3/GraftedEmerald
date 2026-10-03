@@ -55,5 +55,7 @@ void Rogue_ResolveFainted(void);
 void Rogue_SetMetaProgression(void);
 void Rogue_PushChallengeChoices(void);
 void Rogue_PushTypeChoices(void);
+void Rogue_GetFavorite(void);
+void Rogue_SetFavorite(void);
 
 #endif // GUARD_ROGUE_H

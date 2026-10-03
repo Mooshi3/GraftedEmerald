@@ -67,6 +67,7 @@ extern const u8 Rogue_Room_EventScript_Merchant[];
 #define CENTER_X 10 // where a room's trainer, boss, clerk or nurse stands
 #define CENTER_Y 7
 #define NUM_DOORS 3
+#define MAX_STARTER_CHOICES 4 // three with the Starter choice unlock, and the favorite
 #define NO_DOOR 0xFF
 #define NUM_MARKERS NUM_DOORS // object local IDs 1-3: the signs over the doors
 #define MAX_ROOM_OBJECTS 5    // local IDs 4-8: what's in the room
@@ -277,6 +278,7 @@ enum
     UNLOCK_SWITCH_STYLE,
     UNLOCK_GOOD_GENES,
     UNLOCK_PEDIGREE,
+    UNLOCK_FAVORITE,
     UNLOCK_SHOP_COUNT,
     UNLOCK_HARD_MODE = 15, // not bought: beating a Normal run opens it
 };
@@ -303,6 +305,7 @@ static const struct
     [UNLOCK_PEDIGREE] = {COMPOUND_STRING("Pedigree"), COMPOUND_STRING("Every Pokémon has an egg move to\nrelearn, some have two."), 80, UNLOCK_GOOD_GENES},
     [UNLOCK_SWITCH_STYLE] = {COMPOUND_STRING("Switch style"), COMPOUND_STRING("You may switch Pokémon when a\nfoe faints (Shift battle style)."), 20, -1},
     [UNLOCK_START_PIECE] = {COMPOUND_STRING("Heirloom"), COMPOUND_STRING("Pick one of three graft pieces\nto start each run with."), 50, -1},
+    [UNLOCK_FAVORITE] = {COMPOUND_STRING("Favorite"), COMPOUND_STRING("A team member you name in a\nCENTER becomes a starter choice."), 150, -1},
 };
 
 #define RUN_FLAG_HARD     (1 << 0)
@@ -1702,20 +1705,35 @@ static void ClearRunProgress(void)
     SetGraftSetting(GRAFT_SETTING_MONOTYPE, TYPE_NONE);
 }
 
-// The starter candidates of a run: one, or three with the Starter choice unlock
-static void GetStarterCandidates(enum Species *out)
+// The Favorite unlock's species (its first stage), or SPECIES_NONE
+static enum Species GetFavorite(void)
+{
+    enum Species species = VarGet(VAR_ROGUE_FAVORITE);
+    if (!HasUnlock(UNLOCK_FAVORITE) || species == SPECIES_NONE || species >= NUM_SPECIES || !IsSpeciesEnabled(species))
+        return SPECIES_NONE;
+    return species;
+}
+
+// The starter candidates of a run: one, or three with the Starter choice unlock, plus the favorite.
+// Returns how many.
+static u32 GetStarterCandidates(enum Species *out)
 {
     rng_value_t rng = LocalRandomSeed(Mix32(GetRunSeed() ^ 0x57A7));
-    u32 i, j;
-    for (i = 0; i < 3; i++)
+    u32 i, j, count = HasUnlock(UNLOCK_STARTER_CHOICE) ? 3 : 1;
+    enum Species favorite = GetFavorite();
+
+    for (i = 0; i < count; i++)
     {
         do
         {
             out[i] = PickStarter(&rng);
             for (j = 0; j < i && out[j] != out[i]; j++)
                 ;
-        } while (j < i);
+        } while (j < i || out[i] == favorite);
     }
+    if (favorite != SPECIES_NONE)
+        out[count++] = favorite;
+    return count;
 }
 
 static void GiveStarter(enum Species species)
@@ -1728,7 +1746,7 @@ static void GiveStarter(enum Species species)
 static void StartRun(bool32 hard, u32 challenge, u32 monotype)
 {
     u32 seed = Random32();
-    enum Species starters[3];
+    enum Species starters[MAX_STARTER_CHOICES];
 
     ClearRunProgress();
     VarSet(VAR_ROGUE_SEED_LO, seed & 0xFFFF);
@@ -1745,11 +1763,8 @@ static void StartRun(bool32 hard, u32 challenge, u32 monotype)
         SetGraftSetting(GRAFT_SETTING_MONOTYPE, monotype);
     SetForcedSettings();
 
-    if (!HasUnlock(UNLOCK_STARTER_CHOICE))
-    {
-        GetStarterCandidates(starters);
+    if (GetStarterCandidates(starters) == 1)
         GiveStarter(starters[0]);
-    }
 
     AddBagItem(ITEM_POKE_BALL, HasUnlock(UNLOCK_MORE_BALLS) ? 8 : 5);
     AddBagItem(ITEM_PATCH_BALL, HasUnlock(UNLOCK_MORE_BALLS) ? 5 : 3);
@@ -1796,7 +1811,7 @@ void Rogue_TakeDoor(void)
             return;
         }
         StartRun(gSpecialVar_0x8005 == 2, gSpecialVar_0x8006, gSpecialVar_0x8007);
-        gSpecialVar_Result = HasUnlock(UNLOCK_STARTER_CHOICE) ? ROGUE_DOOR_CHOOSE_STARTER : ROGUE_DOOR_STARTED_RUN;
+        gSpecialVar_Result = (CalculatePlayerPartyCount() == 0) ? ROGUE_DOOR_CHOOSE_STARTER : ROGUE_DOOR_STARTED_RUN;
         return;
     }
     if (door == ROGUE_ROOM_HUB)
@@ -1953,18 +1968,39 @@ static void PushChoice(const u8 *name, u32 id)
 
 void Rogue_PushStarterChoices(void)
 {
-    enum Species starters[3];
-    u32 i;
-    GetStarterCandidates(starters);
-    for (i = 0; i < 3; i++)
+    enum Species starters[MAX_STARTER_CHOICES];
+    u32 i, count = GetStarterCandidates(starters);
+    for (i = 0; i < count; i++)
         PushChoice(GetSpeciesName(starters[i]), i);
 }
 
 void Rogue_GiveChosenStarter(void)
 {
-    enum Species starters[3];
-    GetStarterCandidates(starters);
-    GiveStarter(starters[gSpecialVar_Result < 3 ? gSpecialVar_Result : 0]);
+    enum Species starters[MAX_STARTER_CHOICES];
+    u32 count = GetStarterCandidates(starters);
+    GiveStarter(starters[gSpecialVar_Result < count ? gSpecialVar_Result : 0]);
+}
+
+// The Favorite unlock (a POKéFAN in the run's POKéMON CENTERS): VAR_RESULT = whether it's unlocked,
+// STR_VAR_1 = the current favorite, VAR_0x8005 = whether there is one
+void Rogue_GetFavorite(void)
+{
+    enum Species favorite = GetFavorite();
+    gSpecialVar_Result = HasUnlock(UNLOCK_FAVORITE) && Rogue_IsRunActive();
+    gSpecialVar_0x8005 = (favorite != SPECIES_NONE);
+    if (favorite != SPECIES_NONE)
+        StringCopy(gStringVar1, GetSpeciesName(favorite));
+}
+
+// VAR_0x8004 = the party slot picked; STR_VAR_1 = the favorite (the first stage of its species)
+void Rogue_SetFavorite(void)
+{
+    enum Species species = GetMonData(&gParties[B_TRAINER_PLAYER][gSpecialVar_0x8004], MON_DATA_SPECIES);
+    u32 depth;
+    for (depth = 0; depth < 3 && GetSpeciesPreEvolution(species) != SPECIES_NONE; depth++)
+        species = GetSpeciesPreEvolution(species);
+    VarSet(VAR_ROGUE_FAVORITE, species);
+    StringCopy(gStringVar1, GetSpeciesName(species));
 }
 
 static const u16 sHeirloomAbilities[] =
