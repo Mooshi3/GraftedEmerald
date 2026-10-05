@@ -136,7 +136,9 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   Meteor Falls, Victory Road, Seafloor, Shoal, Mt. Pyre, Sky Pillar, Mirage Tower, New Mauville…), volcano
   (Fiery Path, Jagged Pass, Mt. Chimney, Magma Hideout, Routes 111-113), forest (the other land routes);
   everything surfed or fished is a beach Pokémon, Rock Smash ones cave Pokémon. A family counts with all
-  its evolutions. `sHabitatExtras` places families by hand where the maps don't say it (Clobbopus: beach).
+  its evolutions. `sHabitatExtras` places families by hand where the maps don't say it (Clobbopus: beach);
+  `sBeachOnly` moves sea creatures the sheet also puts on forest-route land to the beach only (Krabby,
+  Binacle, Wiglett, Wingull, Corsola…; 2026-10-05). Freshwater families stay in forests (they have ponds).
 - Trainers and bosses are talk-to-battle (no line of sight); their room's doors stay locked until beaten.
 - Shops and rests are a Poké Mart or a Pokémon Center standing in a forest or beach room; walk in to buy or
   heal, walk out to the same room.

@@ -862,6 +862,16 @@ static const struct { u16 species; u8 biome; } sHabitatExtras[] =
     {SPECIES_GRUBBIN, BIOME_POWER_PLANT},
 };
 
+// Sea creatures the sheet also puts on a forest route's land (Route 104's Wiglett, Route 114's Krabby…):
+// beach rooms only (Jacob, 2026-10-05: "Krabby totally belongs on the beach"). Freshwater families
+// (Lotad, Surskit, Poliwag, Psyduck, Wooper…) and the starters stay in forests, which have ponds.
+static const u16 sBeachOnly[] =
+{
+    SPECIES_KRABBY, SPECIES_BINACLE, SPECIES_CORSOLA, SPECIES_MAREANIE, SPECIES_WIGLETT, SPECIES_PYUKUMUKU,
+    SPECIES_SHELLOS_WEST, SPECIES_SHELLOS_EAST, SPECIES_WINGULL, SPECIES_CRAMORANT, SPECIES_TIRTOUGA,
+    SPECIES_KABUTO, SPECIES_OMANYTE, SPECIES_CLAUNCHER, SPECIES_POPPLIO, SPECIES_BUIZEL,
+};
+
 // Which families live in each theme: every species on the theme's encounter tables (Jacob's sheet)
 // and everything it evolves into. Built once from the live tables.
 static EWRAM_DATA u8 sHabitats[BIOME_COUNT][(NUM_SPECIES + 7) / 8] = {0};
@@ -877,6 +887,18 @@ static void AddToHabitat(u32 biome, enum Species species, u32 depth)
     evos = GetSpeciesEvolutions(species);
     for (i = 0; evos != NULL && evos[i].method != EVOLUTIONS_END; i++)
         AddToHabitat(biome, evos[i].targetSpecies, depth + 1);
+}
+
+static void RemoveFromHabitat(u32 biome, enum Species species, u32 depth)
+{
+    const struct Evolution *evos;
+    u32 i;
+    if (species == SPECIES_NONE || species >= NUM_SPECIES || depth > 3)
+        return;
+    sHabitats[biome][species / 8] &= ~(1 << (species % 8));
+    evos = GetSpeciesEvolutions(species);
+    for (i = 0; evos != NULL && evos[i].method != EVOLUTIONS_END; i++)
+        RemoveFromHabitat(biome, evos[i].targetSpecies, depth + 1);
 }
 
 static void AddTableToHabitat(u32 biome, const struct WildPokemonInfo *info, u32 count)
@@ -914,6 +936,11 @@ static void BuildHabitats(void)
     }
     for (i = 0; i < ARRAY_COUNT(sHabitatExtras); i++)
         AddToHabitat(sHabitatExtras[i].biome, sHabitatExtras[i].species, 0);
+    for (i = 0; i < ARRAY_COUNT(sBeachOnly); i++)
+    {
+        RemoveFromHabitat(BIOME_FOREST, sBeachOnly[i], 0);
+        AddToHabitat(BIOME_BEACH, sBeachOnly[i], 0);
+    }
     sHabitatsFrom = headers;
 }
 

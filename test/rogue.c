@@ -975,3 +975,13 @@ TEST("Rogue: generated trainers never field a Pokemon the team can't damage at a
     }
     EXPECT_GT(checked, 200);
 }
+
+TEST("Rogue: sea creatures live on the beach, not in forests")
+{
+    EXPECT(!Rogue_LivesIn(SPECIES_KRABBY, 0));
+    EXPECT(!Rogue_LivesIn(SPECIES_KINGLER, 0));
+    EXPECT(Rogue_LivesIn(SPECIES_KRABBY, 1));
+    EXPECT(!Rogue_LivesIn(SPECIES_WIGLETT, 0));
+    EXPECT(Rogue_LivesIn(SPECIES_WIGLETT, 1));
+    EXPECT(Rogue_LivesIn(SPECIES_LOTAD, 0)); // freshwater: forests have ponds
+}
