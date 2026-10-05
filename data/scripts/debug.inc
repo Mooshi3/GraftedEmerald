@@ -257,6 +257,18 @@ Debug_EventScript_RogueBeach::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x200
 	goto Debug_EventScript_RogueWarp
 
+Debug_EventScript_RoguePlains::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0xA00
+	goto Debug_EventScript_RogueWarp
+
+Debug_EventScript_RogueLake::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0xC00
+	goto Debug_EventScript_RogueWarp
+
+Debug_EventScript_RogueSwamp::
+	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0xE00
+	goto Debug_EventScript_RogueWarp
+
 Debug_EventScript_RogueCave::
 	setvar VAR_ROGUE_ROOM_TYPE, ROGUE_ROOM_WILD | 0x400
 	goto Debug_EventScript_RogueWarp

@@ -93,19 +93,22 @@ static const u8 sDoorBlockX[NUM_DOORS] = {3, 5, 7};
 // Room themes: VAR_ROGUE_ROOM_TYPE bits 9-11
 enum
 {
-    BIOME_FOREST,
+    BIOME_FOREST, // woods (the value kept from when every green room was a forest)
     BIOME_BEACH,
     BIOME_CAVE,
     BIOME_VOLCANO,
     BIOME_POWER_PLANT,
-    BIOME_COUNT,
+    BIOME_PLAINS,
+    BIOME_LAKE,
+    BIOME_SWAMP,
+    BIOME_COUNT, // 8: VAR_ROGUE_ROOM_TYPE has 3 bits for it
 };
 #define ROOM_BIOME_SHIFT 9
 #define ROOM_BIOME_MASK  (7 << ROOM_BIOME_SHIFT)
 
 enum
 {
-    ROOM_KIND_OUTDOOR, // MAP_ROGUE_ROOM: forest or beach
+    ROOM_KIND_OUTDOOR, // MAP_ROGUE_ROOM: woods, plains, lake, swamp or beach
     ROOM_KIND_WALLED,  // MAP_ROGUE_CAVE / MAP_ROGUE_VOLCANO / MAP_ROGUE_POWER_PLANT
     ROOM_KIND_ARENA,   // a boss's Elite Four room
     ROOM_KIND_STOP,    // MAP_ROGUE_STOP: the rest stop between floors
@@ -149,6 +152,8 @@ enum
 {
     GROUND_GRASS,
     GROUND_TALL_GRASS,
+    GROUND_LONG_GRASS, // swamps (Route 120's)
+    GROUND_FLOWERS,    // plains
 };
 
 struct RoomObject
@@ -698,15 +703,29 @@ static bool32 IsBuildingRoom(u32 type)
 // Each floor has a home theme most rooms take; buildings stand outdoors
 static u32 PickBiome(rng_value_t *rng, u32 type, u32 floor)
 {
-    u8 weights[BIOME_COUNT] = {12, 12, 12, 12, 12};
+    // The green themes share what used to be the forest's weight
+    u8 weights[BIOME_COUNT] = {[BIOME_FOREST] = 4, [BIOME_BEACH] = 12, [BIOME_CAVE] = 12, [BIOME_VOLCANO] = 12,
+                               [BIOME_POWER_PLANT] = 12, [BIOME_PLAINS] = 4, [BIOME_LAKE] = 2, [BIOME_SWAMP] = 2};
     u32 home = sFloorHomeBiome[(max(floor, 1) - 1) % ARRAY_COUNT(sFloorHomeBiome)];
 
-    weights[home] = 55;
+    if (home == BIOME_FOREST)
+    {
+        weights[BIOME_FOREST] = 18;
+        weights[BIOME_PLAINS] = 18;
+        weights[BIOME_LAKE] = 10;
+        weights[BIOME_SWAMP] = 9;
+    }
+    else
+    {
+        weights[home] = 55;
+    }
     if (IsBuildingRoom(type))
     {
+        // a Mart or a Center stands in the woods, on the plains or on a beach
         weights[BIOME_CAVE] = weights[BIOME_VOLCANO] = weights[BIOME_POWER_PLANT] = 0;
+        weights[BIOME_LAKE] = weights[BIOME_SWAMP] = 0;
         if (home == BIOME_BEACH)
-            weights[BIOME_FOREST] = 15;
+            weights[BIOME_FOREST] = weights[BIOME_PLAINS] = 8;
         else
             weights[BIOME_BEACH] = 15;
     }
@@ -734,7 +753,7 @@ static u32 GetRoomKind(void)
 static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
 {
     {MAP_ROUTE124, BIOME_COUNT},
-    {MAP_SAFARI_ZONE_SOUTH, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_SOUTH, BIOME_PLAINS},
     {MAP_UNDERWATER_ROUTE126, BIOME_COUNT},
     {MAP_ABANDONED_SHIP_ROOMS_B1F, BIOME_COUNT},
     {MAP_GRANITE_CAVE_B2F, BIOME_CAVE},
@@ -773,9 +792,9 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP2, BIOME_CAVE},
     {MAP_CAVE_OF_ORIGIN_UNUSED_RUBY_SAPPHIRE_MAP3, BIOME_CAVE},
     {MAP_NEW_MAUVILLE_ENTRANCE, BIOME_POWER_PLANT},
-    {MAP_SAFARI_ZONE_SOUTHWEST, BIOME_FOREST},
-    {MAP_SAFARI_ZONE_NORTH, BIOME_FOREST},
-    {MAP_SAFARI_ZONE_NORTHWEST, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_SOUTHWEST, BIOME_PLAINS},
+    {MAP_SAFARI_ZONE_NORTH, BIOME_PLAINS},
+    {MAP_SAFARI_ZONE_NORTHWEST, BIOME_PLAINS},
     {MAP_METEOR_FALLS_1F_2R, BIOME_CAVE},
     {MAP_SHOAL_CAVE_LOW_TIDE_STAIRS_ROOM, BIOME_CAVE},
     {MAP_SHOAL_CAVE_LOW_TIDE_LOWER_ROOM, BIOME_CAVE},
@@ -790,8 +809,8 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_UNDERWATER_ROUTE124, BIOME_COUNT},
     {MAP_SHOAL_CAVE_LOW_TIDE_ICE_ROOM, BIOME_CAVE},
     {MAP_SOOTOPOLIS_CITY, BIOME_COUNT},
-    {MAP_SAFARI_ZONE_SOUTHEAST, BIOME_FOREST},
-    {MAP_SAFARI_ZONE_NORTHEAST, BIOME_FOREST},
+    {MAP_SAFARI_ZONE_SOUTHEAST, BIOME_PLAINS},
+    {MAP_SAFARI_ZONE_NORTHEAST, BIOME_PLAINS},
     {MAP_MAGMA_HIDEOUT_2F_1R, BIOME_VOLCANO},
     {MAP_MAGMA_HIDEOUT_2F_2R, BIOME_VOLCANO},
     {MAP_MAGMA_HIDEOUT_3F_1R, BIOME_VOLCANO},
@@ -808,27 +827,27 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_ARTISAN_CAVE_1F, BIOME_CAVE},
     {MAP_ALTERING_CAVE, BIOME_CAVE},
     {MAP_METEOR_FALLS_STEVENS_CAVE, BIOME_CAVE},
-    {MAP_ROUTE101, BIOME_FOREST},
-    {MAP_ROUTE102, BIOME_FOREST},
-    {MAP_ROUTE103, BIOME_FOREST},
-    {MAP_ROUTE104, BIOME_FOREST},
+    {MAP_ROUTE101, BIOME_PLAINS},
+    {MAP_ROUTE102, BIOME_PLAINS},
+    {MAP_ROUTE103, BIOME_PLAINS},
+    {MAP_ROUTE104, BIOME_PLAINS},
     {MAP_PETALBURG_WOODS, BIOME_FOREST},
     {MAP_RUSTURF_TUNNEL, BIOME_CAVE},
     {MAP_ROUTE105, BIOME_COUNT},
     {MAP_ROUTE109, BIOME_COUNT},
-    {MAP_ROUTE110, BIOME_FOREST},
+    {MAP_ROUTE110, BIOME_PLAINS},
     {MAP_ROUTE111, BIOME_VOLCANO},
     {MAP_ROUTE112, BIOME_VOLCANO},
     {MAP_FIERY_PATH, BIOME_VOLCANO},
     {MAP_JAGGED_PASS, BIOME_VOLCANO},
     {MAP_ROUTE113, BIOME_VOLCANO},
-    {MAP_ROUTE114, BIOME_FOREST},
-    {MAP_ROUTE115, BIOME_FOREST},
+    {MAP_ROUTE114, BIOME_PLAINS},
+    {MAP_ROUTE115, BIOME_PLAINS},
     {MAP_METEOR_FALLS_1F_1R, BIOME_CAVE},
     {MAP_METEOR_FALLS_B1F_1R, BIOME_CAVE},
     {MAP_ROUTE116, BIOME_FOREST},
-    {MAP_ROUTE117, BIOME_FOREST},
-    {MAP_ROUTE118, BIOME_FOREST},
+    {MAP_ROUTE117, BIOME_PLAINS},
+    {MAP_ROUTE118, BIOME_BEACH}, // its land is all sea creatures
     {MAP_ROUTE119, BIOME_FOREST},
     {MAP_GRANITE_CAVE_1F, BIOME_CAVE},
     {MAP_GRANITE_CAVE_B1F, BIOME_CAVE},
@@ -838,10 +857,10 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_MAGMA_HIDEOUT_1F, BIOME_VOLCANO},
     {MAP_NEW_MAUVILLE_INSIDE, BIOME_POWER_PLANT},
     {MAP_ROUTE120, BIOME_FOREST},
-    {MAP_ROUTE121, BIOME_FOREST},
-    {MAP_ROUTE123, BIOME_FOREST},
+    {MAP_ROUTE121, BIOME_PLAINS},
+    {MAP_ROUTE123, BIOME_PLAINS},
     {MAP_SHOAL_CAVE_LOW_TIDE_ENTRANCE_ROOM, BIOME_CAVE},
-    {MAP_ROUTE130, BIOME_FOREST},
+    {MAP_ROUTE130, BIOME_PLAINS},
     {MAP_SEAFLOOR_CAVERN_ENTRANCE, BIOME_CAVE},
     {MAP_CAVE_OF_ORIGIN_1F, BIOME_CAVE},
     {MAP_VICTORY_ROAD_1F, BIOME_CAVE},
@@ -853,6 +872,40 @@ static const struct { u16 map; u8 landBiome; } sHabitatMaps[] =
     {MAP_AQUA_HIDEOUT_1F, BIOME_COUNT},
 };
 
+// Maps whose surf and fishing tables are fresh water (everything else's water is the sea: the beach)
+static const struct { u16 map; u8 biome; } sFreshWaterMaps[] =
+{
+    {MAP_ROUTE102, BIOME_LAKE},
+    {MAP_ROUTE110, BIOME_LAKE},
+    {MAP_ROUTE111, BIOME_LAKE},
+    {MAP_ROUTE114, BIOME_LAKE},
+    {MAP_ROUTE117, BIOME_LAKE},
+    {MAP_ROUTE123, BIOME_LAKE},
+    {MAP_PETALBURG_CITY, BIOME_LAKE},
+    {MAP_SAFARI_ZONE_SOUTHWEST, BIOME_LAKE},
+    {MAP_SAFARI_ZONE_NORTHWEST, BIOME_LAKE},
+    {MAP_METEOR_FALLS_1F_1R, BIOME_LAKE},
+    {MAP_METEOR_FALLS_1F_2R, BIOME_LAKE},
+    {MAP_METEOR_FALLS_B1F_1R, BIOME_LAKE},
+    {MAP_METEOR_FALLS_B1F_2R, BIOME_LAKE},
+    {MAP_VICTORY_ROAD_B2F, BIOME_LAKE},
+    {MAP_SOOTOPOLIS_CITY, BIOME_LAKE},
+    {MAP_ROUTE119, BIOME_SWAMP},
+    {MAP_ROUTE120, BIOME_SWAMP},
+    {MAP_SAFARI_ZONE_SOUTHEAST, BIOME_SWAMP},
+};
+
+static u32 GetWaterBiome(u16 map)
+{
+    u32 i;
+    for (i = 0; i < ARRAY_COUNT(sFreshWaterMaps); i++)
+    {
+        if (sFreshWaterMaps[i].map == map)
+            return sFreshWaterMaps[i].biome;
+    }
+    return BIOME_BEACH;
+}
+
 // Families placed by hand where the sheet's maps don't say it (an octopus lives on the beach even
 // if the sheet puts it on a route's land)
 static const struct { u16 species; u8 biome; } sHabitatExtras[] =
@@ -860,11 +913,23 @@ static const struct { u16 species; u8 biome; } sHabitatExtras[] =
     {SPECIES_CLOBBOPUS, BIOME_BEACH},
     {SPECIES_PAWMI, BIOME_POWER_PLANT},   // the sheet places Pawmo and Charjabug: their first stages too
     {SPECIES_GRUBBIN, BIOME_POWER_PLANT},
+    // marsh dwellers from other maps' land
+    {SPECIES_CROAGUNK, BIOME_SWAMP},
+    {SPECIES_GOOMY, BIOME_SWAMP},
+    {SPECIES_TOEDSCOOL, BIOME_SWAMP},
+    {SPECIES_DEWPIDER, BIOME_SWAMP},
+    {SPECIES_YANMA, BIOME_SWAMP},
+    {SPECIES_STUNFISK, BIOME_SWAMP},
+    {SPECIES_FOONGUS, BIOME_SWAMP},
+    {SPECIES_GULPIN, BIOME_SWAMP},
+    {SPECIES_LOTAD, BIOME_LAKE},
+    {SPECIES_SURSKIT, BIOME_LAKE},
+    {SPECIES_TYMPOLE, BIOME_SWAMP},
 };
 
 // Sea creatures the sheet also puts on a forest route's land (Route 104's Wiglett, Route 114's Krabby…):
 // beach rooms only (Jacob, 2026-10-05: "Krabby totally belongs on the beach"). Freshwater families
-// (Lotad, Surskit, Poliwag, Psyduck, Wooper…) and the starters stay in forests, which have ponds.
+// (Lotad, Surskit, Poliwag, Psyduck, Wooper…) live in lakes and swamps; the starters stay where the sheet puts them.
 static const u16 sBeachOnly[] =
 {
     SPECIES_KRABBY, SPECIES_BINACLE, SPECIES_CORSOLA, SPECIES_MAREANIE, SPECIES_WIGLETT, SPECIES_PYUKUMUKU,
@@ -929,8 +994,8 @@ static void BuildHabitats(void)
         {
             const struct WildEncounterTypes *types = &headers[i].encounterTypes[t];
             AddTableToHabitat(sHabitatMaps[j].landBiome, types->landMonsInfo, NUM_LAND_MONS_ENCOUNTER_SLOTS);
-            AddTableToHabitat(BIOME_BEACH, types->waterMonsInfo, NUM_WATER_MONS_ENCOUNTER_SLOTS);
-            AddTableToHabitat(BIOME_BEACH, types->fishingMonsInfo, NUM_FISHING_MONS_ENCOUNTER_SLOTS);
+            AddTableToHabitat(GetWaterBiome(map), types->waterMonsInfo, NUM_WATER_MONS_ENCOUNTER_SLOTS);
+            AddTableToHabitat(GetWaterBiome(map), types->fishingMonsInfo, NUM_FISHING_MONS_ENCOUNTER_SLOTS);
             AddTableToHabitat(BIOME_CAVE, types->rockSmashMonsInfo, NUM_ROCK_SMASH_MONS_ENCOUNTER_SLOTS);
         }
     }
@@ -939,6 +1004,9 @@ static void BuildHabitats(void)
     for (i = 0; i < ARRAY_COUNT(sBeachOnly); i++)
     {
         RemoveFromHabitat(BIOME_FOREST, sBeachOnly[i], 0);
+        RemoveFromHabitat(BIOME_PLAINS, sBeachOnly[i], 0);
+        RemoveFromHabitat(BIOME_LAKE, sBeachOnly[i], 0);
+        RemoveFromHabitat(BIOME_SWAMP, sBeachOnly[i], 0);
         AddToHabitat(BIOME_BEACH, sBeachOnly[i], 0);
     }
     sHabitatsFrom = headers;
@@ -949,7 +1017,7 @@ static bool32 LivesIn(enum Species species, u32 biome)
     return species < NUM_SPECIES && (sHabitats[biome][species / 8] & (1 << (species % 8)));
 }
 
-// For tests: biome 0 forest, 1 beach, 2 cave, 3 volcano
+// For tests: biome 0 woods, 1 beach, 2 cave, 3 volcano, 4 power plant, 5 plains, 6 lake, 7 swamp
 bool32 Rogue_LivesIn(u16 species, u32 biome)
 {
     BuildHabitats();
@@ -1344,7 +1412,40 @@ static void AddTrainerObject(void)
     AddObject(graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
 }
 
-// Outdoor rooms: the forest border with an opening per door, and trees, ponds or sea inside
+// A pond of w x h blocks somewhere inside: never in the top row (under a door), the entrance's column
+// or the middle object's; it must leave every door reachable. FALSE (and nothing placed) if it can't.
+static bool32 TryPlaceWater(rng_value_t *rng, u32 w, u32 h, bool32 hasCenterObject)
+{
+    u32 bx, by;
+    u32 bx0 = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
+    u32 by0 = INNER_BY_MIN + 1 + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN - h + 1);
+    if (by0 + h - 1 > INNER_BY_MAX)
+        return FALSE;
+    for (by = by0; by < by0 + h; by++)
+    {
+        for (bx = bx0; bx < bx0 + w; bx++)
+        {
+            if ((bx == ENTRANCE_BX && by >= ENTRANCE_BY - 1) || (hasCenterObject && bx == CENTER_X / 2)
+             || sPlan.water[by][bx] || sPlan.tree[by][bx])
+                return FALSE;
+        }
+    }
+    for (by = by0; by < by0 + h; by++)
+    {
+        for (bx = bx0; bx < bx0 + w; bx++)
+            sPlan.water[by][bx] = TRUE;
+    }
+    if (AreDoorsReachable())
+        return TRUE;
+    for (by = by0; by < by0 + h; by++)
+    {
+        for (bx = bx0; bx < bx0 + w; bx++)
+            sPlan.water[by][bx] = FALSE;
+    }
+    return FALSE;
+}
+
+// Outdoor rooms: the border of trees with an opening per door, and trees, ponds or sea inside
 static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
 {
     u32 bx, by, x, y, i, count;
@@ -1381,30 +1482,42 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
         sPlan.buildingX = CENTER_BUILDING_X;
     }
 
-    // Forest: sometimes a pond (1x1 to 2x2 blocks), never right under a door and with grass below it
-    if (!beach && type != ROGUE_ROOM_HUB && sPlan.building == BUILDING_NONE && LocalRandom(rng) % 100 < 40)
+    // Water: a lake's big pond, a swamp's puddles, sometimes a small pond in the woods or on the plains
+    if (!beach && type != ROGUE_ROOM_HUB && sPlan.building == BUILDING_NONE)
     {
-        u32 w = 1 + LocalRandom(rng) % 2, h = 1 + LocalRandom(rng) % 2;
-        u32 bx0 = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
-        u32 by0 = INNER_BY_MIN + 1 + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN - h);
-        bool32 ok = TRUE;
-        for (by = by0; by < by0 + h; by++)
+        if (sPlan.biome == BIOME_LAKE)
         {
-            for (bx = bx0; bx < bx0 + w; bx++)
+            for (i = 0; i < 12; i++)
             {
-                if ((bx == ENTRANCE_BX && by >= ENTRANCE_BY - 1) || (hasCenterObject && bx == CENTER_X / 2))
-                    ok = FALSE;
-                sPlan.water[by][bx] = TRUE;
+                if (TryPlaceWater(rng, i < 6 ? 3 : 2, 2, hasCenterObject))
+                    break;
             }
         }
-        if (!ok || !AreDoorsReachable())
-            memset(sPlan.water, 0, sizeof(sPlan.water));
+        else if (sPlan.biome == BIOME_SWAMP)
+        {
+            count = 3 + LocalRandom(rng) % 3;
+            for (i = 0; i < count * 4 && count > 0; i++)
+            {
+                if (TryPlaceWater(rng, 1, 1, hasCenterObject))
+                    count--;
+            }
+        }
+        else if (LocalRandom(rng) % 100 < (sPlan.biome == BIOME_FOREST ? 35 : 15))
+        {
+            TryPlaceWater(rng, 1 + LocalRandom(rng) % 2, 1 + LocalRandom(rng) % 2, hasCenterObject);
+        }
     }
 
     // A few trees inside (fewer on a beach), never closing off a door
     if (type != ROGUE_ROOM_HUB)
     {
-        count = beach ? LocalRandom(rng) % 3 : 2 + LocalRandom(rng) % 4;
+        switch (sPlan.biome)
+        {
+        case BIOME_FOREST: count = 7 + LocalRandom(rng) % 4; break; // the woods are thick
+        case BIOME_SWAMP:  count = 2 + LocalRandom(rng) % 3; break;
+        case BIOME_LAKE:   count = 1 + LocalRandom(rng) % 3; break;
+        default:           count = LocalRandom(rng) % 3; break;     // plains and beaches are open
+        }
         for (i = 0; i < count * 4 && count > 0; i++)
         {
             bx = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 1);
@@ -1430,10 +1543,18 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
         }
     }
 
-    // Patches of tall grass in a forest (just for looks: there are no random encounters here)
+    // Patches of tall grass (just for looks: there are no random encounters here); a swamp's grass is
+    // long, and the plains have flowers too
     if (!beach)
     {
-        count = 2 + LocalRandom(rng) % 3;
+        u32 grass = (sPlan.biome == BIOME_SWAMP) ? GROUND_LONG_GRASS : GROUND_TALL_GRASS;
+        switch (sPlan.biome)
+        {
+        case BIOME_PLAINS: count = 3 + LocalRandom(rng) % 3; break;
+        case BIOME_SWAMP:  count = 3 + LocalRandom(rng) % 3; break;
+        case BIOME_LAKE:   count = 1 + LocalRandom(rng) % 2; break;
+        default:           count = 2 + LocalRandom(rng) % 3; break;
+        }
         for (i = 0; i < count; i++)
         {
             u32 w = 2 + LocalRandom(rng) % 4, h = 2 + LocalRandom(rng) % 2;
@@ -1441,7 +1562,18 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
             for (y = y0; y < y0 + h; y++)
             {
                 for (x = x0; x < x0 + w; x++)
-                    sPlan.ground[y][x] = GROUND_TALL_GRASS;
+                    sPlan.ground[y][x] = grass;
+            }
+        }
+        if (sPlan.biome == BIOME_PLAINS)
+        {
+            count = 8 + LocalRandom(rng) % 8;
+            for (i = 0; i < count; i++)
+            {
+                x = INNER_X_MIN + LocalRandom(rng) % (INNER_X_MAX - INNER_X_MIN + 1);
+                y = INNER_Y_MIN + LocalRandom(rng) % (INNER_Y_MAX - INNER_Y_MIN + 1);
+                if (sPlan.ground[y][x] == GROUND_GRASS)
+                    sPlan.ground[y][x] = GROUND_FLOWERS;
             }
         }
     }
@@ -1743,6 +1875,7 @@ static u16 GetTreeMetatile(s32 x, s32 y)
 #define DOOR_TILE_CAVE    0x07D
 #define DOOR_TILE_VOLCANO 0x06D
 #define DOOR_TILE_POWER   0x0AF // metal stairs
+#define METATILE_GENERAL_FLOWERS 0x004
 
 // The door openings' ground shows the next room's theme
 static u16 GetDoorGroundMetatile(s32 x, s32 y)
@@ -1757,6 +1890,14 @@ static u16 GetDoorGroundMetatile(s32 x, s32 y)
             break; // a dirt path
         switch (sPlan.doorBiomes[i])
         {
+        case BIOME_FOREST:
+            return TILE_GROUND(METATILE_General_TallGrass);
+        case BIOME_PLAINS:
+            return TILE_GROUND(METATILE_GENERAL_FLOWERS);
+        case BIOME_LAKE:
+            return TILE_GROUND(METATILE_General_Grass);
+        case BIOME_SWAMP:
+            return TILE_GROUND(METATILE_General_LongGrass);
         case BIOME_BEACH:
             return TILE_GROUND(0x124);
         case BIOME_CAVE:
@@ -1808,6 +1949,10 @@ static u16 GetOutdoorGroundMetatile(s32 x, s32 y)
         return TILE_GROUND(treeBelow ? (left ? 0x1C6 : 0x1C7) : METATILE_General_TallGrass);
     if (treeBelow)
         return TILE_GROUND(left ? 0x1CE : 0x1CF);
+    if (sPlan.ground[y][x] == GROUND_LONG_GRASS)
+        return TILE_GROUND(METATILE_General_LongGrass);
+    if (sPlan.ground[y][x] == GROUND_FLOWERS)
+        return TILE_GROUND(METATILE_GENERAL_FLOWERS);
     return TILE_GROUND(beach ? 0x124 : METATILE_General_Grass);
 }
 
@@ -1889,8 +2034,16 @@ static bool32 GetWalledDoorPreview(s32 x, s32 y, u16 *tile)
         u32 biome = sPlan.doorBiomes[i];
         if (sPlan.doors[i] == NO_DOOR || x < GetDoorX(i) || x > GetDoorX(i) + (sPlan.biome != BIOME_CAVE))
             continue;
-        if (biome == BIOME_FOREST && sPlan.doors[i] < ROGUE_ROOM_BOSS && !IsBuildingRoom(sPlan.doors[i]))
+        if (sPlan.doors[i] >= ROGUE_ROOM_BOSS || IsBuildingRoom(sPlan.doors[i]))
+            return FALSE;
+        else if (biome == BIOME_FOREST)
+            *tile = TILE_GROUND(METATILE_General_TallGrass);
+        else if (biome == BIOME_PLAINS)
+            *tile = TILE_GROUND(METATILE_GENERAL_FLOWERS);
+        else if (biome == BIOME_LAKE)
             *tile = TILE_GROUND(METATILE_General_Grass);
+        else if (biome == BIOME_SWAMP)
+            *tile = TILE_GROUND(METATILE_General_LongGrass);
         else if (biome == BIOME_BEACH)
             *tile = TILE_GROUND(0x124);
         else if (biome == sPlan.biome)
@@ -2378,8 +2531,8 @@ void Rogue_TakeDoor(void)
             type = ROGUE_ROOM_EVENT;
         else
             type = PickWeighted(&rng, sDoorWeights, ROGUE_ROOM_TYPE_COUNT, 1u << ROGUE_ROOM_MYSTERY);
-        if (IsBuildingRoom(type) && biome != BIOME_FOREST && biome != BIOME_BEACH)
-            biome = BIOME_FOREST; // buildings stand outdoors
+        if (IsBuildingRoom(type) && biome != BIOME_FOREST && biome != BIOME_PLAINS && biome != BIOME_BEACH)
+            biome = BIOME_FOREST; // buildings stand outdoors, on dry land
         type |= ROOM_TYPE_FROM_MYSTERY;
     }
     VarSet(VAR_ROGUE_ROOM_TYPE, type | (biome << ROOM_BIOME_SHIFT));
@@ -3707,8 +3860,11 @@ static const struct { const u8 *topic; const u8 *text; } sHelpTopics[] =
         "A “?” door could be anything, even\n"
         "an event you won't find elsewhere.\p"
         "The ground in a doorway shows the\n"
-        "next room: grass, sand, cave rock,\l"
-        "volcanic rock or metal stairs.\p"
+        "next room: tall grass for woods,\l"
+        "flowers for plains, short grass for\l"
+        "a lake, long grass for a swamp,\l"
+        "sand, cave rock, volcanic rock or\l"
+        "metal stairs.\p"
         "A trainer keeps the doors shut\n"
         "until you beat them.")},
     {COMPOUND_STRING("Catching"), COMPOUND_STRING(

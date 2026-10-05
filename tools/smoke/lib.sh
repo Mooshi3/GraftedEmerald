@@ -45,5 +45,6 @@ toggle_flag() { echo -n "press R+START 3;wait 30;$(R 8 DOWN)press A;wait 20;pres
 pokemon_menu_on() { toggle_flag 2144; }
 # Rogue (branch claude/grafted-rogue): Debug -> Scripts -> slot N (0-based). Entering a room can show a message
 # ("FLOOR 2", a boss); dismiss it (press A) before opening the debug menu again. 0 wild, 1 trainer, 2 items,
-# 3 shop, 4 rest, 5 boss, 6 the last room before the boss, 7 next floor, 8 event. Only in a run.
+# 3 shop, 4 rest, 5 boss, 6 the last room before the boss, 7 next floor, 8 event, 9 beach, 10 cave,
+# 11 volcano, 12 rest stop, 13 power plant, 14 plains, 15 lake, 16 swamp (0 is a woods room). Only in a run.
 rogue_room() { echo -n "press R+START 3;wait 30;$(R 5 DOWN)press A;wait 20;$(R "$1" DOWN)press A;wait 300;"; }

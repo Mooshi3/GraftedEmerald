@@ -385,6 +385,9 @@ extern const u8 Debug_EventScript_RogueCave[];
 extern const u8 Debug_EventScript_RogueVolcano[];
 extern const u8 Debug_EventScript_RogueRestStop[];
 extern const u8 Debug_EventScript_RoguePowerPlant[];
+extern const u8 Debug_EventScript_RoguePlains[];
+extern const u8 Debug_EventScript_RogueLake[];
+extern const u8 Debug_EventScript_RogueSwamp[];
 extern const u8 Debug_EventScript_Script_2[];
 extern const u8 Debug_EventScript_Script_3[];
 extern const u8 Debug_EventScript_Script_4[];
@@ -697,6 +700,9 @@ static const struct DebugMenuOption sDebugMenu_Actions_Scripts[] =
     { COMPOUND_STRING("Rogue: Volcano"), DebugAction_ExecuteScript, Debug_EventScript_RogueVolcano },
     { COMPOUND_STRING("Rogue: Rest stop"), DebugAction_ExecuteScript, Debug_EventScript_RogueRestStop },
     { COMPOUND_STRING("Rogue: Power plant"), DebugAction_ExecuteScript, Debug_EventScript_RoguePowerPlant },
+    { COMPOUND_STRING("Rogue: Plains"), DebugAction_ExecuteScript, Debug_EventScript_RoguePlains },
+    { COMPOUND_STRING("Rogue: Lake"), DebugAction_ExecuteScript, Debug_EventScript_RogueLake },
+    { COMPOUND_STRING("Rogue: Swamp"), DebugAction_ExecuteScript, Debug_EventScript_RogueSwamp },
     { NULL }
 };
 

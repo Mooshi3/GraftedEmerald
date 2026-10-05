@@ -426,7 +426,7 @@ TEST("Rogue: a caught wild Pokemon has no egg moves it never knew")
 
 TEST("Rogue: wild Pokemon live where the encounter sheet puts their family")
 {
-    EXPECT(Rogue_LivesIn(SPECIES_PANCHAM, 0));     // Route 104's land: forest
+    EXPECT(Rogue_LivesIn(SPECIES_PANCHAM, 5));     // Route 104's land: plains
     EXPECT(!Rogue_LivesIn(SPECIES_PANCHAM, 1));
     EXPECT(Rogue_LivesIn(SPECIES_CLOBBOPUS, 1));   // placed on the beach by hand
     EXPECT(Rogue_LivesIn(SPECIES_GRAPPLOCT, 1));   // and its evolution with it
@@ -445,7 +445,7 @@ TEST("Rogue: every theme has wild Pokemon on every floor")
     u8 doors[3];
     for (floor = 1; floor <= ROGUE_FLOORS_NORMAL; floor++)
     {
-        for (biome = 0; biome < 5; biome++)
+        for (biome = 0; biome < 8; biome++)
         {
             for (seed = 1; seed < 6; seed++)
             {
@@ -983,5 +983,10 @@ TEST("Rogue: sea creatures live on the beach, not in forests")
     EXPECT(Rogue_LivesIn(SPECIES_KRABBY, 1));
     EXPECT(!Rogue_LivesIn(SPECIES_WIGLETT, 0));
     EXPECT(Rogue_LivesIn(SPECIES_WIGLETT, 1));
-    EXPECT(Rogue_LivesIn(SPECIES_LOTAD, 0)); // freshwater: forests have ponds
+    EXPECT(Rogue_LivesIn(SPECIES_LOTAD, 6)); // freshwater: lakes
+    EXPECT(!Rogue_LivesIn(SPECIES_LOTAD, 1));
+    EXPECT(Rogue_LivesIn(SPECIES_CROAGUNK, 7)); // swamps
+    EXPECT(Rogue_LivesIn(SPECIES_MAGIKARP, 6));
+    EXPECT(Rogue_LivesIn(SPECIES_CATERPIE, 0)); // Petalburg Woods
+    EXPECT(Rogue_LivesIn(SPECIES_ZIGZAGOON, 5)); // Route 101: plains
 }

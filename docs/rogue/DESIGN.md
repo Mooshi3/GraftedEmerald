@@ -240,3 +240,13 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   never fields a Pokémon, or takes a type graft, that's immune to every damaging move the team's
   non-fainted Pokémon know (`Rogue_CanTeamHitTypes`; species rerolled up to 20 times). Bosses are left
   alone: the player sees them coming. Abilities (Levitate, Wonder Guard) aren't checked.
+- Outdoor themes split (2026-10-05, Jacob: "split forest into plains/woods/lake/swamp"): the green
+  floor's rooms are woods (dense trees: Petalburg Woods, Routes 116/119/120), plains (open, flowers:
+  Routes 101-104, 110, 114, 115, 117, 121, 123, 130, the Safari Zone), lake (a big pond; the fresh
+  surf/fishing tables of 102, 110, 111, 114, 117, 123, Petalburg, the Safari ponds, Meteor Falls,
+  Victory Road, Sootopolis) or swamp (puddles and long grass; the water of 119, 120 and the Safari's
+  marsh, plus marsh families by hand: Croagunk, Goomy, Toedscool, Dewpider, Yanma, Stunfisk, Foongus,
+  Gulpin, Tympole). Sea water stays the beach's; Route 118's land (all sea creatures) is beach too.
+  Doorway previews: tall grass (woods), flowers (plains), short grass (lake), long grass (swamp).
+  Buildings stand only in woods, plains or on a beach. Biome ids 5-7 (`BIOME_PLAINS/LAKE/SWAMP`);
+  `BIOME_FOREST` (0) is the woods. Debug Scripts 14-16 jump to each.
