@@ -2814,8 +2814,11 @@ void Rogue_VaultPiece(const struct GraftPiece *piece)
     struct GraftPiece new = *piece;
     if (!RemoveGraftPiece(&new))
         return;
-    if (GetVaultPiece(&old))
-        AddGraftPiece(&old);
+    if (GetVaultPiece(&old) && !AddGraftPiece(&old))
+    {
+        AddGraftPiece(&new); // the bag already holds 15 of the vaulted piece: keep things as they were
+        return;
+    }
     SetVaultPiece(&new);
 }
 
