@@ -250,3 +250,8 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   Doorway previews: tall grass (woods), flowers (plains), short grass (lake), long grass (swamp).
   Buildings stand only in woods, plains or on a beach. Biome ids 5-7 (`BIOME_PLAINS/LAKE/SWAMP`);
   `BIOME_FOREST` (0) is the woods. Debug Scripts 14-16 jump to each.
+- Room layout (2026-10-07, Jacob: a swamp closed a Pokémon in): trees and water only in the two block
+  columns on each side; the middle three stay open, so the entrance, every door and the room's middle
+  always connect. Objects (wild Pokémon, items) are only placed where the player can walk to them. The
+  "?" door's rare Pokémon comes from the room's own theme (a stronger pick; a usual one if the theme
+  has none that strong), not from every species (a Krabby turned up in a volcano).

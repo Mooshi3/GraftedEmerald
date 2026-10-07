@@ -658,11 +658,13 @@ u32 Rogue_GetFloorDonors(u16 *species, u32 count)
 }
 
 // A rare Pokémon: from two floors ahead's pool
+static enum Species PickHabitatSpecies(rng_value_t *rng, u32 bstFloor, bool32 unevolvedOnly);
+
+// The "?" door's rare Pokémon: from the room's habitat like any other, but from a stronger pool (a
+// Krabby turned up in a volcano when it ignored the habitat, Jacob 2026-10-07)
 static enum Species PickRareSpecies(rng_value_t *rng)
 {
-    u32 minBst, maxBst;
-    GetFloorBstRange(min(GetFloor() + 2, 6), &minBst, &maxBst);
-    return PickSpecies(rng, minBst, maxBst, FALSE, TYPE_NONE);
+    return PickHabitatSpecies(rng, min(GetFloor() + 2, 6), FALSE);
 }
 
 // A starter: not evolved, evolves, and no stronger than the first-stage starters
@@ -1027,11 +1029,16 @@ bool32 Rogue_LivesIn(u16 species, u32 biome)
 // Wild Pokémon live where Jacob's encounter sheet puts their family
 static enum Species PickRoomSpecies(rng_value_t *rng)
 {
+    return PickHabitatSpecies(rng, GetFloor(), GetFloor() == 1);
+}
+
+// A species living in the room's theme, as strong as the given floor's Pokémon; any theme's if none fits
+static enum Species PickHabitatSpecies(rng_value_t *rng, u32 bstFloor, bool32 unevolvedOnly)
+{
     u32 biome = GetRoomBiome(), minBst, maxBst, tries;
-    bool32 unevolvedOnly = (GetFloor() == 1);
 
     BuildHabitats();
-    GetFloorBstRange(GetFloor(), &minBst, &maxBst);
+    GetFloorBstRange(bstFloor, &minBst, &maxBst);
     for (tries = 0; tries < 4000; tries++)
     {
         enum Species species = 1 + LocalRandom(rng) % NATIONAL_DEX_COUNT;
@@ -1043,6 +1050,8 @@ static enum Species PickRoomSpecies(rng_value_t *rng)
             continue;
         return species;
     }
+    if (bstFloor != GetFloor())
+        return PickHabitatSpecies(rng, GetFloor(), FALSE); // no strong one here: a usual one of this theme
     return PickFloorSpecies(rng, TYPE_NONE);
 }
 
@@ -1217,10 +1226,9 @@ static bool32 IsBlockedTile(s32 x, s32 y)
 }
 
 // Every door, and the building's door, can be walked to from the entrance
-static bool32 AreDoorsReachable(void)
+// Flood fill from the entrance. seen: 0 = not reached, 1 = blocked, 2 = reached
+static void FindReachableTiles(u8 seen[ROOM_H][ROOM_W])
 {
-    // seen: 0 = not yet, 1 = blocked, 2 = reached
-    u8 seen[ROOM_H][ROOM_W];
     u16 queue[ROOM_W * ROOM_H];
     u32 head = 0, tail = 0, i;
     s32 x, y;
@@ -1247,6 +1255,14 @@ static bool32 AreDoorsReachable(void)
             queue[tail++] = ny * ROOM_W + nx;
         }
     }
+}
+
+static bool32 AreDoorsReachable(void)
+{
+    u8 seen[ROOM_H][ROOM_W];
+    u32 i;
+
+    FindReachableTiles(seen);
     for (i = 0; i < NUM_DOORS; i++)
     {
         u32 gx = GetDoorX(i);
@@ -1371,14 +1387,17 @@ static void AddObject(u16 graphicsId, u32 x, u32 y, u8 movementType, const u8 *s
     obj->script = script;
 }
 
+// Somewhere the player can walk up to (never in a pocket the trees and water close off)
 static void AddObjectAnywhere(rng_value_t *rng, u16 graphicsId, u8 movementType, const u8 *script)
 {
+    u8 seen[ROOM_H][ROOM_W];
     u32 tries;
+    FindReachableTiles(seen);
     for (tries = 0; tries < 100; tries++)
     {
         u32 x = INNER_X_MIN + LocalRandom(rng) % (INNER_X_MAX - INNER_X_MIN + 1);
         u32 y = INNER_Y_MIN + 1 + LocalRandom(rng) % (INNER_Y_MAX - INNER_Y_MIN);
-        if (IsTileFree(x, y))
+        if (IsTileFree(x, y) && seen[y][x] == 2)
         {
             AddObject(graphicsId, x, y, movementType, script);
             return;
@@ -1412,12 +1431,27 @@ static void AddTrainerObject(void)
     AddObject(graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
 }
 
-// A pond of w x h blocks somewhere inside: never in the top row (under a door), the entrance's column
-// or the middle object's; it must leave every door reachable. FALSE (and nothing placed) if it can't.
+// Trees and water stay in the two block columns on each side of the room (Jacob, 2026-10-07: a swamp
+// closed a Pokémon in); the middle three, the entrance's and the doors' way, stay open
+#define SIDE_W 2
+static u32 PickSideBlockX(rng_value_t *rng, u32 w)
+{
+    if (LocalRandom(rng) % 2)
+        return INNER_BX_MIN + LocalRandom(rng) % (SIDE_W + 1 - w);
+    return INNER_BX_MAX + 1 - SIDE_W + LocalRandom(rng) % (SIDE_W + 1 - w);
+}
+
+static bool32 IsSideBlockX(u32 bx)
+{
+    return bx < INNER_BX_MIN + SIDE_W || bx > INNER_BX_MAX - SIDE_W;
+}
+
+// A pond of w x h blocks (w at most SIDE_W) on one side: never in the top row (under a door); it must
+// leave every door reachable. FALSE (and nothing placed) if it can't.
 static bool32 TryPlaceWater(rng_value_t *rng, u32 w, u32 h, bool32 hasCenterObject)
 {
     u32 bx, by;
-    u32 bx0 = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 2 - w);
+    u32 bx0 = PickSideBlockX(rng, w);
     u32 by0 = INNER_BY_MIN + 1 + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN - h + 1);
     if (by0 + h - 1 > INNER_BY_MAX)
         return FALSE;
@@ -1489,7 +1523,7 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
         {
             for (i = 0; i < 12; i++)
             {
-                if (TryPlaceWater(rng, i < 6 ? 3 : 2, 2, hasCenterObject))
+                if (TryPlaceWater(rng, 2, i < 6 ? 3 : 2, hasCenterObject))
                     break;
             }
         }
@@ -1520,9 +1554,9 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
         }
         for (i = 0; i < count * 4 && count > 0; i++)
         {
-            bx = INNER_BX_MIN + LocalRandom(rng) % (INNER_BX_MAX - INNER_BX_MIN + 1);
+            bx = PickSideBlockX(rng, 1);
             by = INNER_BY_MIN + LocalRandom(rng) % (INNER_BY_MAX - INNER_BY_MIN + 1);
-            if (sPlan.tree[by][bx] || (bx == ENTRANCE_BX && by == ENTRANCE_BY))
+            if (sPlan.tree[by][bx] || (bx == ENTRANCE_BX && by == ENTRANCE_BY) || !IsSideBlockX(bx))
                 continue;
             if (by == INNER_BY_MIN && (bx == 3 || bx == 5 || bx == 7))
                 continue; // right under a door
@@ -1536,7 +1570,8 @@ static void PlanOutdoorRoom(rng_value_t *rng, u32 type, bool32 hasCenterObject)
             if (beach && (bx == INNER_BX_MIN || bx == INNER_BX_MAX))
                 continue; // the sea side
             sPlan.tree[by][bx] = TRUE;
-            if (!AreDoorsReachable())
+            // with the middle open, side trees only matter around a building
+            if (sPlan.building != BUILDING_NONE && !AreDoorsReachable())
                 sPlan.tree[by][bx] = FALSE;
             else
                 count--;
@@ -1667,6 +1702,35 @@ static void BuildRoomPlan(void)
         AddTrainerObject();
         break;
     }
+}
+
+// For tests: the room's middle three block columns have no trees or water, and every object in it can
+// be walked up to
+bool32 Rogue_IsRoomOpen(void)
+{
+    u8 seen[ROOM_H][ROOM_W];
+    u32 bx, by, i;
+    BuildRoomPlan();
+    if (sPlan.kind != ROOM_KIND_OUTDOOR && sPlan.kind != ROOM_KIND_WALLED)
+        return TRUE;
+    for (by = INNER_BY_MIN; by <= INNER_BY_MAX && sPlan.kind == ROOM_KIND_OUTDOOR; by++)
+    {
+        for (bx = INNER_BX_MIN + SIDE_W; bx <= INNER_BX_MAX - SIDE_W; bx++)
+        {
+            if (sPlan.tree[by][bx] || sPlan.water[by][bx])
+                return FALSE;
+        }
+    }
+    FindReachableTiles(seen);
+    for (i = 0; i < sPlan.numObjects; i++)
+    {
+        s32 x = sPlan.objects[i].x, y = sPlan.objects[i].y;
+        // reachable if the player can stand next to it
+        if (!((y + 1 < ROOM_H && seen[y + 1][x] == 2) || (y > 0 && seen[y - 1][x] == 2)
+           || (x + 1 < ROOM_W && seen[y][x + 1] == 2) || (x > 0 && seen[y][x - 1] == 2)))
+            return FALSE;
+    }
+    return TRUE;
 }
 
 // For tests: the current room's doors, and whether every one is reachable from the entrance

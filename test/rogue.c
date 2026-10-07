@@ -990,3 +990,41 @@ TEST("Rogue: sea creatures live on the beach, not in forests")
     EXPECT(Rogue_LivesIn(SPECIES_CATERPIE, 0)); // Petalburg Woods
     EXPECT(Rogue_LivesIn(SPECIES_ZIGZAGOON, 5)); // Route 101: plains
 }
+
+TEST("Rogue: trees and water stay to the sides; everything in a room can be reached")
+{
+    u32 seed, biome, type;
+    static const u8 sTypes[] = {ROGUE_ROOM_WILD, ROGUE_ROOM_ITEM, ROGUE_ROOM_TRAINER, ROGUE_ROOM_EVENT, ROGUE_ROOM_SHOP, ROGUE_ROOM_REST};
+    VarSet(VAR_ROGUE_RUN_FLAGS, 0);
+    for (seed = 1; seed < 10; seed++)
+    {
+        for (biome = 0; biome < 8; biome++)
+        {
+            for (type = 0; type < ARRAY_COUNT(sTypes); type++)
+            {
+                SetRoom(seed * 2654435761u, 1 + seed % 4, 2 + seed % 6, sTypes[type] | (biome << 9));
+                EXPECT(Rogue_IsRoomOpen());
+            }
+        }
+    }
+}
+
+TEST("Rogue: the rare Pokemon behind a ? door lives in its room's theme")
+{
+    u32 seed, biome, checked = 0;
+    for (seed = 1; seed < 40; seed++)
+    {
+        for (biome = 0; biome < 8; biome++)
+        {
+            const struct ObjectEventTemplate *template;
+            SetRoom(seed * 7777, 2, 3, ROGUE_ROOM_EVENT | (biome << 9));
+            Rogue_OnTransition();
+            template = &gSaveBlock1Ptr->objectEventTemplates[3];
+            if (FlagGet(template->flagId) || template->graphicsId < OBJ_EVENT_MON)
+                continue; // a gift or a merchant
+            checked++;
+            EXPECT(Rogue_LivesIn(template->graphicsId - OBJ_EVENT_MON, biome));
+        }
+    }
+    EXPECT_GT(checked, 20);
+}
