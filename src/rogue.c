@@ -570,7 +570,7 @@ static u32 GetBossLevel(void)
     return 3 + (GetFloor() - 1) * 8 + 8;
 }
 
-// EXP in a run (decided with Jacob 2026-10-03, after runs rarely reached the first boss): the whole
+// EXP in a run (decided with Mooshi 2026-10-03, after runs rarely reached the first boss): the whole
 // team learns, at double EXP (triple with Quick study), and a Pokémon 5+ levels under the cap gets
 // double that again, so a new catch catches up. The hard cap is the floor's boss level (in the
 // finale, the Champion's), so the boost can't outlevel the boss.
@@ -661,7 +661,7 @@ u32 Rogue_GetFloorDonors(u16 *species, u32 count)
 static enum Species PickHabitatSpecies(rng_value_t *rng, u32 bstFloor, bool32 unevolvedOnly);
 
 // The "?" door's rare Pokémon: from the room's habitat like any other, but from a stronger pool (a
-// Krabby turned up in a volcano when it ignored the habitat, Jacob 2026-10-07)
+// Krabby turned up in a volcano when it ignored the habitat, Mooshi 2026-10-07)
 static enum Species PickRareSpecies(rng_value_t *rng)
 {
     return PickHabitatSpecies(rng, min(GetFloor() + 2, 6), FALSE);
@@ -930,7 +930,7 @@ static const struct { u16 species; u8 biome; } sHabitatExtras[] =
 };
 
 // Sea creatures the sheet also puts on a forest route's land (Route 104's Wiglett, Route 114's Krabby…):
-// beach rooms only (Jacob, 2026-10-05: "Krabby totally belongs on the beach"). Freshwater families
+// beach rooms only (Mooshi, 2026-10-05: "Krabby totally belongs on the beach"). Freshwater families
 // (Lotad, Surskit, Poliwag, Psyduck, Wooper…) live in lakes and swamps; the starters stay where the sheet puts them.
 static const u16 sBeachOnly[] =
 {
@@ -939,7 +939,7 @@ static const u16 sBeachOnly[] =
     SPECIES_KABUTO, SPECIES_OMANYTE, SPECIES_CLAUNCHER, SPECIES_POPPLIO, SPECIES_BUIZEL,
 };
 
-// Which families live in each theme: every species on the theme's encounter tables (Jacob's sheet)
+// Which families live in each theme: every species on the theme's encounter tables (Mooshi's sheet)
 // and everything it evolves into. Built once from the live tables.
 static EWRAM_DATA u8 sHabitats[BIOME_COUNT][(NUM_SPECIES + 7) / 8] = {0};
 static EWRAM_DATA const struct WildPokemonHeader *sHabitatsFrom = NULL;
@@ -1026,7 +1026,7 @@ bool32 Rogue_LivesIn(u16 species, u32 biome)
     return biome < BIOME_COUNT && LivesIn(species, biome);
 }
 
-// Wild Pokémon live where Jacob's encounter sheet puts their family
+// Wild Pokémon live where Mooshi's encounter sheet puts their family
 static enum Species PickRoomSpecies(rng_value_t *rng)
 {
     return PickHabitatSpecies(rng, GetFloor(), GetFloor() == 1);
@@ -1425,13 +1425,13 @@ static bool32 IsRoomGuarded(u32 type)
 
 static void AddTrainerObject(void)
 {
-    // Trainers and bosses don't spot the player: talk to them to battle (Jacob, 2026-10-03)
+    // Trainers and bosses don't spot the player: talk to them to battle (Mooshi, 2026-10-03)
     u16 graphicsId = (GetRoomType() == ROGUE_ROOM_ACE) ? sAceKinds[GetTrainerKind() % ARRAY_COUNT(sAceKinds)].graphicsId
                                                        : sTrainerKinds[GetTrainerKind()].graphicsId;
     AddObject(graphicsId, CENTER_X, CENTER_Y, MOVEMENT_TYPE_FACE_DOWN, Rogue_Room_EventScript_Trainer);
 }
 
-// Trees and water stay in the two block columns on each side of the room (Jacob, 2026-10-07: a swamp
+// Trees and water stay in the two block columns on each side of the room (Mooshi, 2026-10-07: a swamp
 // closed a Pokémon in); the middle three, the entrance's and the doors' way, stay open
 #define SIDE_W 2
 static u32 PickSideBlockX(rng_value_t *rng, u32 w)
@@ -1814,7 +1814,7 @@ u32 Rogue_GetFloorWeather(u32 floor)
 }
 
 // Hard mode curses: from floor 2, 40% of floors have one, rolled from the run seed like the weather and
-// named at the rest stop before the floor (Jacob, 2026-10-03)
+// named at the rest stop before the floor (Mooshi, 2026-10-03)
 u32 Rogue_GetFloorCurse(u32 floor)
 {
     u32 roll;
@@ -1835,7 +1835,7 @@ static void CheckGraftAchievement(void);
 
 // Can the player's team damage a Pokémon of these types at all? A generated trainer (who may block the
 // way) never fields one that's immune to every damaging move the team knows, like a Ghost against a
-// starter that only has Normal moves (Jacob, 2026-10-03). Outside a run, or with no damaging moves, yes.
+// starter that only has Normal moves (Mooshi, 2026-10-03). Outside a run, or with no damaging moves, yes.
 bool32 Rogue_CanTeamHitTypes(u32 type1, u32 type2)
 {
     u32 i, j;
@@ -2392,9 +2392,9 @@ static void SetForcedSettings(void)
     SetGraftSetting(GRAFT_SETTING_FAINTING, GRAFT_FAINTING_NORMAL); // fainted Pokémon: Rogue_OnBattleEnd
     SetGraftSetting(GRAFT_SETTING_WILD_SPAWNS, GRAFT_WILD_SPAWNS_HIDDEN);
     SetGraftSetting(GRAFT_SETTING_LEVEL_CAP, GRAFT_LEVEL_CAP_HARD); // the floor's boss level (Rogue_GetLevelCap)
-    // Set by the run, not chosen on a settings screen (decided with Jacob 2026-10-02)
+    // Set by the run, not chosen on a settings screen (decided with Mooshi 2026-10-02)
     SetGraftSetting(GRAFT_SETTING_SHINY_ODDS, GRAFT_SHINY_ODDS_BOOSTED);
-    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, TRUE); // the whole team learns (Jacob 2026-10-03: runs were too hard)
+    SetGraftSetting(GRAFT_SETTING_EXP_SHARE, TRUE); // the whole team learns (Mooshi 2026-10-03: runs were too hard)
     SetGraftSetting(GRAFT_SETTING_ENEMY_GRAFTS, IsHardMode() ? GRAFT_ENEMY_GRAFTS_MORE : GRAFT_ENEMY_GRAFTS_NORMAL);
     SetGraftSetting(GRAFT_SETTING_WILD_GRAFTS, GRAFT_WILD_GRAFTS_OFF);
     SetGraftSetting(GRAFT_SETTING_BATTLE_ITEMS, FALSE);
@@ -2721,7 +2721,7 @@ static u32 RecordWonSpecies(void)
 }
 
 // ---------------------------------------------------------------------------------------------
-// Achievements (Jacob, 2026-10-03): each pays BP once. Worth building a run around, but all of them
+// Achievements (Mooshi, 2026-10-03): each pays BP once. Worth building a run around, but all of them
 // together (340 BP) buy well under half of the unlock shop. Earned ones are announced by the map's
 // OnFrame (VAR_ROGUE_ACHIEVE_SHOW), so they can come from anywhere: a battle, the Graft Bag, a boss.
 enum
@@ -3365,7 +3365,7 @@ static void BuildTrainer(u32 slot, u32 key)
     u32 size, level, iv, i;
 
     sTrainers[slot] = *GetTrainerStructFromId(baseId);
-    // Healing items only for the Champion and Hard mode's bosses (Jacob 2026-10-03): the borrowed
+    // Healing items only for the Champion and Hard mode's bosses (Mooshi 2026-10-03): the borrowed
     // trainer's Bag goes otherwise
     if (!(boss && (IsHardMode() || baseId == TRAINER_WALLACE)))
         memset(sTrainers[slot].items, 0, sizeof(sTrainers[slot].items));

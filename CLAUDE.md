@@ -104,7 +104,7 @@ After Birch's intro, before the game starts, a scrolling GAME SETTINGS screen (`
 
 ## Grafted Rogue (branch `rogue`)
 
-This branch turns the game into a roguelite; `docs/rogue/DESIGN.md` has Jacob's decisions and the status. Grafted Emerald fixes get merged in from `main`.
+This branch turns the game into a roguelite; `docs/rogue/DESIGN.md` has Mooshi's decisions and the status. Grafted Emerald fixes get merged in from `main`.
 
 - A new game starts in the base (`Rogue_Home`, no truck): unlocks show as secret base decorations (`Rogue_DecorateHome`), Prof. Birch is a help menu, the scientist sells unlocks, the exit starts a run. Every room is the one map `Rogue_Room`, rebuilt from a seed (run seed mixed with floor and room) by `src/rogue.c`: `Rogue_OnTransition` places objects (door signs, room contents) in the saved templates before they spawn, `Rogue_OnLoad` draws trees, grass, ponds and doors (it runs again after every battle, so everything is recomputed from the seed, nothing stored).
 - Run state is in vars (`VAR_ROGUE_*`, `include/constants/vars.h`); unlocks in `VAR_ROGUE_UNLOCKS` survive runs, BP is the Frontier's `battlePoints`. There's no settings screen: the start room asks about meta-progression once (`VAR_ROGUE_INTRO`), and `StartRun` sets every other setting for the run (`SetForcedSettings`), challenges (Inverse, Monotype) included.

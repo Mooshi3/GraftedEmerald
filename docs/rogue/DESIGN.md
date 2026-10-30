@@ -1,7 +1,7 @@
 # Grafted Emerald: Rogue — design
 
 Short runs built around grafting: pick doors, catch and harvest what's behind them, build a team out of
-pieces, beat the bosses. Pokémon that faint are gone. Decisions are Jacob's (answers of 2026-10-02);
+pieces, beat the bosses. Pokémon that faint are gone. Decisions are Mooshi's (answers of 2026-10-02);
 **Open** marks what's still undecided.
 
 ## The run
@@ -64,7 +64,7 @@ Sleep Clause, Smart Wilds, shiny odds…) plus Rogue's own (meta-progression on/
 
 ## Milestones
 
-1. **Prototype rooms (to show Jacob):** the room generator, doors with symbols, Wild / Trainer / Item /
+1. **Prototype rooms (to show Mooshi):** the room generator, doors with symbols, Wild / Trainer / Item /
    Rest / Shop rooms with simple content, a boss room, a random starter, permadeath, run over.
 2. Floors and bosses: floor pools and level curve, Gym Leaders by type, the finale, Normal/Hard length.
 3. Meta-progression: BP, the unlock shop, the settings.
@@ -96,11 +96,11 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
   (30), 4th/5th/6th team slot (40/70/100), Ball pouch (+3 Poké, +2 Patch Balls, 20), First aid (2 Revives,
   30), Last rites I/II/III (60/90/120), Heirloom (start each run with one of three pieces: a strong ability,
   a 110–140 stat, a type, 50). With Unlocks Off, all of them and Hard mode are open from the start
-  (confirmed by Jacob).
-- Fainting (decided with Jacob 2026-10-02): nothing is lost on its own. After a battle, each Pokémon that
+  (confirmed by Mooshi).
+- Fainting (decided with Mooshi 2026-10-02): nothing is lost on its own. After a battle, each Pokémon that
   fainted asks: Keep it (stays on the team, fainted, until a Revive; asked again only if it faints again
   after being revived) or Last rites (broken down into graft pieces). Only asked while last rites are left
-  this floor (2026-10-03, Jacob: a fainted Pokémon is worth more than an empty slot, and it can be revived
+  this floor (2026-10-03, Mooshi: a fainted Pokémon is worth more than an empty slot, and it can be revived
   or swapped out for a catch, so "Let it go" was dropped). Last rites I/II/III
   give 1/2/3 uses a floor, so grafting balls and the Splicer stay useful and killing your own Pokémon for
   pieces stays a limited strategy. Per floor or per run is still open (one constant to change).
@@ -109,14 +109,14 @@ Milestone 1 is playable: `src/rogue.c`, map `data/maps/Rogue_Room`, tests in `te
   floors ahead's pool, or a merchant with Splice Balls, Rare Candy, held items), else a random room.
 
 Not done yet: bosses from other generations (sprites, waiting on assets), more events.
-- No settings screen (Jacob 2026-10-02). A new save's start room asks once: meta-progression yes/no
+- No settings screen (Mooshi 2026-10-02). A new save's start room asks once: meta-progression yes/no
   (no = everything unlocked). A run sets the rest: shiny odds 1/512, EXP Share Item (Party with the Team
   training unlock), Enemy Grafts Normal (More on Hard), Wild Grafts Off, battle items allowed, Set style
   (Shift with the Switch style unlock), no Sleep Clause, Smart Wilds on Hard only.
 - Challenges, picked at the start door for one run: Inverse battles or Monotype (choose the type; the
   starter gets it grafted). Bosses pay half again in BP.
 
-### Balance pass (2026-10-02, after Jacob's first run: the floor-1 boss was out of reach)
+### Balance pass (2026-10-02, after Mooshi's first run: the floor-1 boss was out of reach)
 
 - Floors are 10 rooms. Levels climb slowly: wilds 3 to 9 on floor 1 (+8 a floor), trainers one above,
   the boss 2 above the last room (floor 1: level 11) with floor + 1 Pokémon plus its ace.
@@ -131,7 +131,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   has a home theme (floor 1 forest, 2 beach, 3 cave, 4 volcano, then around again) that a door's room takes
   55% of the time, 15% for each other theme.
 - A door's opening shows the next room's theme: sand, cave rock, volcanic ground or grass in front of it.
-- Wild Pokémon live where Jacob's encounter sheet puts their family (2026-10-03, replacing type pools:
+- Wild Pokémon live where Mooshi's encounter sheet puts their family (2026-10-03, replacing type pools:
   a fighting-type panda isn't a beach Pokémon). Each Hoenn map with encounters has a theme: caves (Granite,
   Meteor Falls, Victory Road, Seafloor, Shoal, Mt. Pyre, Sky Pillar, Mirage Tower, New Mauville…), volcano
   (Fiery Path, Jagged Pass, Mt. Chimney, Magma Hideout, Routes 111-113), forest (the other land routes);
@@ -179,7 +179,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
 - Second unlock page (`VAR_ROGUE_UNLOCKS_2`, ids 16+): Discount (40 BP: shops a quarter off), Harvest bonus
   (60 BP: each piece broken down from a Pokémon has a 25% chance of a spare copy; balls, the Splicer, last
   rites), Catch bonus (50 BP: a real catch has a 25% chance of leaving one random piece).
-- Normal mode getting easy with everything unlocked is fine (Jacob): it's the training wheels for Hard mode,
+- Normal mode getting easy with everything unlocked is fine (Mooshi): it's the training wheels for Hard mode,
   which will scale up.
 
 ### Species won with (2026-10-03)
@@ -192,7 +192,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
 
 ### EXP (2026-10-03, after runs rarely reached the first boss)
 
-- Jacob's runs reached the boss with one Pokémon around level 10 and catches still at 5: only the
+- Mooshi's runs reached the boss with one Pokémon around level 10 and catches still at 5: only the
   battler learned (EXP Share Party was an unlock), and catches never caught up.
 - Now the whole team always learns (Gen 6 EXP Share), at double EXP; a Pokémon 5+ levels under the cap
   gets double that again, so a new catch catches up. A hard level cap at the floor's boss level (the
@@ -236,11 +236,11 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   (one Pokémon with all five graft kinds) 25, Collector (10 species won with) 30, Curator (50) 60.
   Announced by the map's OnFrame (`VAR_ROGUE_ACHIEVE_SHOW`); Prof. Birch lists them with their rewards.
   Small team comes free on a first win without team slot unlocks; that's why it pays less.
-- Immune walls (2026-10-03, Jacob's Meowth vs a Shuppet guard in the first room): a generated trainer
+- Immune walls (2026-10-03, Mooshi's Meowth vs a Shuppet guard in the first room): a generated trainer
   never fields a Pokémon, or takes a type graft, that's immune to every damaging move the team's
   non-fainted Pokémon know (`Rogue_CanTeamHitTypes`; species rerolled up to 20 times). Bosses are left
   alone: the player sees them coming. Abilities (Levitate, Wonder Guard) aren't checked.
-- Outdoor themes split (2026-10-05, Jacob: "split forest into plains/woods/lake/swamp"): the green
+- Outdoor themes split (2026-10-05, Mooshi: "split forest into plains/woods/lake/swamp"): the green
   floor's rooms are woods (dense trees: Petalburg Woods, Routes 116/119/120), plains (open, flowers:
   Routes 101-104, 110, 114, 115, 117, 121, 123, 130, the Safari Zone), lake (a big pond; the fresh
   surf/fishing tables of 102, 110, 111, 114, 117, 123, Petalburg, the Safari ponds, Meteor Falls,
@@ -250,7 +250,7 @@ Not done yet: bosses from other generations (sprites, waiting on assets), more e
   Doorway previews: tall grass (woods), flowers (plains), short grass (lake), long grass (swamp).
   Buildings stand only in woods, plains or on a beach. Biome ids 5-7 (`BIOME_PLAINS/LAKE/SWAMP`);
   `BIOME_FOREST` (0) is the woods. Debug Scripts 14-16 jump to each.
-- Room layout (2026-10-07, Jacob: a swamp closed a Pokémon in): trees and water only in the two block
+- Room layout (2026-10-07, Mooshi: a swamp closed a Pokémon in): trees and water only in the two block
   columns on each side; the middle three stay open, so the entrance, every door and the room's middle
   always connect. Objects (wild Pokémon, items) are only placed where the player can walk to them. The
   "?" door's rare Pokémon comes from the room's own theme (a stronger pick; a usual one if the theme
