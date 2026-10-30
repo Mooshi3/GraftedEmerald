@@ -60,7 +60,7 @@ Sleep Clause, Smart Wilds, shiny odds…) plus Rogue's own (meta-progression on/
   from the run so a new run clears only the run.
 - **Content by floor:** the wild/trainer species pool and levels come from the floor number, not from
   maps. Trainer parties are generated (hooked where `ApplyTrainerGrafts` already runs).
-- Branch: `claude/grafted-rogue`; Grafted Emerald fixes get merged in.
+- Branch: `rogue`; Grafted Emerald fixes get merged in from `main`.
 
 ## Milestones
 
