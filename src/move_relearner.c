@@ -1203,7 +1203,7 @@ static bool32 IsTMMoveRelearnerActive(void)
     return (P_TM_MOVES_RELEARNER || P_ENABLE_MOVE_RELEARNERS);
 }
 
-// GRAFT: no tutor list (Jacob, 2026-10-03): it offered every tutor move for free, skipping the
+// GRAFT: no tutor list (Mooshi, 2026-10-03): it offered every tutor move for free, skipping the
 // tutors who charge for them (the Battle Frontier's take BP). Only P_FLAG_TUTOR_MOVES can open it.
 static bool32 IsTutorMoveRelearnerActive(void)
 {

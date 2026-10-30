@@ -1,4 +1,4 @@
-"""Pins recolor results Jacob approved: `golden.py save FILE` records them, `golden.py check FILE` lists what changed.
+"""Pins recolor results Mooshi approved: `golden.py save FILE` records them, `golden.py check FILE` lists what changed.
 
 The cases are the round-2 A/B sheets' rows (mon:type1/type2), minus the ones still being tuned.
 """
