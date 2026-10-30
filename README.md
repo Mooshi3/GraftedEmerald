@@ -1,53 +1,71 @@
-# About `pokeemerald-expansion`
+# Grafted Emerald
 
-![Gif that shows debugging functionality that is unique to pokeemerald-expansion such as rerolling Trainer ID, Cheat Start, PC from Debug Menu, Debug PC Fill, Pokémon Sprite Visualizer, Debug Warp to Map, and Battle Debug Menu](https://github.com/user-attachments/assets/cf9dfbee-4c6b-4bca-8e0a-07f116ef891c) ![Gif that shows overworld functionality that is unique to pokeemerald-expansion such as indoor running, BW2 style map popups, overworld followers, DNA Splicers, Gen 1 style fishing, OW Item descriptions, Quick Run from Battle, Use Last Ball, Wild Double Battles, and Catch from EXP](https://github.com/user-attachments/assets/383af243-0904-4d41-bced-721492fbc48e) ![Gif that shows off a number of modern Pokémon battle mechanics happening in the pokeemerald-expansion engine: 2 vs 1 battles, modern Pokémon, items, moves, abilities, fully customizable opponents and partners, Trainer Slides, and generational gimmicks](https://github.com/user-attachments/assets/50c576bc-415e-4d66-a38f-ad712f3316be)
+Two Pokémon Emerald hacks built around **grafting**: break Pokémon down into pieces (a move, an
+ability, a type, a nature or one base stat) and graft those pieces onto your own team. Any Pokémon
+can be made viable.
 
-<!-- If you want to re-record or change these gifs, here are some notes that I used: https://files.catbox.moe/05001g.md -->
+- **Grafted Emerald** is the full Hoenn adventure with grafting, Pokémon from every region in the
+  wild, grafted trainers, and new-game settings that range from a relaxed run to a Nuzlocke.
+- **Grafted Rogue** is a roguelite: floors of rooms built from a seed, a boss at the end of each
+  floor, a new starter every run, and unlocks that carry over between runs.
 
-**`pokeemerald-expansion`** is a GBA ROM hack base that equips developers with a comprehensive toolkit for creating Pokémon ROM hacks. **`pokeemerald-expansion`** is built on top of [pret's `pokeemerald`](https://github.com/pret/pokeemerald) decompilation project. **It is not a playable Pokémon game on its own.**
+## Download
 
-# [Features](FEATURES.md)
+Get the patches from the [Releases](https://github.com/Mooshi3/GraftedEmerald/releases) page:
 
-**`pokeemerald-expansion`** offers hundreds of features from various [core series Pokémon games](https://bulbapedia.bulbagarden.net/wiki/Core_series), along with popular quality-of-life enhancements designed to streamline development and improve the player experience. A full list of those features can be found in [`FEATURES.md`](FEATURES.md).
+| Patch | Game |
+|---|---|
+| `GraftedEmerald.bps` | Grafted Emerald |
+| `GraftedRogue.bps` | Grafted Rogue |
 
-# [Credits](CREDITS.md)
+Each release has notes on how the game plays:
+[Grafted Emerald](tools/patch/GraftedEmerald_README.md) ·
+[Grafted Rogue](https://github.com/Mooshi3/GraftedEmerald/blob/rogue/tools/patch/GraftedRogue_README.md).
 
- [![](https://img.shields.io/github/all-contributors/rh-hideout/pokeemerald-expansion/upcoming)](CREDITS.md)
+## Patching
 
-If you use **`pokeemerald-expansion`**, please credit **RHH (Rom Hacking Hideout)**. Optionally, include the version number for clarity.
+You need a clean **Pokémon Emerald (USA, Europe)** ROM. Its MD5 is
+`605b89b67018abcea91e693a4dd25be3`. Other versions or already-patched ROMs won't work.
 
-```
-Based off RHH's pokeemerald-expansion 1.17.1 https://github.com/rh-hideout/pokeemerald-expansion/
-```
+1. Open a BPS patcher: [Rom Patcher JS](https://www.marcrobledo.com/RomPatcher.js/) in a browser,
+   or [Flips](https://github.com/Alcaro/Flips) on a computer.
+2. Pick the `.bps` patch and your Emerald ROM.
+3. Save the result and play it in any GBA emulator. [mGBA](https://mgba.io/) is recommended.
 
-Please consider [crediting all contributors](CREDITS.md) involved in the project!
+Both patches apply to the same clean ROM, so you can have both games. Don't ask for ROMs: only the
+patches are shared here.
 
-# Choosing `pokeemerald` or **`pokeemerald-expansion`**
+## Grafting in short
 
-- **`pokeemerald-expansion`** supports multiplayer functionality with other games built on **`pokeemerald-expansion`**. It is not compatible with official Pokémon games.
-- If compatibility with official games is important, use [`pokeemerald`](https://github.com/pret/pokeemerald). Otherwise, we recommend using **`pokeemerald-expansion`**.
-- **`pokeemerald-expansion`** incorporates regular updates from `pokeemerald`, including bug fixes and documentation improvements.
+- **Pieces.** Throw a grafting ball at a wild Pokémon instead of catching it. A Patch Ball gives one
+  random piece, a Graft Ball three, a Splice Ball all of them. The Graft Splicer breaks down one of
+  your own Pokémon into all its pieces.
+- **The Graft Bag** holds the pieces, a tab per kind. Pick a piece, then a Pokémon to graft it onto.
+- **Stat Budget.** A stat piece sets one base stat, up to a base stat total that's the same for every
+  species. A weak Pokémon has room to grow; a strong one has to trade.
+- **Grafted types** recolor the Pokémon's sprite, and in battle R shows the opponent's grafts.
 
-# [Getting Started](INSTALL.md)
+## Source code
 
-❗❗ **Important**: Do not use GitHub's "Download Zip" option as it will not include commit history. This is necessary if you want to update or merge other feature branches.
+This repository is the source, built on
+[pokeemerald-expansion](https://github.com/rh-hideout/pokeemerald-expansion) 1.17.1.
 
-If you're new to git and GitHub, [Team Aqua's Asset Repo](https://github.com/Pawkkie/Team-Aquas-Asset-Repo/) has a [guide to forking and cloning the repository](https://github.com/Pawkkie/Team-Aquas-Asset-Repo/wiki/The-Basics-of-GitHub). Then you can follow one of the following guides:
+| Branch | Game |
+|---|---|
+| `main` | Grafted Emerald |
+| `rogue` | Grafted Rogue |
 
-## 📥 [Installing **`pokeemerald-expansion`**](INSTALL.md)
-## 🏗️ [Building **`pokeemerald-expansion`**](INSTALL.md#Building-pokeemerald-expansion)
-## 🚚 [Migrating from **`pokeemerald`**](INSTALL.md#Migrating-from-pokeemerald)
-## 🚀 [Updating **`pokeemerald-expansion`**](INSTALL.md#Updating-pokeemerald-expansion)
+To build it yourself, set up the toolchain as in [docs/INSTALL.md](docs/INSTALL.md), then run
+`make` (or `make release`). `tools/patch/make_patch.sh` builds the release ROM and its patch from
+your own clean Emerald ROM. Developer notes live in [CLAUDE.md](CLAUDE.md) and
+[docs/rogue/DESIGN.md](https://github.com/Mooshi3/GraftedEmerald/blob/rogue/docs/rogue/DESIGN.md); the expansion's own README is in
+[docs/EXPANSION_README.md](docs/EXPANSION_README.md).
 
-# [Documentation](https://rh-hideout.github.io/pokeemerald-expansion/)
+## Credits
 
-For detailed documentation, visit the [pokeemerald-expansion documentation page](https://rh-hideout.github.io/pokeemerald-expansion/).
-
-# [Contributions](CONTRIBUTING.md)
-If you are looking to [report a bug](CONTRIBUTING.md#Bug-Report), [open a pull request](CONTRIBUTING.md#Pull-Requests), or [request a feature](CONTRIBUTING.md#Feature-Request), our [`CONTRIBUTING.md`](CONTRIBUTING.md) has guides for each.
-
-# [Community](https://discord.gg/6CzjAG6GZk)
-
-[![](https://dcbadge.limes.pink/api/server/6CzjAG6GZk)](https://discord.gg/6CzjAG6GZk)
-
-Our community uses the [ROM Hacking Hideout (RHH) Discord server](https://discord.gg/6CzjAG6GZk) to communicate and organize. Most of our discussions take place there, and we welcome anybody to join us!
+- Built on [pokeemerald-expansion](https://github.com/rh-hideout/pokeemerald-expansion) by RHH (Rom
+  Hacking Hideout) and its contributors, itself built on [pret's pokeemerald](https://github.com/pret/pokeemerald)
+  decompilation. See [CREDITS.md](CREDITS.md).
+- Grafted Emerald and Grafted Rogue by Mooshi.
+- Pokémon is © Nintendo, Creatures Inc. and GAME FREAK inc. This is a free, non-commercial fan
+  project and isn't affiliated with or endorsed by them.

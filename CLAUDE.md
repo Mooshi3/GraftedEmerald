@@ -17,6 +17,7 @@ Goal right now: a clean front-to-back playthrough that's publishable.
 - `origin` = Jacob's GitHub repo; `upstream` = rh-hideout/pokeemerald-expansion. Grafted branched from upstream in May 2026 (`21c2420299`) and was merged up to expansion 1.17.1 (+ one post-release fix) on 2026-09-29.
 - Upstream API notes that matter for graft code: use `gParties[B_TRAINER_PLAYER]` / `GetBattlerMon(battler)` (the old `gPlayerParty`/`gEnemyParty` are deprecated); battlers are built by `PokemonToBattleMon` (applies grafted types/ability); opponent parties are built in `CreateNPCTrainerParty` (`src/battle_setup.c`, where `ApplyTrainerGrafts` is hooked); eggs hatch in place (no rebuild), so grafts survive hatching; relearner categories are the `sRelearnTypes` table in `src/move_relearner.c`.
 - Toolchain: `arm-none-eabi-gcc` + `make`. Build output is gitignored.
+- `README.md` is the players' front page for both games (patches in GitHub Releases, `GraftedEmerald.bps` and `GraftedRogue.bps`); upstream's README is `docs/EXPANSION_README.md`. Each patch's notes are `tools/patch/<Game>_README.md`.
 - Releases: Jacob gets ROM builds (`make release`, zipped) until publishing. The public release is a .bps patch: `FLIPS=/path/to/flips tools/patch/make_patch.sh BASE.gba` builds the release ROM, makes the patch against a clean Emerald (USA, Europe), MD5 605b89b67018abcea91e693a4dd25be3, and checks it reproduces the ROM. Never commit or share the base ROM. Decomp hacks rebuild nearly everything, so the patch is about ROM-sized (~17 MB).
 
 ## Grafting
