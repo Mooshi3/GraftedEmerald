@@ -14,6 +14,7 @@ Goal right now: a clean front-to-back playthrough that's publishable.
 
 ## Repo
 
+- Branches: `main` is Grafted Emerald, `rogue` is Grafted Rogue (it merges `main` to pick up fixes). Work on those directly.
 - `origin` = Jacob's GitHub repo; `upstream` = rh-hideout/pokeemerald-expansion. Grafted branched from upstream in May 2026 (`21c2420299`) and was merged up to expansion 1.17.1 (+ one post-release fix) on 2026-09-29.
 - Upstream API notes that matter for graft code: use `gParties[B_TRAINER_PLAYER]` / `GetBattlerMon(battler)` (the old `gPlayerParty`/`gEnemyParty` are deprecated); battlers are built by `PokemonToBattleMon` (applies grafted types/ability); opponent parties are built in `CreateNPCTrainerParty` (`src/battle_setup.c`, where `ApplyTrainerGrafts` is hooked); eggs hatch in place (no rebuild), so grafts survive hatching; relearner categories are the `sRelearnTypes` table in `src/move_relearner.c`.
 - Toolchain: `arm-none-eabi-gcc` + `make`. Build output is gitignored.
